@@ -103,6 +103,8 @@ const S = {
   today: { plan: [], actual: [], rec: null },
   days: {},                         // ymd -> record
   pending: null,
+  habView: LS.get("habView", "week"),
+  habWeek: null,                    // ymd thứ Hai đang xem (null = tuần này)
 };
 if (new URLSearchParams(location.search).has("demo")) S.settings.demo = true;
 const saveSettings = () => LS.set("settings", S.settings);
@@ -425,6 +427,11 @@ async function loadHistory() {
   const from = addDays(mondayOf(t0), -7 * 16);
   Object.assign(S.days, await api().listDays(from, t0));
 }
+// tuần/tháng cũ hơn phần lịch sử đã tải thì tải thêm
+async function ensureDays(from, to) {
+  if (S.days[ymd(from)] || from < addDays(trackStart(), -7)) return;
+  try { Object.assign(S.days, await api().listDays(from, to)); } catch (er) { handleErr(er); }
+}
 async function saveRec(rec) {
   const saved = await api().saveDay(rec);
   S.days[saved.date] = saved;
@@ -593,39 +600,56 @@ function renderOnboarding(v) {
 // ============================================================ render: habits
 const HSHORT = { eat: "Ăn 3 bữa", wake: "Dậy 5:30", korean: "Tiếng Hàn", walk: "Đi bộ", yoga: "Yoga", gym: "Gym", phone: "Cất máy", journal: "Nhật ký" };
 const editable = d => d <= startOfDay(new Date()) && d >= trackStart();
+const dm = d => `${d.getDate()}/${d.getMonth() + 1}`;
+function habitDay(hb, d, cls = "") {
+  const st = cellStatus(hb, d), label = `${esc(hb.name)} ${DOW_SHORT[d.getDay()]} ${dm(d)}`;
+  return editable(d)
+    ? `<button class="mcal__d ${cls}" data-st="${st}" data-day="${ymd(d)}" aria-label="${label}">${d.getDate()}</button>`
+    : `<span class="mcal__d ${cls}" data-st="${st}">${d.getDate()}</span>`;
+}
 function renderHabits() {
   const v = $("#view-habits");
   if (!ready()) { v.innerHTML = `<div class="empty"><h2>Chưa có dữ liệu</h2><p>Kết nối Google ở tab Hôm nay trước nhé.</p></div>`; return; }
-  const t = startOfDay(new Date()), mon = mondayOf(t);
-  let html = `<h2 class="h2" style="margin-top:8px">Tuần này <small>${mon.getDate()}/${mon.getMonth() + 1} – ${addDays(mon, 6).getDate()}/${addDays(mon, 6).getMonth() + 1}</small></h2>
-    <div class="week fade-in"><table><thead><tr><th></th>`;
-  for (let i = 0; i < 7; i++) {
-    const d = addDays(mon, i);
-    html += `<th class="${+d === +t ? "is-today" : ""}">${editable(d) ? `<button class="wday" data-day="${ymd(d)}" aria-label="Sửa thói quen ${DOW[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}">${DOW_SHORT[d.getDay()]}</button>` : DOW_SHORT[d.getDay()]}</th>`;
-  }
-  html += `</tr></thead><tbody>`;
-  for (const hb of HABITS) {
-    const wc = weekCount(hb, mon);
-    html += `<tr><td class="name"><span><i class="ph ${hb.icon}"></i>${esc(HSHORT[hb.id] || hb.name)}</span><small class="num">${wc.label}${wc.star ? " ★" : ""}</small></td>`;
-    for (let i = 0; i < 7; i++) {
-      const d = addDays(mon, i), st = cellStatus(hb, d);
-      html += editable(d)
-        ? `<td><button class="cell" data-st="${st}" data-day="${ymd(d)}" aria-label="${esc(hb.name)} ${DOW_SHORT[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}"></button></td>`
-        : `<td><div class="cell" data-st="${st}"></div></td>`;
-    }
-    html += `</tr>`;
-  }
-  html += `</tbody></table>
-    <div class="legend"><span><i class="cell" data-st="full"></i>Đạt</span><span><i class="cell" data-st="min"></i>Tối thiểu</span><span><i class="cell" data-st="rest"></i>Unwell</span><span><i class="cell" data-st="miss"></i>Bỏ</span><span class="legend__tap"><i class="ph ph-hand-tap"></i>Chạm ô để sửa</span></div></div>`;
+  const t = startOfDay(new Date()), mode = S.habView === "month" ? "month" : "week";
+  let html = `<div class="vtoggle" role="tablist" aria-label="Chế độ xem">
+      <button role="tab" data-hview="week" aria-selected="${mode === "week"}">Tuần</button>
+      <button role="tab" data-hview="month" aria-selected="${mode === "month"}">Tháng</button>
+    </div>`;
+  const nav = (key, prev, next, title, sub) => `<div class="hnav">
+      <button class="icon-btn" data-${key}="-1" aria-label="Trước" ${prev ? "" : "disabled"}><i class="ph ph-caret-left"></i></button>
+      <div class="hnav__t"><b>${title}</b><small class="num">${sub}</small></div>
+      <button class="icon-btn" data-${key}="1" aria-label="Sau" ${next ? "" : "disabled"}><i class="ph ph-caret-right"></i></button>
+    </div>`;
+  const legend = `<div class="legend"><span><i class="sdot" data-st="full"></i>Đạt</span><span><i class="sdot" data-st="min"></i>Tối thiểu</span><span><i class="sdot" data-st="rest"></i>Unwell</span><span><i class="sdot" data-st="miss"></i>Bỏ</span><span class="legend__tap"><i class="ph ph-hand-tap"></i>Chạm ô để sửa</span></div>`;
 
-  // Lịch theo tháng, có nút ‹ › để đổi tháng. Mỗi hàng 1 tuần, mỗi ô ghi số ngày.
+  if (mode === "week") {
+    const mon = S.habWeek ? parseYmd(S.habWeek) : mondayOf(t), sun = addDays(mon, 6), cur = mondayOf(t);
+    const ago = Math.round((cur - mon) / (7 * 864e5));
+    html += nav("week", mon > mondayOf(trackStart()), mon < cur, ago === 0 ? "Tuần này" : ago === 1 ? "Tuần trước" : `${ago} tuần trước`, `${dm(mon)} – ${dm(sun)}`);
+    html += `<div class="week fade-in"><div class="wgrid wgrid--head"><span></span>`;
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(mon, i);
+      html += editable(d)
+        ? `<button class="wday ${+d === +t ? "is-today" : ""}" data-day="${ymd(d)}" aria-label="Sửa thói quen ${DOW[d.getDay()]} ${dm(d)}">${DOW_SHORT[d.getDay()]}</button>`
+        : `<span class="wday ${+d === +t ? "is-today" : ""}">${DOW_SHORT[d.getDay()]}</span>`;
+    }
+    html += `</div>`;
+    for (const hb of HABITS) {
+      const wc = weekCount(hb, mon);
+      html += `<div class="wgrid"><div class="wname"><i class="ph ${hb.icon}"></i><span>${esc(HSHORT[hb.id] || hb.name)}</span><small class="num">${wc.label}${wc.star ? " ★" : ""}</small></div>`;
+      for (let i = 0; i < 7; i++) html += habitDay(hb, addDays(mon, i));
+      html += `</div>`;
+    }
+    html += `${legend}</div>`;
+    v.innerHTML = html; return;
+  }
+
+  // Theo tháng: mỗi thói quen 1 thẻ, hàng = tuần, ô ghi số ngày.
   const cm = S.calMonth || (S.calMonth = { y: t.getFullYear(), m: t.getMonth() });
   const mStart = new Date(cm.y, cm.m, 1), mEnd = new Date(cm.y, cm.m + 1, 0);
-  const canPrev = mStart > trackStart(), canNext = mEnd < t;
   const first = mondayOf(mStart), W = Math.ceil((addDays(mEnd, 1) - first) / (7 * 864e5));
-  html += `<h2 class="h2 monthnav"><button class="icon-btn" data-month="-1" aria-label="Tháng trước" ${canPrev ? "" : "disabled"}><i class="ph ph-caret-left"></i></button>
-    <span>Tháng ${cm.m + 1}<small>/ ${cm.y}</small></span>
-    <button class="icon-btn" data-month="1" aria-label="Tháng sau" ${canNext ? "" : "disabled"}><i class="ph ph-caret-right"></i></button></h2>`;
+  html += nav("month", mStart > trackStart(), mEnd < t, `Tháng ${cm.m + 1}`, cm.y);
+  html += legend;
   for (const hb of HABITS) {
     const s = streak(hb);
     const n = { full: 0, min: 0, miss: 0 };
@@ -637,10 +661,7 @@ function renderHabits() {
         if (d.getMonth() !== cm.m) { rows += `<span class="mcal__d mcal__d--out"></span>`; continue; }
         const st = cellStatus(hb, d);
         if (st in n) n[st]++;
-        const label = `${esc(hb.name)} ${d.getDate()}/${d.getMonth() + 1}`;
-        rows += editable(d)
-          ? `<button class="mcal__d" data-st="${st}" data-day="${ymd(d)}" aria-label="${label}">${d.getDate()}</button>`
-          : `<span class="mcal__d" data-st="${st}">${d.getDate()}</span>`;
+        rows += habitDay(hb, d);
       }
       rows += `</div>`;
     }
@@ -750,7 +771,7 @@ function renderSettings() {
       <label class="field"><span>Gemini API key</span><input id="sKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(s.geminiKey)}" placeholder="AIza…"><span class="keystate" id="sKeyState" role="status"></span><small>Đồng bộ theo tài khoản Google. Lấy miễn phí ở <a class="link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a></small></label>
       <label class="field"><span>Model</span><select id="sModel">${modelOptions()}</select><small>${MODEL_HINT}</small></label>
       <button class="btn btn--block" id="sTest" type="button"><i class="ph ph-plugs-connected"></i> Kiểm tra kết nối</button>
-      <label class="field"><span>Google OAuth Client ID</span><input id="sClient" value="${esc(s.clientId)}"><small>Cùng client với app Korean. Cần thêm địa chỉ app này vào “Authorized JavaScript origins”.</small></label>
+      <label class="field"><span>Google OAuth Client ID</span><input id="sClient" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(s.clientId)}"><small>Cùng client với app Korean. Cần thêm địa chỉ app này vào “Authorized JavaScript origins”.</small></label>
       <button class="btn btn--primary btn--block" id="sSave">Lưu cài đặt</button>
     </div>`);
 }
@@ -1179,7 +1200,7 @@ document.addEventListener("click", async e => {
     try { await fn(); toast("Đã hoàn tác"); } catch (er) { handleErr(er); }
     return render();
   }
-  if (el.classList.contains("tab")) return setView(el.dataset.view);
+  if (el.classList.contains("tab") && el.dataset.view) return setView(el.dataset.view);
   const id = el.id;
   if (id === "btnSettings") return renderSettings();
   if (id === "btnStart") return startFlow();
@@ -1202,12 +1223,17 @@ document.addEventListener("click", async e => {
   if (id === "eSave") { el.disabled = true; try { await saveActEdit(); } catch (er) { el.disabled = false; handleErr(er); } return renderToday(); }
   if (id === "eDel") { el.disabled = true; try { await deleteAct(); } catch (er) { el.disabled = false; handleErr(er); } return renderToday(); }
   if (el.dataset.aid) { const a = S.today.actual.find(x => x.id === el.dataset.aid); if (a) renderActEdit(a); return; }
+  if (el.dataset.hview) { S.habView = el.dataset.hview; LS.set("habView", S.habView); return renderHabits(); }
   if (el.dataset.month) {
     const cm = S.calMonth, d = new Date(cm.y, cm.m + +el.dataset.month, 1);
     S.calMonth = { y: d.getFullYear(), m: d.getMonth() };
-    // tháng cũ hơn phần lịch sử đã tải thì tải thêm
-    const from = mondayOf(d), to = addDays(new Date(d.getFullYear(), d.getMonth() + 1, 0), 7);
-    if (!S.days[ymd(from)] && from >= addDays(trackStart(), -7)) { try { Object.assign(S.days, await api().listDays(from, to)); } catch (er) { handleErr(er); } }
+    await ensureDays(mondayOf(d), addDays(new Date(d.getFullYear(), d.getMonth() + 1, 0), 7));
+    return renderHabits();
+  }
+  if (el.dataset.week) {
+    const mon = addDays(S.habWeek ? parseYmd(S.habWeek) : mondayOf(new Date()), 7 * +el.dataset.week);
+    S.habWeek = ymd(mon);
+    await ensureDays(mon, addDays(mon, 7));
     return renderHabits();
   }
   if (el.dataset.day) return renderDaySheet(el.dataset.day);
