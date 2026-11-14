@@ -121,15 +121,23 @@ sequenceDiagram
     App->>App: render()
     App->>Cal: loadHistory(): listDays 16 tuần, chạy nền rồi render lại tab Thói quen
   else
-    App->>App: render() màn hình onboarding / banner đăng nhập lại
+    App->>App: render() → renderGate(gateStep())
   end
 ```
 `refresh()` chạy lại mỗi khi tab được mở lại (`visibilitychange`). Tab Hôm nay tự render lại mỗi phút để cập nhật "Bây giờ".
 
-### 3.2 Lần đầu dùng (`startFlow`)
-1. `signIn(true)`: Google Identity Services cấp access token (không có refresh token; hết hạn thì banner "Đăng nhập lại").
-2. `findConfig()`: nếu đã có bộ lịch trên Drive (máy khác đã dựng) thì nối vào, không tạo trùng.
-3. Nếu chưa có: cần Gemini key → `Google.setup()` tạo thư mục, 2 lịch, các khối `TEMPLATE` (lặp từ lần gần nhất đúng thứ), ghi file cấu hình.
+### 3.2 Cổng vào (`gateStep` / `renderGate`)
+`gateStep()` trả bước đang chờ, `null` = vào app. Thứ tự kiểm tra:
+`demo` → null · `!signedIn()` → `"login"` · không key và không `settings.keyLater` → `"key"` · không `S.cfg` → `"cal"`.
+`render()` gọi `gateStep()` trước tiên: có bước thì `renderGate(step)` vẽ vào `#gate` và thêm class `is-gated` cho `body`
+(CSS ẩn `.top`, `main`, `.tabs`, `.fab`, dock). `refresh()` không tải dữ liệu khi cổng đang che.
+1. `gateLogin()`: `signIn(!S.cfg)` (lần đầu xin quyền, lần sau chỉ chọn tài khoản). Token sống ~1 tiếng, không refresh token.
+   Chưa có `cfg` thì `findConfig()` ngay; thấy thì `adoptCfg()` (lấy luôn key nếu có trên Drive).
+2. `gateKey()`: `testKey()` (liệt kê model bằng key) thành công mới lưu key + model, `syncKey()`. "Để sau" đặt `settings.keyLater = true`.
+3. `gateSetup()`: `Google.setup()` tạo thư mục, 2 lịch, các khối `TEMPLATE`, ghi file cấu hình (kèm key nếu có); tiến độ ghi vào `#gStep`.
+   "Xem lịch mẫu" bật `settings.demo`.
+Lỗi ở mỗi bước: trả nút về như cũ (`busy()` → hàm restore) và ghi vào `#gateErr`, không đổi bước.
+Mỗi phút, nếu token vừa hết và không có sheet nào mở, `render()` để hiện bước 1.
 
 ### 3.3 Nhập câu → Gemini → lưu
 ```mermaid
@@ -205,10 +213,11 @@ Máy khác mở app → `findConfig()` → `adoptCfg()` lấy key nếu máy đ�
   Lưu từ `#jform`: hôm nay đã có trang thì đọc trang đó, `mergeJournal()` nối từng mục, rồi ghi. Lưu từ `#jpast` (Sửa trong sheet): ghi đè.
   Chạm trang → `journalSheet()` hiện chữ thuần; `#jEditPage` thay thân sheet bằng form `#jpast`.
   Giờ lưu lấy từ `modifiedTime` của Drive (`mod`); demo giữ trong `db.jmod`.
+- Chưa vào được app: cổng `#gate` (mục 3.2) che toàn bộ, các view không tự vẽ màn bắt đầu nữa.
 - Ngày hiển thị: `dmy(d)` → `DD/MM/YYYY`, `fmtDate(d)` → "Thứ Bảy, 14/11/2026". Dữ liệu và tên file vẫn `ymd()` (`YYYY-MM-DD`).
 
 ## 5. Lỗi và hoàn tác
-- `g()` là cửa duy nhất gọi Google: gắn token, 401 → xoá token và báo `e.auth` để hiện banner "Đăng nhập lại", lỗi khác → `Error("Google lỗi <status>: <message>")`.
+- `g()` là cửa duy nhất gọi Google: gắn token, 401 → xoá token và báo `e.auth`; `handleErr` gọi `render()` để tab đang mở chuyển sang thẻ "Đăng nhập lại" (sheet đang mở giữ nguyên), lỗi khác → `Error("Google lỗi <status>: <message>")`.
 - `handleErr(e)` hiện toast lỗi. Các thao tác ghi đều có toast "Hoàn tác" chạy hàm ngược (xoá, ghi lại bản cũ).
   `toast(msg, ms, fn, { label, icon, done })` dùng chung nút đó cho việc khác, ví dụ "Mở Cài đặt".
 

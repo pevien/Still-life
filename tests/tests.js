@@ -512,6 +512,47 @@
     });
   });
 
+  describe("Cổng vào: Đăng nhập → Gemini → Lịch", () => {
+    const CFG = { planCal: "x", actualCal: "y", folderId: "f", journalFolderId: "j", start: todayStr() };
+    const TOK = () => ({ t: "test", exp: Date.now() + 3600e3 });
+    // Đặt trạng thái giả (không gọi Google), chạy fn, rồi trả lại như cũ
+    const withState = async (st, fn) => {
+      const keep = { settings: Object.assign({}, S.settings), cfg: S.cfg, tok: S.tok, looked: S.cfgLooked };
+      try {
+        Object.assign(S.settings, { demo: false, geminiKey: "", keyLater: false }, st.settings || {});
+        S.cfg = st.cfg || null; S.tok = st.tok || null; S.cfgLooked = true;
+        render(); await frame(); await fn();
+      } finally {
+        S.settings = keep.settings;
+        saveSettings(); S.cfg = keep.cfg; S.tok = keep.tok; S.cfgLooked = keep.looked; await reset();
+      }
+    };
+    const shown = sel => { const el = $(sel); return !!el && getComputedStyle(el).display !== "none"; };
+    const onlyGate = () => { ok(shown("#gate"), "cổng hiện"); for (const sel of [".tabs", ".fab", ".top", "main"]) ok(!shown(sel), `${sel} phải ẩn`); };
+
+    test("chưa đăng nhập: chỉ màn đăng nhập, không tab, không nút bút", () => withState({}, async () => {
+      eq(gateStep(), "login"); onlyGate(); ok($("#gLogin"), "nút đăng nhập");
+    }));
+    test("hết phiên (đã có lịch): vẫn bước 1, chữ nói là đăng nhập lại", () => withState({ cfg: CFG, settings: { geminiKey: "k" } }, async () => {
+      eq(gateStep(), "login"); onlyGate(); ok($("#gate").textContent.includes("đăng nhập lại") || $("#gate").textContent.includes("Đăng nhập lại"), $("#gate").textContent);
+    }));
+    test("đăng nhập rồi, chưa có key: bước 2; key trống thì báo lỗi tại chỗ", () => withState({ tok: TOK() }, async () => {
+      eq(gateStep(), "key"); onlyGate(); ok($("#gKey") && $("#sModel") && $("#gKeyLater"), "có ô key, model, Để sau");
+      $("#gKeySave").click(); await frame();
+      ok(!$("#gateErr").hidden && $("#gateErr").textContent.includes("key"), "báo lỗi");
+    }));
+    test("bấm Để sau: sang bước 3 với 2 nút Tạo lịch / Xem lịch mẫu", () => withState({ tok: TOK() }, async () => {
+      $("#gKeyLater").click(); await wait(30);
+      eq(gateStep(), "cal"); onlyGate(); ok($("#gSetup") && $("#gDemo"), "2 nút");
+    }));
+    test("có key + có lịch: vào app, không cổng", () => withState({ tok: TOK(), cfg: CFG, settings: { geminiKey: "k" } }, async () => {
+      eq(gateStep(), null); ok(!shown("#gate") && shown(".tabs"), "app bình thường");
+    }));
+    test("demo: không cần đăng nhập", () => withState({ settings: { demo: true } }, async () => {
+      eq(gateStep(), null);
+    }));
+  });
+
   describe("Trang Nhật ký: form chỉ để viết, đọc trong sheet", () => {
     const openJ = async () => { S.jdirty = false; setView("journal"); for (let i = 0; i < 40 && !$("#jform"); i++) await wait(20); };
     const fill = vals => { for (const [k, v] of Object.entries(vals)) $(`#jform [name="${k}"]`).value = v; };

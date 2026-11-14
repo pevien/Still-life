@@ -490,7 +490,7 @@ function currentBlocks() {
 
 function renderToday() {
   const v = $("#view-today");
-  if (!ready()) return renderOnboarding(v);
+  if (!ready()) return;   // cổng vào đang che app
   const rec = S.today.rec || blankRec(todayStr()), now = new Date();
   const { cur, next, done, skipped } = currentBlocks();
   let html = "";
@@ -641,22 +641,69 @@ function timelineHTML() {
   </div>`;
 }
 
-function renderOnboarding(v) {
-  const s = S.settings;
-  const hasKey = !!s.geminiKey, isIn = signedIn(), hasCfg = !!S.cfg;
-  v.innerHTML = `<div class="empty fade-in">
-    <h2>Chào bạn. Mình dựng hệ thống cho ngày của bạn nhé.</h2>
-    <p>Lịch nằm trên Google Calendar, nhật ký nằm trên Google Drive, còn app này là chỗ ghi nhanh và nhìn lại.</p>
-    <ol class="steps">
-      <li class="${hasKey ? "ok" : ""}"><i class="ph${hasKey ? "-fill ph-check-circle" : " ph-circle"}"></i><span>Nhập Gemini API key<small>Dùng lại key của app Korean được</small></span></li>
-      <li class="${isIn ? "ok" : ""}"><i class="ph${isIn ? "-fill ph-check-circle" : " ph-circle"}"></i><span>Đăng nhập Google<small>Chỉ cấp quyền cho các lịch và file app tự tạo</small></span></li>
-      <li class="${hasCfg ? "ok" : ""}"><i class="ph${hasCfg ? "-fill ph-check-circle" : " ph-circle"}"></i><span>Tạo 2 lịch Kế hoạch, Thực tế và thư mục Drive<small>Làm một lần, tự nhận ra nếu đã có</small></span></li>
-    </ol>
-    <div class="row">
-      <button class="btn btn--primary" id="btnStart">${!hasKey ? "Bắt đầu" : !isIn ? "Đăng nhập Google" : "Tạo lịch"}</button>
-      <button class="btn btn--ghost" id="btnDemo">Xem thử với dữ liệu mẫu</button>
-    </div>
-  </div>`;
+// ============================================================ cổng vào: Đăng nhập → Gemini → Lịch
+// Mỗi lúc chỉ một việc, full màn hình: ẩn header, tab, nút bút. Demo bỏ qua cổng (không cần Google).
+function gateStep() {
+  if (S.settings.demo) return null;
+  if (!signedIn()) return "login";
+  if (!S.settings.geminiKey && !S.settings.keyLater) return "key";
+  if (!S.cfg) return "cal";
+  return null;
+}
+const gateErr = msg => `<p class="gate__err" id="gateErr" role="alert"${msg ? "" : " hidden"}>${msg ? `<i class="ph ph-warning-circle"></i> ${esc(msg)}` : ""}</p>`;
+function showGateErr(msg) { const el = $("#gateErr"); if (!el) return toast(msg); el.hidden = false; el.innerHTML = `<i class="ph ph-warning-circle"></i> ${esc(msg)}`; }
+function renderGate(step) {
+  const g = $("#gate");
+  const html = {
+    login: `<h1 class="gate__brand">Still life</h1>
+      <p class="gate__lead">${S.cfg ? "Phiên Google đã hết. Đăng nhập lại để tiếp tục." : "Đăng nhập Google để bắt đầu."}</p>
+      <button class="btn btn--primary btn--block" id="gLogin"><i class="ph ph-google-logo"></i> Đăng nhập Google</button>`,
+    key: `<h1 class="gate__title">Kết nối Gemini</h1>
+      <p class="gate__lead">Để gõ một câu là app tự hiểu bạn vừa làm gì.</p>
+      <label class="field"><span>Gemini API key</span><input id="gKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="AIza…">
+        <small>Lấy miễn phí ở <a class="link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a></small></label>
+      <label class="field"><span>Model</span><select id="sModel">${modelOptions()}</select></label>
+      <button class="btn btn--primary btn--block" id="gKeySave">Kết nối</button>`,
+    cal: `<h1 class="gate__title">Lịch của bạn</h1>
+      <p class="gate__lead">Chưa có lịch Still life trên Google của bạn.</p>
+      <button class="btn btn--primary btn--block" id="gSetup">Bắt đầu tạo lịch</button>
+      <button class="btn btn--block" id="gDemo" style="margin-top:8px">Xem lịch mẫu</button>
+      <p class="gate__step" id="gStep" hidden></p>`,
+  }[step];
+  g.innerHTML = `<div class="gate__card fade-in" data-step="${step}">${html}${gateErr("")}
+    ${step === "key" ? `<button class="gate__later" id="gKeyLater" type="button">Để sau</button>` : ""}</div>`;
+  g.hidden = false; document.body.classList.add("is-gated");
+}
+function hideGate() { const g = $("#gate"); g.hidden = true; g.innerHTML = ""; document.body.classList.remove("is-gated"); }
+// Bước 1: đăng nhập. Máy chưa có cấu hình thì tìm ngay trên Drive (lấy luôn key nếu đã lưu ở máy khác).
+async function gateLogin(btn) {
+  const done = busy(btn, "Đang đăng nhập");
+  try {
+    await signIn(!S.cfg);
+    if (!S.cfg) { const found = await Google.findConfig(); if (found) adoptCfg(found); }
+  } catch (e) { done(); return showGateErr(e.message || "Đăng nhập lỗi"); }
+  return refresh();
+}
+// Bước 2: thử key với Gemini rồi mới lưu. Lỗi thì giữ nguyên màn để sửa.
+async function gateKey(btn) {
+  const key = cleanKey($("#gKey").value);
+  if (!key) return showGateErr("Dán key vào trước nhé");
+  const done = busy(btn, "Đang kết nối Gemini");
+  try { await testKey(key); } catch (e) { done(); return showGateErr(e.message); }
+  S.settings.geminiKey = key; S.settings.model = $("#sModel").value; saveSettings(); syncKey(key);
+  toast("Đã kết nối Gemini");
+  return refresh();
+}
+// Bước 3: tạo 2 lịch + thư mục Drive. Hiện từng việc đang làm dưới nút.
+async function gateSetup(btn) {
+  const done = busy(btn, "Đang tạo lịch"), st = $("#gStep");
+  $("#gDemo").disabled = true;
+  try {
+    S.cfg = await Google.setup(m => { if (st) { st.hidden = false; st.textContent = m; } });
+    LS.set("cfg", S.cfg);
+  } catch (e) { done(); $("#gDemo").disabled = false; if (st) st.hidden = true; return showGateErr(e.message); }
+  toast("Xong! Lịch đã có trên Google Calendar");
+  return refresh();
 }
 
 // ============================================================ render: habits
@@ -1323,12 +1370,7 @@ function handleErr(e) {
   console.error(e);
   if (e.needKey) return toast(e.message, 6000, () => renderSettings(), { label: "Mở Cài đặt", icon: "ph-gear-six", done: null });
   toast(e.message || "Có lỗi xảy ra", 4200);
-  if (e.auth) showBanner();
-}
-function showBanner() {
-  const b = $("#banner");
-  if (!S.settings.demo && S.cfg && !signedIn()) b.innerHTML = `<div class="banner"><span>Phiên Google đã hết hạn.</span><button class="btn" id="btnReauth">Đăng nhập lại</button></div>`;
-  else b.innerHTML = "";
+  if (e.auth) render();   // hết phiên giữa chừng: tab đang mở chuyển sang thẻ đăng nhập lại (sheet đang mở giữ nguyên chữ)
 }
 
 // Nhận cấu hình tìm thấy trên Drive; lấy luôn Gemini key nếu máy này chưa có
@@ -1336,24 +1378,6 @@ function adoptCfg(found) {
   S.cfg = found; LS.set("cfg", S.cfg);
   if (found.geminiKey && !S.settings.geminiKey) { S.settings.geminiKey = found.geminiKey; saveSettings(); }
 }
-async function startFlow() {
-  const s = S.settings;
-  try {
-    if (!signedIn()) { await signIn(true); toast("Đã đăng nhập Google"); }
-    if (!S.cfg) {
-      const found = await Google.findConfig();
-      if (found) { adoptCfg(found); toast("Đã tìm thấy lịch Still life của bạn"); }
-      else if (!s.geminiKey) return renderSettings();
-      else {
-        openSheet("Đang dựng hệ thống", `<p class="muted" id="setupStep">Bắt đầu…</p>`);
-        S.cfg = await Google.setup(m => { const el = $("#setupStep"); if (el) el.textContent = m; });
-        LS.set("cfg", S.cfg); closeSheet(); toast("Xong! Lịch đã có trên Google Calendar");
-      }
-    }
-    await refresh();
-  } catch (e) { closeSheet(); handleErr(e); renderToday(); }
-}
-
 // ============================================================ render orchestration
 function header() {
   const now = new Date(), h = now.getHours();
@@ -1361,18 +1385,22 @@ function header() {
   $("#dateTitle").textContent = fmtDate(now);
 }
 function render() {
-  header(); showBanner();
+  const step = gateStep();
+  if (step) return renderGate(step);
+  hideGate(); header();
   if (S.view === "today") renderToday();
   if (S.view === "habits") renderHabits();
   if (S.view === "journal") renderJournal();
 }
 async function refresh() {
   // Đã đăng nhập nhưng máy này chưa có cấu hình (vd máy thứ hai): tự tìm bộ lịch có sẵn trên Drive
-  if (!S.settings.demo && !S.cfg && signedIn()) {
+  // (chỉ tìm một lần mỗi phiên mở app, để màn "Lịch của bạn" không gọi Drive liên tục)
+  if (!S.settings.demo && !S.cfg && signedIn() && !S.cfgLooked) {
+    S.cfgLooked = true;
     try { const found = await Google.findConfig(); if (found) { adoptCfg(found); toast("Đã nối vào lịch Still life của bạn"); } }
     catch (e) { handleErr(e); }
   }
-  if (!ready()) return render();
+  if (!ready() || gateStep()) return render();   // cổng đang che app thì chưa tải dữ liệu
   try { await loadToday(); render(); loadHistory().then(() => { if (S.view === "habits") renderHabits(); }).catch(handleErr); }
   catch (e) { handleErr(e); render(); }
 }
@@ -1424,10 +1452,13 @@ document.addEventListener("click", async e => {
   if (el.classList.contains("tab") && el.dataset.view) return setView(el.dataset.view);
   const id = el.id;
   if (id === "btnSettings") return renderSettings();
-  if (id === "btnStart") return startFlow();
-  if (id === "btnDemo") { S.settings.demo = true; saveSettings(); return refresh(); }
-  if (id === "btnReauth" || id === "sIn") { try { await signIn(false); closeSheet(); await refresh(); } catch (er) { handleErr(er); } return; }
-  if (id === "sOut") { signOut(); closeSheet(); return render(); }
+  if (id === "gLogin") return gateLogin(el);
+  if (id === "gKeySave") return gateKey(el);
+  if (id === "gKeyLater") { S.settings.keyLater = true; saveSettings(); return refresh(); }
+  if (id === "gSetup") return gateSetup(el);
+  if (id === "gDemo") { S.settings.demo = true; saveSettings(); return refresh(); }
+  if (id === "sIn") { try { await signIn(false); closeSheet(); await refresh(); } catch (er) { handleErr(er); } return; }
+  if (id === "sOut") { signOut(); closeSheet(); return render(); }   // → cổng bước 1
   if (id === "sDemoOff") { S.settings.demo = false; saveSettings(); closeSheet(); return refresh(); }
   if (id === "sDemoReset") { Demo.reset(); location.reload(); return; }
   if (id === "sTest") return testConnection();
@@ -1578,7 +1609,7 @@ document.addEventListener("keydown", e => { if (e.key !== "Escape") return; if (
 })();
 
 // Cập nhật thanh "Bây giờ" mỗi phút
-setInterval(() => { if (S.view === "today" && $("#sheet").hidden && document.activeElement !== $("#inputText")) renderToday(); }, 60000);
+setInterval(() => { if (gateStep() && $("#gate").hidden && $("#sheet").hidden) return render(); if (S.view === "today" && $("#sheet").hidden && document.activeElement !== $("#inputText")) renderToday(); }, 60000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
 
 if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js").catch(() => {});

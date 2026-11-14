@@ -82,6 +82,20 @@ Thanh dưới có 4 ô: Hôm nay · Thói quen · Nhật ký · Cài đặt (Cà
    - Chạm một trang trong danh sách: sheet hiện **chữ thuần** (không phải form), có giờ lưu "Đã lưu vào Google Drive lúc HH:MM".
      Nút "Sửa" nhỏ ở cuối sheet mới mở form điền sẵn; lưu từ đó thì ghi đè đúng trang ấy.
 
+## Cổng vào: Đăng nhập → Gemini → Lịch
+Chưa vào được app thì chỉ hiện **một màn, một việc**, full màn hình: không đầu trang, không thanh tab, không nút bút.
+Lỗi hiện ngay dưới nút, bấm lại được; không hiện gì khác.
+
+1. **Đăng nhập** (chưa đăng nhập hoặc hết phiên ~1 tiếng): "Still life", một dòng, nút Đăng nhập Google.
+   Đăng nhập xong app tự tìm lịch và key trên Drive (máy khác đã dựng thì nối vào, có key thì bỏ qua bước 2).
+2. **Kết nối Gemini** (chưa có key): ô key, chọn model (chọn sẵn), nút Kết nối (thử key với Gemini rồi mới lưu), link nhỏ "Để sau".
+   Bấm "Để sau" thì không hỏi lại nữa; nhập key sau trong Cài đặt.
+3. **Lịch của bạn** (chưa có lịch trên Drive): nút Bắt đầu tạo lịch (hiện từng việc đang tạo) và Xem lịch mẫu (chế độ demo).
+   Có lịch rồi thì vào app như bình thường.
+
+- Demo (kể cả `?demo`) không qua cổng. Thoát demo → về cổng (bước 3 nếu chưa có lịch).
+- Đăng xuất → bước 1. Hết phiên khi đang mở sheet: sheet giữ nguyên chữ, đóng sheet thì thấy bước 1.
+
 ## Định dạng ngày
 Mọi ngày hiện ra đều theo **DD/MM/YYYY** (vd `14/11/2026`), có thể kèm thứ: "Thứ Bảy, 14/11/2026", "T6 13/11/2026".
 Tên file và dữ liệu vẫn dùng `YYYY-MM-DD`. Ô chọn ngày (`input type=date`) hiện theo cài đặt ngôn ngữ của máy.

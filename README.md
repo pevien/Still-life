@@ -24,10 +24,11 @@ Dữ liệu mẫu chỉ nằm trong trình duyệt. Thoát xem thử trong Cài 
    - Muốn chạy thử trên máy thì thêm `http://localhost:8123`.
 
 ### 2. Trong app
-1. Mở app → **Bắt đầu** → dán Gemini API key (dùng chung key của app Korean được). Key được lưu vào file cấu hình trên Drive, máy khác đăng nhập cùng tài khoản sẽ tự có.
-2. **Đăng nhập Google**.
-3. **Tạo lịch**: app tạo 2 lịch "Still life · Kế hoạch", "Still life · Thực tế" và thư mục Drive "Still life".
-   Nếu đăng nhập trên máy khác, app tự tìm lại cấu hình, không tạo trùng.
+1. **Đăng nhập Google**.
+2. **Kết nối Gemini**: dán key (dùng chung key của app Korean được), chọn model, bấm Kết nối. Chưa có key thì bấm "Để sau".
+   Key được lưu vào file cấu hình trên Drive, máy khác đăng nhập cùng tài khoản sẽ tự có và bỏ qua bước này.
+3. **Bắt đầu tạo lịch**: app tạo 2 lịch "Still life · Kế hoạch", "Still life · Thực tế" và thư mục Drive "Still life".
+   Nếu đăng nhập trên máy khác, app tự tìm lại cấu hình, không tạo trùng. Muốn xem trước thì bấm "Xem lịch mẫu".
 4. Trên Android: Chrome → menu ⋮ → **Thêm vào màn hình chính**.
 
 ### 3. Thông báo

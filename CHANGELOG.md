@@ -5,6 +5,55 @@ Mới nhất ở trên. Số `vNN` là phiên bản cache trong `sw.js`.
 
 ---
 
+## 2026-11-14 · Cổng vào 3 bước: Đăng nhập → Gemini → Lịch · v34
+**Đổi gì**
+1. Chưa vào được app thì chỉ hiện một màn full màn hình, không đầu trang, không thanh tab, không nút bút:
+   - **Bước 1 · Đăng nhập**: "Still life", một dòng, nút Đăng nhập Google. Hết phiên cũng về đây (chữ đổi thành "Phiên Google đã hết…").
+   - **Bước 2 · Kết nối Gemini**: ô key, chọn model, nút Kết nối, link nhỏ "Để sau".
+   - **Bước 3 · Lịch của bạn**: "Bắt đầu tạo lịch" và "Xem lịch mẫu". Đã có lịch trên Drive thì bỏ qua.
+2. Lỗi ở bước nào hiện ngay dưới nút của bước đó, bấm lại được.
+3. Bỏ màn "Chào bạn" + 3 bước, thẻ "Đăng nhập lại nhé" (v32, v33) và hàm `startFlow`.
+
+**Vì sao**
+- Màn cũ trộn mọi thứ: các bước, nút xem thử, thanh tab, nút bút, trong khi lúc đó chỉ làm được một việc.
+  Mỗi lúc một việc thì không phải đọc, không bấm nhầm.
+- Thứ tự Đăng nhập trước: đăng nhập xong app lấy được key và lịch đã lưu trên Drive, máy thứ hai đi thẳng vào app.
+- "Để sau" ở bước Gemini: app vẫn dùng được không cần AI (nút Tự thêm), không để key lỗi chặn ngoài cửa.
+- Không làm đăng nhập ngầm khi hết phiên: hay bị Safari iPhone chặn; bấm một nút là đủ.
+
+**Logic**
+- `gateStep()` quyết định bước (demo → không cổng; chưa đăng nhập → login; chưa key và chưa "Để sau" → key; chưa cfg → cal).
+  `render()` hỏi `gateStep()` trước; có bước thì vẽ `#gate`, `body.is-gated` ẩn phần còn lại bằng CSS.
+- `refresh()` không gọi `loadToday()` khi cổng đang che; `findConfig()` chỉ chạy một lần mỗi phiên mở app (`S.cfgLooked`).
+- Key được thử bằng `testKey()` trước khi lưu, nên key sai không lọt vào app.
+- `settings.keyLater` nhớ lựa chọn "Để sau"; gõ câu cần AI mà chưa có key vẫn báo kèm nút Mở Cài đặt như trước.
+- Hết phiên khi đang mở sheet: không đóng sheet (giữ chữ), cổng hiện phía sau. Mỗi phút kiểm tra token để hiện bước 1 cả khi không bấm gì.
+- Thay 2 test của v32 bằng 6 test cổng vào (từng bước, chỉ còn cổng trên màn, Để sau, demo, vào app).
+
+## 2026-11-14 · Màn bắt đầu ít chữ hơn · v33
+**Đổi gì**: màn bắt đầu (máy chưa có cấu hình) chỉ còn: "Chào bạn.", một dòng "Lịch ở Google Calendar, nhật ký ở Google Drive.",
+3 bước mỗi bước một dòng (Gemini API key · Đăng nhập Google · Tạo lịch và thư mục Drive), nút "Bắt đầu" và "Xem thử".
+Bỏ dòng phụ dưới mỗi bước, rút gọn tiêu đề và nút "Xem thử với dữ liệu mẫu".
+
+**Vì sao**: màn đầu tiên nhiều chữ, mắt phải đọc hết mới thấy nút. Các dòng phụ (dùng lại key app Korean, quyền truy cập, tự nhận ra lịch đã có)
+không giúp quyết định bấm gì; khi cần thì các bước sau tự nói.
+
+**Logic**: chỉ đổi chữ trong `renderOnboarding`, gom HTML mỗi bước vào hàm `step()`. Thứ tự bước và nút chính đổi theo bước đang chờ như cũ.
+
+## 2026-11-14 · Hết phiên Google: chỉ hiện thẻ Đăng nhập lại · v32
+**Đổi gì**: máy đã dựng hệ thống mà phiên Google hết hạn thì cả 3 tab chỉ hiện một thẻ "Đăng nhập lại nhé." với một nút.
+Bỏ banner "Phiên Google đã hết hạn" và không hiện lại khung "Chào bạn…" cùng 3 bước bắt đầu.
+
+**Vì sao**: trước đây tab Hôm nay hiện cả banner lẫn khung bắt đầu, với 2 nút đăng nhập và các bước đã làm xong.
+Trông như phải cài lại từ đầu, trong khi chỉ cần đăng nhập lại. Tab Thói quen, Nhật ký thì bảo "sang tab Hôm nay", thêm một bước thừa.
+
+**Logic**
+- `needReauth()` = không demo + có `S.cfg` + hết token. Đúng thì `renderOnboarding`, `renderHabits`, `renderJournal` đều vẽ `reauthCard()`.
+- Chưa có `S.cfg` (lần đầu, máy mới) thì vẫn hiện các bước bắt đầu như cũ.
+- Bỏ `#banner`, `showBanner()` và CSS `.banner`. Lỗi 401 giữa chừng: `handleErr` gọi `render()`, tab đang mở chuyển sang thẻ.
+  Không đóng sheet đang mở, để chữ đang nhập không mất; đăng nhập lại rồi bấm lưu lần nữa.
+- Thêm 2 test (hết phiên: 3 tab chỉ có thẻ, không banner; chưa có cấu hình: vẫn có các bước).
+
 ## 2026-11-14 · Ngày hiện theo DD/MM/YYYY · v31
 **Đổi gì**: mọi ngày trong app hiện theo `DD/MM/YYYY`: đầu trang ("Thứ Bảy, 14/11/2026"), dòng tuần ở Thói quen
 ("09/11/2026 – 15/11/2026"), tiêu đề sheet, danh sách nhật ký, nhãn chip ngày, tiêu đề file nhật ký mới, tên sự kiện "Thói quen · 14/11/2026".
