@@ -288,13 +288,13 @@ const Google = {
   },
   async mutePlan(items, mute) {
     const base = `${CAL}/calendars/${encodeURIComponent(S.cfg.planCal)}/events`;
-    for (const it of items) {
+    await Promise.all(items.map(it => {   // song song: tắt cả chục khối mất ~1 lượt mạng thay vì chục lượt
       const t = TPL[it.key] || {};
       const body = mute
         ? { summary: "💤 " + it.title, reminders: { useDefault: false, overrides: [] } }
         : { summary: it.title, reminders: { useDefault: false, overrides: (t.rem || [0]).map(m => ({ method: "popup", minutes: m })) } };
-      await g(`${base}/${encodeURIComponent(it.id)}`, { method: "PATCH", body: JSON.stringify(body) });
-    }
+      return g(`${base}/${encodeURIComponent(it.id)}`, { method: "PATCH", body: JSON.stringify(body) });
+    }));
   },
   async addPlan(it) {   // khối riêng cho 1 ngày, không lặp
     const body = {
@@ -1299,6 +1299,9 @@ function setView(v) {
 // ============================================================ events
 function autosize() { const t = $("#inputText"); t.style.height = "auto"; t.style.height = Math.min(Math.round(innerHeight * 0.6), t.scrollHeight + 2) + "px"; }
 
+// Nút đang chạy: khoá + vòng quay + chữ trạng thái (render lại sẽ thay nút mới)
+function busy(el, label) { el.disabled = true; el.classList.add("is-busy"); el.innerHTML = `<i class="ph ph-circle-notch spin"></i> ${esc(label)}`; }
+
 document.addEventListener("click", async e => {
   const el = e.target.closest("button, [data-close]");
   if (!el) {   // chỗ trống ở cột Kế hoạch → thêm khối (làm tròn xuống 15 phút)
@@ -1334,7 +1337,7 @@ document.addEventListener("click", async e => {
     closeSheet(); toast("Đã lưu cài đặt"); return render();
   }
   if (id === "btnOpenCal") return window.open("https://calendar.google.com/calendar/r/day", "_blank", "noopener");
-  if (id === "btnUnwell") { el.disabled = true; try { await setUnwell(true); toast("Unwell day. Nghỉ ngơi nhé", 2600, () => setUnwell(false)); } catch (er) { handleErr(er); } return render(); }
+  if (id === "btnUnwell") { busy(el, "Đang chuyển sang ngày nhẹ nhàng…"); try { await setUnwell(true); toast("Unwell day. Nghỉ ngơi nhé", 2600, () => setUnwell(false)); } catch (er) { handleErr(er); } return render(); }
   if (id === "eSave") { el.disabled = true; try { await saveActEdit(); } catch (er) { el.disabled = false; handleErr(er); } return renderToday(); }
   if (id === "eDel") { el.disabled = true; try { await deleteAct(); } catch (er) { el.disabled = false; handleErr(er); } return renderToday(); }
   if (id === "pAdd") { el.disabled = true; try { if (!(await savePlanAdd())) { el.disabled = false; return; } } catch (er) { el.disabled = false; handleErr(er); } return renderToday(); }
@@ -1360,7 +1363,7 @@ document.addEventListener("click", async e => {
     try { await setHabit(S.dayDate, el.dataset.dh, el.dataset.lv || null); } catch (er) { handleErr(er); }
     renderDaySheet(S.dayDate); return S.view === "habits" ? renderHabits() : renderToday();
   }
-  if (id === "btnUnwellOff") { el.disabled = true; try { await setUnwell(false); toast("Đã bật lại lịch bình thường"); } catch (er) { handleErr(er); } return render(); }
+  if (id === "btnUnwellOff") { busy(el, "Đang bật lại lịch…"); try { await setUnwell(false); toast("Đã bật lại lịch bình thường"); } catch (er) { handleErr(er); } return render(); }
   if (id === "cSave") return savePending();
   if (el.dataset.act) {
     if (el.dataset.act === "other") { S.otherFor = el.dataset.id; return openCompose("Đang làm gì thay vào đó?"); }
