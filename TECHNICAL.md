@@ -153,6 +153,9 @@ sequenceDiagram
 - Sheet xác nhận: mỗi thẻ việc có ô ngày sửa được (`dateField`, giá trị qua `validDay`: không rỗng, không tương lai),
   tô màu khi khác hôm nay; chip thói quen có `date` khác hôm nay hiện nhãn ngắn (`dayShort`: "Hôm qua" hoặc "T6 13/11"). Không còn gì để ghi (`pendingEmpty`)
   thì khoá Lưu, trừ chế độ "Làm việc khác". Bỏ hết dòng thì ẩn lời đáp cũ. Giờ ngược có cảnh báo (`timeWarn`), khi lưu thành 15 phút.
+- "Tự thêm" (`#btnManual` → `openManual()`): không gọi Gemini, `manualPending(text)` dựng sẵn một `pending` có 1 việc
+  (`manual: true`) rồi đi chung `renderConfirm` → `savePending`, nên ngày, cảnh báo giờ, hoàn tác, "Làm việc khác" đều như luồng AI.
+  Tên trống khi lưu thì lấy tên nhóm.
 - Chế độ demo không có key thì dùng `demoParse()` (bắt từ khoá đơn giản) để vẫn thử được luồng.
 - Hoàn tác: xoá các việc vừa tạo, trả bản ghi ngày về bản chụp trước khi lưu (`restoreRec`), trả lại nhật ký cũ.
 

@@ -397,6 +397,8 @@ input[type=time]::-webkit-calendar-picker-indicator { opacity: .6; cursor: point
 }
 .dock textarea:focus { outline: none; border-color: var(--silver); }
 .dock .icon-btn { width: 48px; height: 48px; border-radius: 14px; }
+/* Tự thêm: nằm bên trái, tách khỏi cặp nút AI (mic, gửi) */
+.dock__manual { margin-right: auto; height: 48px; }
 .dock__mic { background: var(--surface); box-shadow: var(--edge), var(--e1); }
 .dock__mic.is-live { background: #C9473A; color: #fff; animation: pulse 1.2s var(--ease) infinite; }
 .dock__send { background: var(--accent); color: var(--accent-ink); box-shadow: var(--edge), var(--e1); }

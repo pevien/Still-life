@@ -619,6 +619,33 @@
       ok($(".act__warn"), "có cảnh báo");
       closeSheet();
     });
+    test("Tự thêm: nút trong ô nhập mở thẻ việc trống, không gọi AI, tên lấy từ chữ đã gõ", async () => {
+      await reset();
+      const orig = window.callGemini; let ai = 0; window.callGemini = async () => { ai++; return orig(); };
+      try {
+        openCompose(); $("#inputText").value = "Dọn phòng\nrồi nghỉ";
+        $("#btnManual").click(); await wait(20);
+        eq([sheetOpen(), sheetTitle(), ai], [true, "Tự thêm", 0]);
+        ok(!$("#dock").classList.contains("is-open"), "ô nhập đóng lại");
+        const box = $$("#sheetBody .act"); eq(box.length, 1);
+        eq($('[data-f="title"]', box[0]).value, "Dọn phòng");
+        eq($('[data-f="end"]', box[0]).value, hm(new Date()));
+        ok(!$(".reply"), "không có lời đáp AI");
+      } finally { window.callGemini = orig; closeSheet(); $("#inputText").value = ""; resetOther(); }
+    });
+    test("Tự thêm khi Làm việc khác: giờ từ đầu khối đang chạy, nhóm theo khối; lưu thì ghi việc + bỏ qua khối", async () => {
+      await reset();
+      const blk = block("Khối test", new Date(Date.now() - 40 * 60000), new Date(Date.now() + 20 * 60000), { id: "t_manual", cat: "korean" });
+      S.today.plan.push(blk); S.otherFor = blk.id;
+      try {
+        const p = manualPending("");
+        eq([p.activities[0].start, p.activities[0].category, p.activities[0].title], [hm(blk.start), "korean", ""]);
+        renderConfirm(p); await savePending();
+        const a = S.today.actual[S.today.actual.length - 1];
+        eq(a.title, CATS.korean.name, "tên trống thì lấy tên nhóm");
+        ok((S.today.rec.skip || []).includes(blk.id), "khối đang chạy được đánh dấu bỏ qua");
+      } finally { S.today.plan = S.today.plan.filter(b => b.id !== blk.id); resetOther(); closeSheet(); }
+    });
     test("lỗi thiếu Gemini key: toast có nút Mở Cài đặt", async () => {
       await reset();
       handleErr(Object.assign(new Error("Chưa có Gemini API key"), { needKey: true }));

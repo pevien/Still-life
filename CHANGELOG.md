@@ -5,6 +5,22 @@ Mới nhất ở trên. Số `vNN` là phiên bản cache trong `sw.js`.
 
 ---
 
+## 2026-11-14 · Nút "Tự thêm" trong ô nhập · v26
+**Đổi gì**: ô nhập (cả khi mở từ "Làm việc khác") có thêm nút "Tự thêm" bên trái mic, gửi. Bấm thì đóng ô nhập và mở sheet
+"Tự thêm" với một thẻ việc trống (Tên, Nhóm, Giờ, Ngày) để tự điền rồi Lưu, không qua Gemini.
+
+**Vì sao**: có lúc chỉ muốn ghi nhanh một việc đã biết rõ, không cần AI đọc câu: không có mạng tốt, không có key,
+hoặc AI hiểu sai và gõ lại mất công hơn tự điền.
+
+**Logic**
+- Không làm form mới: `manualPending(text)` tạo một `pending` giống kết quả AI (1 việc, `manual: true`) và dùng lại
+  `renderConfirm` / `savePending`. Nhờ vậy ô ngày, cảnh báo giờ ngược, hoàn tác và đánh dấu bỏ qua khối "Làm việc khác" giữ nguyên.
+- Mặc định: tên = dòng đầu chữ đã gõ (tối đa 80 ký tự), để gõ dở rồi đổi ý không mất chữ. Giờ = 30 phút trước → bây giờ.
+  Đang "Làm việc khác" thì bắt đầu từ đầu khối đang chạy và lấy nhóm của khối, vì thường là thay thế đúng khoảng đó.
+- Tên để trống khi lưu thì dùng tên nhóm, tránh tạo sự kiện Calendar không tên.
+- Nút để kiểu ghost, nằm tách bên trái cặp mic, gửi, để AI vẫn là cách chính.
+- Thêm 2 test (tổng 93).
+
 ## 2026-11-14 · Ngày nằm trong form thẻ việc · v25
 **Đổi gì**: thẻ việc trong sheet xác nhận theo thứ tự Tên → Nhóm → Giờ → Ngày. Ngày là ô chọn ngày sửa được, kèm chữ "Hôm nay", "Hôm qua"
 hoặc thứ; ngày khác hôm nay thì ô được tô màu nhấn. Bỏ nhãn "Ghi vào Hôm qua" nằm ngoài thẻ (bản v24). Đổi nhóm thì viền thẻ đổi màu theo.

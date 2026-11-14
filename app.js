@@ -858,6 +858,19 @@ function dateField(ds) {
 // Nhãn ngày ngắn cho chip thói quen: "Hôm qua" hoặc "T6 13/11" ("" = hôm nay)
 const dayShort = ds => (!ds || ds === todayStr() ? "" : dayHint(ds) === "Hôm qua" ? "Hôm qua" : (d => `${DOW_SHORT[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`)(parseYmd(ds)));
 const pendingEmpty = p => !p.activities.length && !p.habits.length && !(p.journal || "").trim() && !p.unwell;
+// "Tự thêm": thẻ việc trống, không qua AI. Tên lấy từ chữ đã gõ (nếu có).
+// Đang "Làm việc khác" thì giờ bắt đầu = đầu khối đang chạy, nhóm theo khối; không thì 30 phút trước.
+function manualPending(text) {
+  const now = new Date(), blk = S.otherFor && S.today.plan.find(b => b.id === S.otherFor);
+  const from = blk && blk.start < now ? blk.start : new Date(now - 30 * 60000);
+  const title = (text || "").trim().split("\n")[0].slice(0, 80);
+  return { manual: true, reply: "", habits: [], journal: "", unwell: false, raw: text || "",
+    activities: [{ title, category: blk && CATS[blk.cat] ? blk.cat : "life", date: todayStr(), start: hm(from), end: hm(now) }] };
+}
+function openManual() {
+  closeCompose(true); renderConfirm(manualPending($("#inputText").value));
+  const t = $('#sheetBody [data-f="title"]'); if (t && !t.value) t.focus();
+}
 function renderConfirm(p) {
   S.pending = p;
   const catOpts = sel => Object.entries(CATS).map(([k, c]) => `<option value="${k}" ${k === sel ? "selected" : ""}>${c.name}</option>`).join("");
@@ -869,7 +882,7 @@ function renderConfirm(p) {
     p.activities.forEach((a, i) => {
       const ds = validDay(a.date);
       html += `<div class="act" style="${catVars(a.category)}" data-i="${i}">
-        <input class="input" type="text" data-f="title" value="${esc(a.title)}" aria-label="Tên việc">
+        <input class="input" type="text" data-f="title" value="${esc(a.title)}" placeholder="Tên việc" aria-label="Tên việc">
         <button type="button" class="icon-btn act__rm" data-rm="${i}" aria-label="Bỏ dòng này"><i class="ph ph-trash"></i></button>
         <select class="input" data-f="category" aria-label="Nhóm">${catOpts(a.category)}</select>
         <div class="act__times"><input class="input num" type="time" data-f="start" value="${esc(a.start)}" aria-label="Bắt đầu"><span class="faint">–</span><input class="input num" type="time" data-f="end" value="${esc(a.end)}" aria-label="Kết thúc"></div>
@@ -886,7 +899,7 @@ function renderConfirm(p) {
   if (p.unwell) html += `<p class="care"><b>Bật unwell day cho hôm nay?</b>Lịch sẽ nhẹ lại và chuỗi ngày không gãy.</p>`;
   if (empty) html += `<p class="muted">${p.edited ? "Đã bỏ hết, không còn gì để ghi." : "Mình chưa thấy việc nào để ghi. Thử kể cụ thể hơn, ví dụ “vừa đi bộ 20 phút”."}${S.otherFor ? " Lưu sẽ chỉ đánh dấu bỏ qua khối đang chạy." : ""}</p>`;
   html += `<div class="sheet-actions"><button class="btn" data-close>Hủy</button><button class="btn btn--primary" id="cSave"${canSave ? "" : " disabled"}><i class="ph ph-check"></i> Lưu</button></div>`;
-  openSheet("Mình hiểu là…", html);
+  openSheet(p.manual ? "Tự thêm" : "Mình hiểu là…", html);
 }
 
 // ============================================================ Gemini
@@ -1079,6 +1092,7 @@ async function savePending() {
   try {
     for (const a of p.activities) {
       a.date = validDay(a.date);
+      a.title = (a.title || "").trim() || CATS[a.category]?.name || "Việc";
       const day = parseYmd(a.date);
       let s = atTime(day, a.start), e = atTime(day, a.end);
       if (e <= s) e = new Date(s.getTime() + 15 * 60000);
@@ -1367,6 +1381,7 @@ document.addEventListener("click", async e => {
   if (el.matches("[data-close]")) return closeSheet();
   if (el.id === "btnCompose") return openCompose();
   if (el.id === "dockBackdrop") return closeCompose();
+  if (el.id === "btnManual") return openManual();
   if (el.classList.contains("toast__undo")) {
     const fn = toast._undo, done = toast._done; hideToast(); if (!fn) return;
     if (done === null) return fn();

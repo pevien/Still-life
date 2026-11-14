@@ -69,6 +69,9 @@ Thanh dưới có 4 ô: Hôm nay · Thói quen · Nhật ký · Cài đặt (Cà
      Chip thói quen của ngày khác có nhãn ngày.
    - Không còn gì để ghi thì không lưu được. Giờ kết thúc không sau giờ bắt đầu thì cảnh báo ngay, lưu thành 15 phút.
    - Thiếu hoặc sai Gemini key: thông báo có nút mở Cài đặt.
+   - Nút "Tự thêm" trong ô nhập: bỏ qua AI, mở thẳng một thẻ việc trống (tên lấy từ dòng đầu chữ đã gõ, nếu có;
+     giờ từ 30 phút trước tới bây giờ). Mở từ "Làm việc khác" thì giờ bắt đầu là đầu khối đang chạy, nhóm theo khối,
+     lưu xong khối đó được đánh dấu bỏ qua như khi nhập qua AI.
    - Trên timeline, các việc chồng giờ nằm cạnh nhau.
 3. **Thói quen**: chuyển Tuần / Tháng, lùi tới từng tuần, tháng (không quá ngày bắt đầu, không quá hiện tại).
    Chú thích trạng thái nằm dưới tiêu đề, căn giữa. Chạm ô một ngày để sửa habit ngày đó. Chuỗi 🔥.
