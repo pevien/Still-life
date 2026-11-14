@@ -531,11 +531,17 @@ function renderToday() {
 
   // thời gian theo nhóm + timeline
   html += `<h2 class="h2">Thời gian hôm nay <span class="h2__acts">
-      <button class="icon-btn" id="btnTlToggle" aria-label="${S.tlFull ? "Thu gọn" : "Xem cả ngày"}" title="${S.tlFull ? "Thu gọn" : "Xem cả ngày"}"><i class="ph ph-arrows-${S.tlFull ? "in" : "out"}-line-vertical"></i></button>
       <button class="icon-btn" id="btnOpenCal" aria-label="Mở Google Calendar" title="Mở Google Calendar"><i class="ph ph-calendar-blank"></i></button>
     </span></h2>
     ${summaryHTML()}${timelineHTML()}`;
+  const prev = v.querySelector(".tl__scroll"), keep = prev && prev.dataset.pos ? prev.scrollTop : null;
   v.innerHTML = html;
+  const sc = v.querySelector(".tl__scroll"); if (!sc) return;
+  if (keep != null) { sc.scrollTop = keep; sc.dataset.pos = "1"; }
+  else requestAnimationFrame(() => {   // cuộn tới giờ hiện tại; khi tab đang ẩn (cao 0) thì để lần render sau
+    if (!sc.clientHeight) return;
+    sc.scrollTop = Math.max(0, +sc.dataset.now - sc.clientHeight * 0.35); sc.dataset.pos = "1";
+  });
 }
 
 const fmtDur = m => { m = Math.round(m); return m < 60 ? `${m}p` : `${Math.floor(m / 60)}g${m % 60 ? pad(m % 60) : ""}`; };
@@ -552,8 +558,7 @@ function summaryHTML() {
 
 function timelineHTML() {
   const rec = S.today.rec || {}, PX = 56, t0 = startOfDay(new Date()), now = new Date();
-  let H0 = 5, H1 = 23;
-  if (!S.tlFull) { const nh = now.getHours() + now.getMinutes() / 60; H0 = Math.max(5, Math.min(17, Math.floor(nh) - 3)); H1 = H0 + 6; }
+  const H0 = 5, H1 = 23, PAD = 10;
   const y = d => ((d - t0) / 3600000 - H0) * PX;
   const height = (H1 - H0) * PX;
   const evHTML = it => {
@@ -568,14 +573,19 @@ function timelineHTML() {
     return `<button class="tl__ev${c.lightInk ? " light-ink" : ""}" data-aid="${esc(it.id)}" style="top:${top}px;height:${h}px;--cat:${c.hex}" aria-label="Sửa: ${esc(it.title)} ${hm(it.start)}–${hm(it.end)}">${esc(it.title)}${time}</button>`;
   };
   let hours = "", grid = "";
-  for (let h = H0; h <= H1; h++) { hours += `<div class="tl__hour num" style="top:${(h - H0) * PX}px">${pad(h)}:00</div>`; grid += `<div class="tl__grid" style="top:${(h - H0) * PX + 26}px"></div>`; }
+  for (let h = H0; h <= H1; h++) { hours += `<div class="tl__hour num" style="top:${(h - H0) * PX}px">${pad(h)}:00</div>`; grid += `<div class="tl__grid" style="top:${(h - H0) * PX + PAD}px"></div>`; }
   const nowY = y(now);
-  const nowLine = nowY > 0 && nowY < height ? `<div class="tl__nowline" style="top:${nowY + 26}px"></div>` : "";
+  const nowLine = nowY > 0 && nowY < height ? `<div class="tl__nowline" style="top:${nowY + PAD}px"></div>` : "";
   return `<div class="tl">
-    <div><div class="tl__head">&nbsp;</div><div class="tl__hours" style="height:${height}px">${hours}</div></div>
-    <div><div class="tl__head">Kế hoạch</div><div class="tl__col tl__col--plan" style="height:${height}px">${S.today.plan.map(evHTML).join("")}</div></div>
-    <div><div class="tl__head">Thực tế</div><div class="tl__col tl__col--act" style="height:${height}px">${S.today.actual.map(evHTML).join("")}</div></div>
-    ${grid}${nowLine}
+    <div class="tl__heads"><span></span><div class="tl__head">Kế hoạch</div><div class="tl__head">Thực tế</div></div>
+    <div class="tl__scroll" data-now="${Math.max(0, Math.min(height, nowY)) + PAD}">
+      <div class="tl__body" style="padding:${PAD}px 0">
+        <div class="tl__hours" style="height:${height}px">${hours}</div>
+        <div class="tl__col tl__col--plan" style="height:${height}px">${S.today.plan.map(evHTML).join("")}</div>
+        <div class="tl__col tl__col--act" style="height:${height}px">${S.today.actual.map(evHTML).join("")}</div>
+        ${grid}${nowLine}
+      </div>
+    </div>
   </div>`;
 }
 
@@ -1219,7 +1229,6 @@ document.addEventListener("click", async e => {
   }
   if (id === "btnOpenCal") return window.open("https://calendar.google.com/calendar/r/day", "_blank", "noopener");
   if (id === "btnUnwell") { el.disabled = true; try { await setUnwell(true); toast("Unwell day. Nghỉ ngơi nhé", 2600, () => setUnwell(false)); } catch (er) { handleErr(er); } return render(); }
-  if (id === "btnTlToggle") { S.tlFull = !S.tlFull; return renderToday(); }
   if (id === "eSave") { el.disabled = true; try { await saveActEdit(); } catch (er) { el.disabled = false; handleErr(er); } return renderToday(); }
   if (id === "eDel") { el.disabled = true; try { await deleteAct(); } catch (er) { el.disabled = false; handleErr(er); } return renderToday(); }
   if (el.dataset.aid) { const a = S.today.actual.find(x => x.id === el.dataset.aid); if (a) renderActEdit(a); return; }

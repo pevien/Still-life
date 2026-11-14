@@ -224,10 +224,14 @@ span.chip__half { border-left-color: transparent; }
 .sum__list b { color: var(--ink); font-weight: 600; }
 .sum__list li.is-warn b { color: var(--miss-ink, #B4554B); }
 .tl {
-  position: relative; display: grid; grid-template-columns: 44px 1fr 1fr; column-gap: 6px;
-  border-radius: var(--r); background: var(--surface); box-shadow: var(--edge), var(--e1);
-  padding: 8px 8px 8px 0; overflow: hidden;
+  position: relative; border-radius: var(--r); background: var(--surface); box-shadow: var(--edge), var(--e1);
+  padding: 8px 8px 0 0; overflow: hidden;
 }
+.tl__heads, .tl__body { display: grid; grid-template-columns: 44px 1fr 1fr; column-gap: 6px; }
+.tl__heads { border-bottom: 1px solid var(--line); }
+.tl__scroll { height: min(380px, 52vh); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.tl__scroll::-webkit-scrollbar { display: none; }
+.tl__body { position: relative; }
 .tl__hours, .tl__col { position: relative; }
 .tl__hour { position: absolute; left: 0; right: 0; font-size: 12px; color: var(--ink-faint); text-align: right; padding-right: 6px; transform: translateY(-50%); }
 .tl__grid { position: absolute; left: 44px; right: 0; height: 1px; background: var(--line); opacity: .6; }
