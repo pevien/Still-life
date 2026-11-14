@@ -30,17 +30,17 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --canvas: #0F1813;
-    --surface: #17221B;
-    --surface-2: #1F2C24;
-    --line: #2A3A30;
-    --ink: #E8ECE2;
-    --ink-soft: #A3B3A7;
-    --ink-faint: #6E8075;
+    --canvas: #0B0B0C;
+    --surface: #161618;
+    --surface-2: #1F1F22;
+    --line: #2C2C30;
+    --ink: #ECECEA;
+    --ink-soft: #A8A8AC;
+    --ink-faint: #75757B;
     --accent: #E3C57E;
     --accent-ink: #1F1708;
     --silver: #C7CFD4;
-    --accent-soft: #263037;
+    --accent-soft: #26272B;
     --good: #5DB273;
     --min: #2F5A3A;
     --miss: #4A2D27;
@@ -392,36 +392,39 @@ body.no-dock .toast { bottom: calc(var(--tabs-h) + var(--safe-b) + 16px); }
   .chips { grid-template-columns: repeat(4, 1fr); }
   .top__title { font-size: 36px; }
 }
-/* ---------- Bầu trời sao: nền lấp lánh + ánh bạc ---------- */
+/* ---------- Bầu trời sao: thưa, thỉnh thoảng lóe + ánh bạc ---------- */
 :root { --gold-star: rgb(163 129 47 / .55); --star: rgb(125 139 148 / .5); --star-2: rgb(125 139 148 / .3); --sheen: rgb(255 255 255 / .55); }
 @media (prefers-color-scheme: dark) { :root { --gold-star: rgb(227 197 126 / .9); --star: rgb(236 241 244 / .95); --star-2: rgb(226 232 236 / .55); --sheen: rgb(255 255 255 / .7); } }
-body::before, body::after {
+body::before, body::after, html::after {
   content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
 }
-/* lớp sao tĩnh, nhỏ li ti */
+/* lớp sao tĩnh: thưa, mờ */
 body::before {
   background-image:
-    radial-gradient(circle at 23px 41px, var(--star-2) 0 1.1px, transparent 2.6px),
-    radial-gradient(circle at 131px 97px, var(--star-2) 0 0.9px, transparent 2.2px),
-    radial-gradient(circle at 187px 19px, var(--star-2) 0 1.2px, transparent 2.9px),
-    radial-gradient(circle at 71px 163px, var(--star-2) 0 0.9px, transparent 2.2px),
-    radial-gradient(circle at 211px 181px, var(--star-2) 0 1.1px, transparent 2.6px),
-    radial-gradient(circle at 157px 227px, var(--star-2) 0 0.9px, transparent 2.2px),
-    radial-gradient(circle at 103px 9px, var(--star-2) 0 0.8px, transparent 1.9px);
-  background-size: 240px 240px;
+    radial-gradient(circle at 61px 83px, var(--star-2) 0 1px, transparent 2.4px),
+    radial-gradient(circle at 347px 211px, var(--star-2) 0 0.9px, transparent 2.2px),
+    radial-gradient(circle at 173px 439px, var(--star-2) 0 1.1px, transparent 2.6px);
+  background-size: 520px 520px;
+  opacity: .7;
 }
-/* lớp sao to hơn, nhấp nháy chậm */
+/* sao lóe: hầu như tắt, thỉnh thoảng nhá lên một cái */
 body::after {
   background-image:
-    radial-gradient(circle at 97px 53px, var(--star) 0 1.7px, transparent 4.1px),
-    radial-gradient(circle at 283px 151px, var(--gold-star) 0 2.2px, transparent 5.3px),
-    radial-gradient(circle at 41px 251px, var(--gold-star) 0 1.6px, transparent 3.8px),
-    radial-gradient(circle at 331px 307px, var(--star) 0 1.9px, transparent 4.6px),
-    radial-gradient(circle at 199px 337px, var(--star) 0 1.6px, transparent 3.8px);
-  background-size: 380px 380px;
-  animation: twinkle 5s ease-in-out infinite alternate;
+    radial-gradient(circle at 283px 151px, var(--gold-star) 0 1.8px, transparent 4.6px),
+    radial-gradient(circle at 709px 523px, var(--star) 0 1.6px, transparent 4.2px);
+  background-size: 900px 900px;
+  opacity: 0;
+  animation: flash 13s ease-in-out infinite;
 }
-@keyframes twinkle { from { opacity: .45; } to { opacity: 1; } }
+html::after {
+  background-image:
+    radial-gradient(circle at 131px 619px, var(--star) 0 1.7px, transparent 4.4px),
+    radial-gradient(circle at 587px 97px, var(--gold-star) 0 1.5px, transparent 4px);
+  background-size: 820px 820px;
+  opacity: 0;
+  animation: flash 19s ease-in-out 6s infinite;
+}
+@keyframes flash { 0%, 88%, 100% { opacity: 0; } 93% { opacity: 1; } }
 
 /* nút chính: ánh bạc kim loại + vệt sáng lướt qua thỉnh thoảng */
 .btn--primary, .dock__send {
