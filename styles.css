@@ -330,6 +330,14 @@ button.mcal__d:active { transform: scale(.92); }
   transition: border-color .15s var(--ease);
 }
 .field textarea { resize: vertical; min-height: 64px; }
+/* select tự vẽ mũi tên: cùng lề trái với ô khác, mũi tên cách viền phải */
+select.input, .field select {
+  -webkit-appearance: none; appearance: none; padding-right: 40px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 256 256'%3E%3Cpath fill='none' stroke='%238A8A8F' stroke-linecap='round' stroke-linejoin='round' stroke-width='20' d='m208 96-80 80-80-80'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center; background-size: 16px;
+}
+input[type=time] { min-height: 44px; }
+input[type=time]::-webkit-calendar-picker-indicator { opacity: .6; cursor: pointer; }
 .field textarea:focus, .field input:focus, .field select:focus, .input:focus { outline: none; border-color: var(--silver); }
 .field small { display: block; margin-top: 6px; color: var(--ink-soft); font-size: 12px; }
 .keystate { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; color: var(--ink-soft); }
@@ -433,7 +441,9 @@ button.mcal__d:active { transform: scale(.92); }
 .act__times input { flex: 1; min-width: 0; }
 .act select { grid-column: 1 / -1; min-width: 0; }
 .act .input { padding: 9px 10px; font-size: 15px; }
-.act__rm { grid-column: 2; grid-row: 1; }
+.act select.input { padding-right: 40px; }
+.act__rm { grid-column: 2; grid-row: 1; align-self: stretch; width: auto; height: auto; aspect-ratio: 1; border: 1px solid var(--line); border-radius: var(--r-sm); color: var(--ink-soft); font-size: 20px; }
+@media (hover: hover) and (pointer: fine) { .act__rm:hover { color: #C9473A; border-color: color-mix(in srgb, #C9473A 50%, var(--line)); background: transparent; } }
 .hpick { display: flex; flex-wrap: wrap; gap: 8px; }
 .hpick button { display: inline-flex; gap: 6px; align-items: center; min-height: 40px; padding: 0 12px; border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--surface); font-size: 14px; font-weight: 600; }
 .hpick button[data-lv="full"] { background: color-mix(in srgb, var(--good) 18%, var(--surface)); border-color: var(--good); }
