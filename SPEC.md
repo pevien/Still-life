@@ -62,14 +62,14 @@ Thanh dưới có 4 ô: Hôm nay · Thói quen · Nhật ký · Cài đặt (Cà
    - Bấm khối Kế hoạch → "Chỉnh sửa kế hoạch": đổi tên, giờ cho riêng hôm nay, có hoàn tác.
      Khối thêm trong app có thêm nút xoá.
    - Bấm chỗ trống cột Kế hoạch → "Thêm kế hoạch": giờ bắt đầu theo chỗ bấm (làm tròn xuống 15 phút),
-     dài 30 phút hoặc tới khối kế tiếp, chọn nhóm. Chỉ cho hôm nay.
-   - Bấm khối Thực tế → sửa, xoá việc đã ghi.
+     dài 30 phút hoặc tới khối kế tiếp. Thứ tự ô: Tên, Nhóm, Giờ. Chỉ cho hôm nay.
+   - Bấm khối Thực tế → "Sửa việc đã làm" (Tên, Nhóm, Giờ): sửa, xoá việc đã ghi.
 2. **Nhập** (nút bút nổi ở tab Hôm nay): gõ hoặc nói → Gemini hiểu → thẻ xác nhận (sửa được) → lưu.
-   - Thẻ việc theo thứ tự Tên, Nhóm, Giờ, Ngày. Ngày sửa được (không chọn ngày tương lai), khác hôm nay thì được tô màu.
+   - Thẻ việc theo thứ tự Tên, Nhóm, Giờ, Ngày; nút "+ Thêm việc" thêm thẻ nối tiếp thẻ cuối (cùng ngày, nhóm, 30 phút). Ngày sửa được (không chọn ngày tương lai), khác hôm nay thì được tô màu.
      Chip thói quen của ngày khác có nhãn ngày.
    - Không còn gì để ghi thì không lưu được. Giờ kết thúc không sau giờ bắt đầu thì cảnh báo ngay, lưu thành 15 phút.
    - Thiếu hoặc sai Gemini key: thông báo có nút mở Cài đặt.
-   - Nút "Tự thêm" trong ô nhập: bỏ qua AI, mở thẳng một thẻ việc trống (tên lấy từ dòng đầu chữ đã gõ, nếu có;
+   - Nút "Tự thêm" trong ô nhập: bỏ qua AI, mở sheet "Thêm việc đã làm" (không có dòng nhóm "Thời gian thực tế") với một thẻ việc trống (tên lấy từ dòng đầu chữ đã gõ, nếu có;
      giờ từ 30 phút trước tới bây giờ). Mở từ "Làm việc khác" thì giờ bắt đầu là đầu khối đang chạy, nhóm theo khối,
      lưu xong khối đó được đánh dấu bỏ qua như khi nhập qua AI.
    - Trên timeline, các việc chồng giờ nằm cạnh nhau.

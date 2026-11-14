@@ -454,6 +454,8 @@ input[type=time]::-webkit-calendar-picker-indicator { opacity: .6; cursor: point
 .act__date.is-other .act__dayhint { background: color-mix(in srgb, var(--accent) 22%, var(--surface)); color: var(--ink); }
 .hpick__day { margin-left: 2px; padding: 1px 7px; border-radius: 999px; font-size: 12px; font-weight: 600; background: color-mix(in srgb, var(--accent) 22%, transparent); }
 .act select { grid-column: 1 / -1; min-width: 0; }
+/* "+ Thêm việc" dưới các thẻ việc: viền gạch như một chỗ trống để thêm */
+.act-add { border: 1px dashed var(--line); margin: 0 0 8px; }
 .act .input { padding: 9px 10px; font-size: 15px; }
 .act select.input { padding-right: 40px; }
 .act__rm { grid-column: 2; grid-row: 1; align-self: stretch; width: auto; height: auto; aspect-ratio: 1; border: 1px solid var(--line); border-radius: var(--r-sm); color: var(--ink-soft); font-size: 20px; }

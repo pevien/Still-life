@@ -878,7 +878,7 @@ function renderConfirm(p) {
   // Bỏ hết dòng rồi thì lời đáp cũ (nói về những dòng đó) không còn đúng
   let html = p.reply && !(empty && p.edited) ? `<p class="reply"><i class="ph-fill ph-sparkle"></i>${esc(p.reply)}</p>` : "";
   if (p.activities.length) {
-    html += `<p class="group-t">Thời gian thực tế</p>`;
+    if (!p.manual) html += `<p class="group-t">Thời gian thực tế</p>`;  // sheet Thêm hoạt động chỉ có 1 thẻ, tiêu đề sheet đã đủ
     p.activities.forEach((a, i) => {
       const ds = validDay(a.date);
       html += `<div class="act" style="${catVars(a.category)}" data-i="${i}">
@@ -890,6 +890,7 @@ function renderConfirm(p) {
       </div>`;
     });
   }
+  html += `<button type="button" class="btn btn--ghost btn--block act-add" id="cAddAct"><i class="ph ph-plus"></i> Thêm việc</button>`;
   if (p.habits.length) {
     html += `<p class="group-t">Thói quen</p><div class="hpick">`;
     p.habits.forEach((h, i) => { const hb = H[h.id]; if (!hb) return; const tag = dayShort(h.date); html += `<button type="button" data-hi="${i}" data-lv="${h.level}"><i class="ph ${hb.icon}"></i>${esc(hb.name)} · ${h.level === "full" ? "Đạt" : h.level === "min" ? "Tối thiểu" : "Bỏ"}${h.value ? ` (${h.value})` : ""}${tag ? `<span class="hpick__day">${esc(tag)}</span>` : ""}</button>`; });
@@ -899,7 +900,7 @@ function renderConfirm(p) {
   if (p.unwell) html += `<p class="care"><b>Bật unwell day cho hôm nay?</b>Lịch sẽ nhẹ lại và chuỗi ngày không gãy.</p>`;
   if (empty) html += `<p class="muted">${p.edited ? "Đã bỏ hết, không còn gì để ghi." : "Mình chưa thấy việc nào để ghi. Thử kể cụ thể hơn, ví dụ “vừa đi bộ 20 phút”."}${S.otherFor ? " Lưu sẽ chỉ đánh dấu bỏ qua khối đang chạy." : ""}</p>`;
   html += `<div class="sheet-actions"><button class="btn" data-close>Hủy</button><button class="btn btn--primary" id="cSave"${canSave ? "" : " disabled"}><i class="ph ph-check"></i> Lưu</button></div>`;
-  openSheet(p.manual ? "Tự thêm" : "Mình hiểu là…", html);
+  openSheet(p.manual ? "Thêm việc đã làm" : "Mình hiểu là…", html);
 }
 
 // ============================================================ Gemini
@@ -1076,14 +1077,22 @@ async function submitInput(text) {
   finally { dock.classList.remove("is-busy"); ic.className = "ph ph-paper-plane-tilt"; }
 }
 
+// Đọc lại các ô đang sửa vào S.pending (sheet được dựng lại từ S.pending nên phải đọc trước khi thêm, bỏ dòng hay lưu)
+function syncPending() {
+  const p = S.pending; if (!p) return;
+  $$("#sheetBody .act").forEach(el => { const a = p.activities[+el.dataset.i]; if (a) $$("[data-f]", el).forEach(inp => (a[inp.dataset.f] = inp.value)); });
+  const jt = $("#cJournal"); if (jt) p.journal = jt.value;
+}
+// Thẻ việc mới nối tiếp thẻ cuối: cùng ngày, cùng nhóm, bắt đầu lúc thẻ cuối kết thúc, dài 30 phút
+function nextActivity(last) {
+  if (!last) { const now = new Date(); return { title: "", category: "life", date: todayStr(), start: hm(new Date(now - 30 * 60000)), end: hm(now) }; }
+  const date = validDay(last.date);
+  const s = atTime(parseYmd(date), /^\d\d:\d\d$/.test(last.end) ? last.end : hm(new Date()));
+  return { title: "", category: CATS[last.category] ? last.category : "life", date, start: hm(s), end: hm(new Date(+s + 30 * 60000)) };
+}
 async function savePending() {
   const p = S.pending; if (!p) return;
-  // đọc lại các ô đã sửa
-  $$("#sheetBody .act").forEach(el => {
-    const a = p.activities[+el.dataset.i];
-    $$("[data-f]", el).forEach(inp => (a[inp.dataset.f] = inp.value));
-  });
-  const jt = $("#cJournal"); if (jt) p.journal = jt.value;
+  syncPending();
   if (pendingEmpty(p) && !S.otherFor) { closeSheet(); toast("Không có gì để ghi"); return; }
   const btn = $("#cSave"); btn.disabled = true;
   const today = todayStr(), created = [], prevRecs = {};
@@ -1235,8 +1244,8 @@ function renderPlanAdd(start) {
   const catOpts = Object.entries(CATS).map(([k, c]) => `<option value="${k}" ${k === "build" ? "selected" : ""}>${c.name}</option>`).join("");
   openSheet("Thêm kế hoạch", `<div class="act" style="${catVars("build")}" id="pAddBox">
       <input class="input" type="text" id="pTitle" placeholder="Định làm gì?" aria-label="Tên khối" style="grid-column:1/-1">
-      <div class="act__times"><input class="input num" type="time" id="pStart" value="${hm(start)}" aria-label="Bắt đầu"><span class="faint">–</span><input class="input num" type="time" id="pEnd" value="${hm(end)}" aria-label="Kết thúc"></div>
       <select class="input" id="pCat" aria-label="Nhóm">${catOpts}</select>
+      <div class="act__times"><input class="input num" type="time" id="pStart" value="${hm(start)}" aria-label="Bắt đầu"><span class="faint">–</span><input class="input num" type="time" id="pEnd" value="${hm(end)}" aria-label="Kết thúc"></div>
     </div>
     <p class="faint" style="font-size:13px;margin:0 0 4px">Chỉ thêm cho hôm nay.</p>
     <div class="sheet-actions"><button class="btn" data-close>Hủy</button><button class="btn btn--primary" id="pAdd"><i class="ph ph-plus"></i> Thêm</button></div>`);
@@ -1270,8 +1279,8 @@ function renderActEdit(a) {
   openSheet("Sửa việc đã làm", `<div class="act" style="${catVars(a.cat)}">
       <input class="input" type="text" id="eTitle" value="${esc(a.title)}" aria-label="Tên việc">
       <button type="button" class="icon-btn act__rm" id="eDel" aria-label="Xoá việc này"><i class="ph ph-trash"></i></button>
-      <div class="act__times"><input class="input num" type="time" id="eStart" value="${hm(a.start)}" aria-label="Bắt đầu"><span class="faint">–</span><input class="input num" type="time" id="eEnd" value="${hm(a.end)}" aria-label="Kết thúc"></div>
       <select class="input" id="eCat" aria-label="Nhóm">${catOpts}</select>
+      <div class="act__times"><input class="input num" type="time" id="eStart" value="${hm(a.start)}" aria-label="Bắt đầu"><span class="faint">–</span><input class="input num" type="time" id="eEnd" value="${hm(a.end)}" aria-label="Kết thúc"></div>
     </div>
     <div class="sheet-actions"><button class="btn" data-close>Hủy</button><button class="btn btn--primary" id="eSave"><i class="ph ph-check"></i> Lưu</button></div>`);
 }
@@ -1449,9 +1458,15 @@ document.addEventListener("click", async e => {
     return renderToday();
   }
   if (el.dataset.rm != null && S.pending) {
-    $$("#sheetBody .act").forEach(a => { const it = S.pending.activities[+a.dataset.i]; $$("[data-f]", a).forEach(inp => (it[inp.dataset.f] = inp.value)); });
-    const jt = $("#cJournal"); if (jt) S.pending.journal = jt.value;
+    syncPending();
     S.pending.activities.splice(+el.dataset.rm, 1); S.pending.edited = true; return renderConfirm(S.pending);
+  }
+  if (el.id === "cAddAct" && S.pending) {
+    syncPending();
+    const acts = S.pending.activities; acts.push(nextActivity(acts[acts.length - 1]));
+    renderConfirm(S.pending);
+    const t = $$('#sheetBody [data-f="title"]').pop(); if (t) { t.focus(); t.scrollIntoView({ block: "center" }); }
+    return;
   }
   if (el.dataset.hi != null && S.pending) {
     $$("#sheetBody .act").forEach(a => { const it = S.pending.activities[+a.dataset.i]; $$("[data-f]", a).forEach(inp => (it[inp.dataset.f] = inp.value)); });

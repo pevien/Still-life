@@ -5,6 +5,27 @@ Mới nhất ở trên. Số `vNN` là phiên bản cache trong `sw.js`.
 
 ---
 
+## 2026-11-14 · "Thêm việc đã làm", nút + Thêm việc, form cùng thứ tự · v27
+**Đổi gì**
+1. Sheet mở từ nút "Tự thêm" có tiêu đề **"Thêm việc đã làm"**, không còn dòng nhóm "Thời gian thực tế". Nút trong ô nhập giữ chữ "Tự thêm".
+2. Dưới các thẻ việc (cả sheet này lẫn "Mình hiểu là…" của AI) có nút **"+ Thêm việc"** để ghi nhiều việc một lần.
+3. Mọi form việc theo cùng thứ tự Tên → Nhóm → Giờ: đổi ở **Thêm kế hoạch** và **Sửa việc đã làm** (trước đó Nhóm nằm cuối).
+
+**Vì sao**
+- Tiêu đề nên nói sheet dùng làm gì, và khớp cặp "Thêm kế hoạch" / "Sửa việc đã làm". "Tự thêm" chỉ hợp cho nút, để phân biệt với AI.
+- Tự thêm mà chỉ được một việc thì muốn ghi 3 việc phải mở lại 3 lần. Với AI, nếu nó bỏ sót một việc thì trước đây phải gõ lại cả câu.
+- Có nút thêm thì thùng rác ở mỗi thẻ mới có nghĩa, và giữ thùng rác cho đồng bộ với Sửa việc đã làm.
+- Cùng thứ tự ô thì không phải dò lại mỗi form.
+
+**Logic**
+- Dòng "Thời gian thực tế" chỉ ẩn khi `p.manual`: sheet của AI còn Thói quen, nhật ký nên cần dòng nhóm để tách.
+- Thẻ mới (`nextActivity`) nối tiếp thẻ cuối: cùng ngày, cùng nhóm, bắt đầu lúc thẻ cuối kết thúc, dài 30 phút; tên trống và ô tên được focus.
+  Không có thẻ nào thì 30 phút trước → bây giờ, hôm nay, Sinh hoạt.
+- Trước khi thêm, bỏ dòng hay lưu đều gọi `syncPending()` đọc lại các ô đang sửa, vì sheet được dựng lại từ `S.pending`
+  (gộp 2 đoạn code đọc ô trùng nhau trước đây).
+- Ô ngày của Thêm kế hoạch **chưa** thêm: kế hoạch chỉ tải và hiện cho hôm nay, thêm cho ngày khác sẽ không thấy ở đâu. Để Bản 2.
+- Thêm 2 test.
+
 ## 2026-11-14 · Nút "Tự thêm" trong ô nhập · v26
 **Đổi gì**: ô nhập (cả khi mở từ "Làm việc khác") có thêm nút "Tự thêm" bên trái mic, gửi. Bấm thì đóng ô nhập và mở sheet
 "Tự thêm" với một thẻ việc trống (Tên, Nhóm, Giờ, Ngày) để tự điền rồi Lưu, không qua Gemini.

@@ -155,7 +155,7 @@ sequenceDiagram
   thì khoá Lưu, trừ chế độ "Làm việc khác". Bỏ hết dòng thì ẩn lời đáp cũ. Giờ ngược có cảnh báo (`timeWarn`), khi lưu thành 15 phút.
 - "Tự thêm" (`#btnManual` → `openManual()`): không gọi Gemini, `manualPending(text)` dựng sẵn một `pending` có 1 việc
   (`manual: true`) rồi đi chung `renderConfirm` → `savePending`, nên ngày, cảnh báo giờ, hoàn tác, "Làm việc khác" đều như luồng AI.
-  Tên trống khi lưu thì lấy tên nhóm.
+  Tên trống khi lưu thì lấy tên nhóm. Nút "+ Thêm việc" (`#cAddAct`): `syncPending()` rồi đẩy `nextActivity(thẻ cuối)` và dựng lại sheet.
 - Chế độ demo không có key thì dùng `demoParse()` (bắt từ khoá đơn giản) để vẫn thử được luồng.
 - Hoàn tác: xoá các việc vừa tạo, trả bản ghi ngày về bản chụp trước khi lưu (`restoreRec`), trả lại nhật ký cũ.
 

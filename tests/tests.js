@@ -625,12 +625,13 @@
       try {
         openCompose(); $("#inputText").value = "Dọn phòng\nrồi nghỉ";
         $("#btnManual").click(); await wait(20);
-        eq([sheetOpen(), sheetTitle(), ai], [true, "Tự thêm", 0]);
+        eq([sheetOpen(), sheetTitle(), ai], [true, "Thêm việc đã làm", 0]);
         ok(!$("#dock").classList.contains("is-open"), "ô nhập đóng lại");
         const box = $$("#sheetBody .act"); eq(box.length, 1);
         eq($('[data-f="title"]', box[0]).value, "Dọn phòng");
         eq($('[data-f="end"]', box[0]).value, hm(new Date()));
         ok(!$(".reply"), "không có lời đáp AI");
+        ok(!$("#sheetBody").textContent.includes("Thời gian thực tế"), "không có dòng nhóm");
       } finally { window.callGemini = orig; closeSheet(); $("#inputText").value = ""; resetOther(); }
     });
     test("Tự thêm khi Làm việc khác: giờ từ đầu khối đang chạy, nhóm theo khối; lưu thì ghi việc + bỏ qua khối", async () => {
@@ -645,6 +646,26 @@
         eq(a.title, CATS.korean.name, "tên trống thì lấy tên nhóm");
         ok((S.today.rec.skip || []).includes(blk.id), "khối đang chạy được đánh dấu bỏ qua");
       } finally { S.today.plan = S.today.plan.filter(b => b.id !== blk.id); resetOther(); closeSheet(); }
+    });
+    test("+ Thêm việc: thẻ mới nối tiếp thẻ cuối, không mất chỗ đã sửa", async () => {
+      await reset();
+      renderConfirm(P({ activities: [act("Lớp tiếng Hàn", "19:00", "21:00", ymd(day(-1)))] }));
+      $('#sheetBody [data-f="title"]').value = "Lớp Hàn";
+      $("#cAddAct").click(); await wait(20);
+      const a = S.pending.activities;
+      eq(a.length, 2); eq(a[0].title, "Lớp Hàn", "chỗ đã sửa còn");
+      eq([a[1].title, a[1].category, a[1].date, a[1].start, a[1].end], ["", "life", ymd(day(-1)), "21:00", "21:30"]);
+      eq($$("#sheetBody .act").length, 2);
+      eq(document.activeElement, $$('#sheetBody [data-f="title"]')[1], "focus ô tên thẻ mới");
+      closeSheet();
+    });
+    test("form Thêm kế hoạch và Sửa việc đã làm: Tên → Nhóm → Giờ", async () => {
+      await reset();
+      const order = () => [...$("#sheetBody .act").children].map(el => el.tagName === "SELECT" ? "nhóm" : el.classList.contains("act__times") ? "giờ" : el.type === "text" ? "tên" : null).filter(Boolean);
+      renderPlanAdd(at("10:00")); eq(order(), ["tên", "nhóm", "giờ"]); closeSheet();
+      renderConfirm(P({ activities: [act("A", "10:00", "10:30")] })); await savePending();
+      $(`[data-aid="${S.today.actual[S.today.actual.length - 1].id}"]`).click(); await wait(20);
+      eq(sheetTitle(), "Sửa việc đã làm"); eq(order(), ["tên", "nhóm", "giờ"]); closeSheet();
     });
     test("lỗi thiếu Gemini key: toast có nút Mở Cài đặt", async () => {
       await reset();
