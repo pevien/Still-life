@@ -5,6 +5,72 @@ Mới nhất ở trên. Số `vNN` là phiên bản cache trong `sw.js`.
 
 ---
 
+## 2026-11-14 · Ngày hiện theo DD/MM/YYYY · v31
+**Đổi gì**: mọi ngày trong app hiện theo `DD/MM/YYYY`: đầu trang ("Thứ Bảy, 14/11/2026"), dòng tuần ở Thói quen
+("09/11/2026 – 15/11/2026"), tiêu đề sheet, danh sách nhật ký, nhãn chip ngày, tiêu đề file nhật ký mới, tên sự kiện "Thói quen · 14/11/2026".
+
+**Vì sao**: trước đây lẫn lộn "14 tháng 11", "14/11", "9/11", khó đọc và không thống nhất.
+
+**Logic**
+- Một hàm `dmy(d)` (có số 0 đứng đầu) cho mọi chỗ hiển thị; `fmtDate` = thứ + `dmy`. Bỏ `dm()` cũ.
+- Dữ liệu, tên file `YYYY-MM-DD.md`, `data-day` giữ `ymd()`: đổi sẽ làm hỏng file và sự kiện đã có.
+- Không đổi: số ngày trong ô lịch tháng (chỉ là số), tiêu đề tháng ("Tháng 11 · 2026"), ô chọn ngày (`input type=date` hiện theo ngôn ngữ của máy, app không chỉnh được).
+- File nhật ký cũ có tiêu đề kiểu cũ vẫn đọc bình thường: `parseJournal` bỏ qua dòng `# `.
+
+## 2026-11-14 · Nhật ký: form chỉ để viết, đọc trong sheet · v30
+**Đổi gì**
+1. Form trên trang Nhật ký **luôn trống**, mở lại app cũng trống. Bỏ thẻ "Đã lưu hôm nay" của v28.
+2. Danh sách bên dưới đổi tên thành **"Đã viết"** và gồm cả hôm nay. Lưu xong, dòng "Hôm nay" nháy nền một lần và cuộn tới.
+3. Hôm nay đã có trang mà lưu nữa: **nối** vào từng mục, không ghi đè. Tiêu đề form đổi thành "Viết thêm cho hôm nay."
+4. Chạm một trang: sheet hiện **chữ thuần** kèm giờ lưu. Nút "Sửa" nhỏ ở cuối mới mở form.
+
+**Vì sao**
+- Form đầy chữ cũ trông như bản nháp chưa lưu, và lẫn chỗ để viết với chỗ để đọc. Tách ra: trên để viết, dưới để đọc.
+- Form trống mà lưu đè thì sẽ mất phần đã viết trước đó trong ngày, nên phải nối.
+- Vẫn giữ nút Sửa (nhỏ, ở cuối sheet) vì không có nó thì không sửa được lỗi gõ.
+
+**Logic**
+- `drawJournal(flash)` vẽ form trống + danh sách từ `S.jfiles`, không gọi mạng. Bỏ `S.jedit`, `S.jcur`, `#jEdit`, `#jCancel`.
+- Lưu từ form: có trang hôm nay thì đọc trang, `mergeJournal(cur, add)` nối từng mục (mục trống giữ nguyên), rồi ghi.
+  Mức thói quen Nhật ký tính trên trang sau khi nối.
+- Lưu từ Sửa (`#jpast`): ghi đè đúng trang đó, như trước.
+- Demo lưu thêm giờ lưu (`db.jmod`) để sheet hiện được "lúc HH:MM".
+- Thay 2 test của v28 bằng 4 test: `mergeJournal`, form trống sau khi lưu và khi mở lại, lưu lần 2 thì nối, sheet chữ thuần + Sửa.
+
+## 2026-11-14 · Nút đang chạy: chỉ còn vòng quay · v29
+**Đổi gì**: mọi nút đang chờ mạng chỉ hiện vòng quay ở giữa, bỏ chữ ("Đang lưu lên Drive…", "Đang thử…", "Đang chuyển sang ngày nhẹ nhàng…").
+Áp cho cả các nút trước đây chỉ bị khoá mà không báo gì: Lưu / Xoá / Thêm trong các sheet, nút Làm / Bỏ qua của khối kế hoạch.
+
+**Vì sao**: chữ dài làm nút đổi kích thước, nhảy layout, và đọc rối. Vòng quay đủ để biết đang chạy. Các nút chỉ khoá thì
+trông như bấm không ăn.
+
+**Logic**
+- `busy(el, label)` giữ nguyên rộng / cao của nút trước khi thay nội dung, nên nút không co lại. Vòng quay nằm giữa (`.is-busy`).
+- `label` không hiện nữa mà thành `aria-label` + `aria-busy`, để trình đọc màn hình vẫn biết nút đang làm gì.
+- `busy` trả về hàm trả nút về như cũ (nội dung, kích thước, aria). Lỗi thì gọi hàm này; thành công thì render lại thay nút mới.
+- Chữ "Đang mở nhật ký…" và "Đang kiểm tra key…" giữ nguyên: đó là dòng trạng thái, không phải nút.
+- Sửa 3 test cho đúng hành vi mới (không còn chữ, trả lại như cũ).
+
+## 2026-11-14 · Nhật ký: lưu xong thấy rõ đã lưu · v28
+**Đổi gì**
+1. Bấm "Lưu nhật ký": nút hiện vòng quay và chữ "Đang lưu lên Drive…".
+2. Lưu xong, form hôm nay chuyển thành **bản đã lưu** (chỉ đọc): "Đã lưu hôm nay.", dòng xanh "Đã lưu vào Google Drive lúc HH:MM",
+   nội dung từng mục, nút **Sửa**, và một dòng nói rõ ngày mai sẽ có trang mới, trang này chuyển xuống "Những ngày trước".
+3. Mở lại app trong ngày vẫn thấy bản đã lưu. Bấm Sửa thì ra form điền sẵn, kèm nút "Huỷ, giữ bản đã lưu".
+4. Dưới form có dòng ghi trang được lưu ở đâu (Still life › Nhật ký trên Drive).
+
+**Vì sao**
+- Trước đây bấm Lưu không có gì thay đổi ngoài toast, form vẫn nguyên chữ, nên không biết đã lưu chưa.
+  Mở lại vẫn thấy form đầy chữ, trông như bản nháp chưa gửi, nên không chắc mai còn không.
+- Hôm nay không nằm trong "Những ngày trước" nên càng không thấy dấu hiệu đã lưu.
+
+**Logic**
+- Tách `renderJournal()` (tải) và `drawJournal()` (vẽ, không gọi mạng). Lưu xong vẽ lại ngay từ dữ liệu vừa gửi, không tải lại.
+- Có nội dung hôm nay trên Drive và không đang sửa (`S.jedit`) → hiện bản đã lưu. Mở lại tab thì `jedit` trở về false.
+- `listJournal` lấy thêm `modifiedTime` (`mod`), `saveJournal` trả `mod` = giờ lưu, để hiện "lúc HH:MM".
+- Lưu lỗi thì nút trở lại như cũ, form giữ nguyên chữ.
+- Thêm 2 test (nút đang lưu, bản đã lưu, mở lại; Sửa / Huỷ).
+
 ## 2026-11-14 · "Thêm việc đã làm", nút + Thêm việc, form cùng thứ tự · v27
 **Đổi gì**
 1. Sheet mở từ nút "Tự thêm" có tiêu đề **"Thêm việc đã làm"**, không còn dòng nhóm "Thời gian thực tế". Nút trong ô nhập giữ chữ "Tự thêm".

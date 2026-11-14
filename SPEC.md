@@ -75,7 +75,16 @@ Thanh dưới có 4 ô: Hôm nay · Thói quen · Nhật ký · Cài đặt (Cà
    - Trên timeline, các việc chồng giờ nằm cạnh nhau.
 3. **Thói quen**: chuyển Tuần / Tháng, lùi tới từng tuần, tháng (không quá ngày bắt đầu, không quá hiện tại).
    Chú thích trạng thái nằm dưới tiêu đề, căn giữa. Chạm ô một ngày để sửa habit ngày đó. Chuỗi 🔥.
-4. **Nhật ký**: viết hôm nay, xem các ngày trước.
+4. **Nhật ký**: viết hôm nay, xem các ngày trước. Mỗi ngày một trang trên Drive.
+   - Form trên cùng **luôn trống**, chỉ để viết. Mở lại app cũng trống.
+   - Bấm Lưu: nút chỉ còn vòng quay. Xong thì form trống lại, trang hôm nay hiện ở đầu danh sách "Đã viết" (dòng "Hôm nay", nháy nền một lần).
+   - Hôm nay đã có trang mà viết và lưu nữa: **nối** vào từng mục của trang đó, không ghi đè phần cũ.
+   - Chạm một trang trong danh sách: sheet hiện **chữ thuần** (không phải form), có giờ lưu "Đã lưu vào Google Drive lúc HH:MM".
+     Nút "Sửa" nhỏ ở cuối sheet mới mở form điền sẵn; lưu từ đó thì ghi đè đúng trang ấy.
+
+## Định dạng ngày
+Mọi ngày hiện ra đều theo **DD/MM/YYYY** (vd `14/11/2026`), có thể kèm thứ: "Thứ Bảy, 14/11/2026", "T6 13/11/2026".
+Tên file và dữ liệu vẫn dùng `YYYY-MM-DD`. Ô chọn ngày (`input type=date`) hiện theo cài đặt ngôn ngữ của máy.
 
 ## Kiểm thử
 Unit test chạy trong trình duyệt, ở chế độ demo, không đụng Google: xem `tests/` và mục Kiểm thử trong README.

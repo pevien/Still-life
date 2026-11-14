@@ -77,7 +77,9 @@ function rfc(d) {
 }
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const todayStr = () => ymd(new Date());
-const fmtDate = d => `${DOW[d.getDay()]}, ${d.getDate()} tháng ${d.getMonth() + 1}`;
+// Mọi ngày hiện ra đều theo DD/MM/YYYY (vd 14/11/2026)
+const dmy = d => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+const fmtDate = d => `${DOW[d.getDay()]}, ${dmy(d)}`;
 const LV = { full: 3, min: 2, skip: 1 };
 const better = (a, b) => ((LV[a] || 0) >= (LV[b] || 0) ? a : b);
 
@@ -278,7 +280,7 @@ const Google = {
   async saveDay(rec) {
     const d = parseYmd(rec.date);
     const body = {
-      summary: `Thói quen · ${d.getDate()}/${d.getMonth() + 1}` + (rec.unwell ? " · unwell day" : ""),
+      summary: `Thói quen · ${dmy(d)}` + (rec.unwell ? " · unwell day" : ""),
       start: { date: rec.date }, end: { date: ymd(addDays(d, 1)) }, transparency: "transparent",
       reminders: { useDefault: false, overrides: [] }, colorId: "2",
       extendedProperties: { private: recToProps(rec) },
@@ -317,12 +319,12 @@ const Google = {
   },
   async listJournal() {
     const r = await g(`${DRIVE}/files?${q({ q: `'${S.cfg.journalFolderId}' in parents and trashed=false`, fields: "files(id,name,modifiedTime)", orderBy: "name desc", pageSize: 120 })}`);
-    return r.files.map(f => ({ id: f.id, date: f.name.replace(/\.md$/, "") }));
+    return r.files.map(f => ({ id: f.id, date: f.name.replace(/\.md$/, ""), mod: f.modifiedTime }));
   },
   async readJournal(file) { return g(`${DRIVE}/files/${file.id}?alt=media`); },
   async saveJournal(date, md, file) {
     const r = await this.writeFile(`${date}.md`, S.cfg.journalFolderId, md, "text/markdown", file && file.id);
-    return { id: r.id, date };
+    return { id: r.id, date, mod: new Date().toISOString() };
   },
 };
 
@@ -356,7 +358,7 @@ const Demo = (() => {
     return { days, actual, journal, muted: [] };
   }
   db.planEdit = db.planEdit || {}; db.planExtra = db.planExtra || [];
-  const persist = () => LS.set("demo", { days: db.days, actual: db.actual.map(a => Object.assign({}, a, { start: +a.start, end: +a.end })), journal: db.journal, muted: db.muted, planEdit: db.planEdit, planExtra: db.planExtra });
+  const persist = () => LS.set("demo", { days: db.days, actual: db.actual.map(a => Object.assign({}, a, { start: +a.start, end: +a.end })), journal: db.journal, jmod: db.jmod, muted: db.muted, planEdit: db.planEdit, planExtra: db.planExtra });
   db.actual = db.actual.map(a => Object.assign(a, { start: new Date(a.start), end: new Date(a.end) }));
   return {
     async setup() { return { planCal: "demo", actualCal: "demo", start: ymd(addDays(new Date(), -60)) }; },
@@ -383,9 +385,9 @@ const Demo = (() => {
     async deletePlan(id) { db.planExtra = db.planExtra.filter(x => x.id !== id); delete db.planEdit[id]; persist(); },
     async updatePlan(it) { db.planEdit[it.id] = { title: it.title, start: +it.start, end: +it.end }; persist(); return Object.assign({}, it); },
     async mutePlan(items, mute) { for (const it of items) { db.muted = db.muted.filter(x => x !== it.id); if (mute) db.muted.push(it.id); } persist(); },
-    async listJournal() { return Object.keys(db.journal).sort().reverse().map(date => ({ id: date, date })); },
+    async listJournal() { return Object.keys(db.journal).sort().reverse().map(date => ({ id: date, date, mod: (db.jmod || {})[date] })); },
     async readJournal(f) { return db.journal[f.date] || ""; },
-    async saveJournal(date, md) { db.journal[date] = md; persist(); return { id: date, date }; },
+    async saveJournal(date, md) { const mod = new Date().toISOString(); db.journal[date] = md; (db.jmod = db.jmod || {})[date] = mod; persist(); return { id: date, date, mod }; },
     reset() { localStorage.removeItem("sl.demo"); },
   };
 })();
@@ -660,9 +662,8 @@ function renderOnboarding(v) {
 // ============================================================ render: habits
 const HSHORT = { eat: "Ăn 3 bữa", wake: "Dậy 5:30", korean: "Tiếng Hàn", walk: "Đi bộ", yoga: "Yoga", gym: "Gym", phone: "Cất máy", journal: "Nhật ký" };
 const editable = d => d <= startOfDay(new Date()) && d >= trackStart();
-const dm = d => `${d.getDate()}/${d.getMonth() + 1}`;
 function habitDay(hb, d, cls = "") {
-  const st = cellStatus(hb, d), label = `${esc(hb.name)} ${DOW_SHORT[d.getDay()]} ${dm(d)}`;
+  const st = cellStatus(hb, d), label = `${esc(hb.name)} ${DOW_SHORT[d.getDay()]} ${dmy(d)}`;
   return editable(d)
     ? `<button class="mcal__d ${cls}" data-st="${st}" data-day="${ymd(d)}" aria-label="${label}">${d.getDate()}</button>`
     : `<span class="mcal__d ${cls}" data-st="${st}">${d.getDate()}</span>`;
@@ -685,12 +686,12 @@ function renderHabits() {
   if (mode === "week") {
     const mon = S.habWeek ? parseYmd(S.habWeek) : mondayOf(t), sun = addDays(mon, 6), cur = mondayOf(t);
     const ago = Math.round((cur - mon) / (7 * 864e5));
-    html += nav("week", mon > mondayOf(trackStart()), mon < cur, ago === 0 ? "Tuần này" : ago === 1 ? "Tuần trước" : `${ago} tuần trước`, `${dm(mon)} – ${dm(sun)}`);
+    html += nav("week", mon > mondayOf(trackStart()), mon < cur, ago === 0 ? "Tuần này" : ago === 1 ? "Tuần trước" : `${ago} tuần trước`, `${dmy(mon)} – ${dmy(sun)}`);
     html += `${legend}<div class="week fade-in"><div class="wgrid wgrid--head"><span></span>`;
     for (let i = 0; i < 7; i++) {
       const d = addDays(mon, i);
       html += editable(d)
-        ? `<button class="wday ${+d === +t ? "is-today" : ""}" data-day="${ymd(d)}" aria-label="Sửa thói quen ${DOW[d.getDay()]} ${dm(d)}">${DOW_SHORT[d.getDay()]}</button>`
+        ? `<button class="wday ${+d === +t ? "is-today" : ""}" data-day="${ymd(d)}" aria-label="Sửa thói quen ${DOW[d.getDay()]} ${dmy(d)}">${DOW_SHORT[d.getDay()]}</button>`
         : `<span class="wday ${+d === +t ? "is-today" : ""}">${DOW_SHORT[d.getDay()]}</span>`;
     }
     html += `</div>`;
@@ -749,14 +750,14 @@ function renderDaySheet(date) {
       ${opts.map(([lv, ic, lab]) => lv === "min" && !hb.min ? `<span class="seg__gap"></span>` : `<button data-dh="${hb.id}" data-lv="${lv}" aria-pressed="${cur === lv}" aria-label="${lab}" title="${lab}"><i class="ph ${ic}"></i></button>`).join("")}
     </div></div>`;
   }).join("");
-  openSheet(`${DOW[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`, `<div class="daylist">${rows}</div>`);
+  openSheet(`${DOW[d.getDay()]} ${dmy(d)}`, `<div class="daylist">${rows}</div>`);
 }
 
 // ============================================================ render: journal
 const JFIELDS = [["vui", "Hôm nay vui vì"], ["bietOn", "Biết ơn điều gì"], ["mai", "Mai muốn làm gì"], ["them", "Ghi thêm"]];
 function journalMd(date, f) {
   const d = parseYmd(date);
-  let md = `# Nhật ký · ${fmtDate(d)} ${d.getFullYear()}\n`;
+  let md = `# Nhật ký · ${fmtDate(d)}\n`;
   for (const [k, label] of JFIELDS) if ((f[k] || "").trim()) md += `\n## ${label === "Hôm nay vui vì" ? "Vui vì" : label === "Biết ơn điều gì" ? "Biết ơn" : label === "Mai muốn làm gì" ? "Mai muốn" : "Ghi thêm"}\n${f[k].trim()}\n`;
   return md;
 }
@@ -778,21 +779,34 @@ async function renderJournal() {
   if (S.jdirty && $("#jform", v)) return;
   S.jdirty = false;
   v.innerHTML = `<p class="muted">Đang mở nhật ký…</p>`;
-  let files = [];
-  try { files = await api().listJournal(); } catch (e) { return handleErr(e); }
-  S.jfiles = files;
-  const today = todayStr(), tf = files.find(f => f.date === today);
-  const cur = tf ? parseJournal(await api().readJournal(tf)) : {};
+  try { S.jfiles = await api().listJournal(); } catch (e) { return handleErr(e); }
+  drawJournal();
+}
+// Form luôn trống, chỉ để viết. Mọi trang đã lưu (cả hôm nay) nằm ở danh sách bên dưới; chạm để đọc.
+// Vẽ từ S.jfiles, không gọi mạng, nên lưu xong hiện ngay trang hôm nay trong danh sách.
+function drawJournal(flash) {
+  const v = $("#view-journal"), today = todayStr(), files = S.jfiles || [];
+  const hasToday = files.some(f => f.date === today);
   let html = `<form class="jcard fade-in" id="jform">
     <p class="now__label"><i class="ph ph-moon"></i> ${fmtDate(new Date())} · trước khi ngủ</p>
-    <h2 class="now__title" style="font-size:28px;margin-bottom:16px">Ba dòng cho hôm nay.</h2>`;
-  html += journalFormFields(cur);
-  html += `<button class="btn btn--primary btn--block" type="submit"><i class="ph ph-floppy-disk"></i> Lưu nhật ký</button></form>`;
-  const past = files.filter(f => f.date !== today);
-  html += `<h2 class="h2">Những ngày trước <small>${past.length}</small></h2>`;
-  html += past.length ? `<ul class="jlist">${past.map(f => { const d = parseYmd(f.date); return `<li><button data-jdate="${esc(f.date)}"><b>${DOW_SHORT[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}</b><span class="jprev" data-prev="${esc(f.date)}">${esc((S.jprev || {})[f.date] || "")}</span><i class="ph ph-caret-right"></i></button></li>`; }).join("")}</ul>` : `<p class="muted">Trang đầu tiên sẽ là hôm nay.</p>`;
+    <h2 class="now__title" style="font-size:28px;margin-bottom:16px">${hasToday ? "Viết thêm cho hôm nay." : "Ba dòng cho hôm nay."}</h2>
+    ${journalFormFields({})}
+    <button class="btn btn--primary btn--block" type="submit"><i class="ph ph-floppy-disk"></i> Lưu nhật ký</button>
+    <p class="jnote">${hasToday ? "Hôm nay đã có trang. Lưu nữa thì viết nối vào trang đó, không mất phần cũ." : "Lưu vào Google Drive (Still life › Nhật ký), mỗi ngày một trang."}</p>
+  </form>`;
+  html += `<h2 class="h2">Đã viết <small>${files.length}</small></h2>`;
+  html += files.length ? `<ul class="jlist">${files.map(f => { const d = parseYmd(f.date), isT = f.date === today; return `<li${f.date === flash ? ' class="is-new"' : ""}><button data-jdate="${esc(f.date)}"><b>${isT ? "Hôm nay" : `${DOW_SHORT[d.getDay()]} ${dmy(d)}`}</b><span class="jprev" data-prev="${esc(f.date)}">${esc((S.jprev || {})[f.date] || "")}</span><i class="ph ph-caret-right"></i></button></li>`; }).join("")}</ul>` : `<p class="muted">Chưa có trang nào. Trang đầu tiên sẽ là hôm nay.</p>`;
   v.innerHTML = html;
-  loadPreviews(past.slice(0, 20));
+  loadPreviews(files.slice(0, 20));
+}
+// Ghép phần mới vào trang đã có: mỗi mục nối xuống dòng dưới, mục trống giữ nguyên
+const mergeJournal = (cur, add) => { const out = Object.assign({}, cur); for (const [k] of JFIELDS) { const t = (add[k] || "").trim(); if (t) out[k] = [out[k], t].filter(Boolean).join("\n"); } return out; };
+// Sheet đọc một trang: chữ thuần, không phải form. Có nút Sửa nhỏ nếu cần sửa lỗi.
+function journalSheet(f, j) {
+  const d = parseYmd(f.date), body = JFIELDS.filter(([k]) => (j[k] || "").trim()).map(([k, label]) => `<h3>${label}</h3><p>${esc(j[k])}</p>`).join("");
+  const at = f.mod ? `<p class="jsaved__meta"><i class="ph-fill ph-check-circle"></i> Đã lưu vào Google Drive lúc ${hm(new Date(f.mod))}${f.date === todayStr() ? "" : ` · ${dmy(new Date(f.mod))}`}</p>` : "";
+  openSheet(`${DOW[d.getDay()]} ${dmy(d)}`, `${at}<div class="md jread">${body || '<p class="muted">Trang trống.</p>'}</div>
+    <button class="btn btn--ghost btn--block" id="jEditPage" data-date="${esc(f.date)}" type="button" style="margin-top:20px"><i class="ph ph-pencil-simple"></i> Sửa</button>`);
 }
 // Câu đầu tiên của mỗi trang cũ, tải dần sau khi hiện danh sách
 const firstLine = j => (JFIELDS.map(([k]) => j[k]).find(Boolean) || "").split("\n")[0];
@@ -856,7 +870,7 @@ function dateField(ds) {
     <span class="act__dayhint">${esc(dayHint(ds))}</span></label>`;
 }
 // Nhãn ngày ngắn cho chip thói quen: "Hôm qua" hoặc "T6 13/11" ("" = hôm nay)
-const dayShort = ds => (!ds || ds === todayStr() ? "" : dayHint(ds) === "Hôm qua" ? "Hôm qua" : (d => `${DOW_SHORT[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`)(parseYmd(ds)));
+const dayShort = ds => (!ds || ds === todayStr() ? "" : dayHint(ds) === "Hôm qua" ? "Hôm qua" : (d => `${DOW_SHORT[d.getDay()]} ${dmy(d)}`)(parseYmd(ds)));
 const pendingEmpty = p => !p.activities.length && !p.habits.length && !(p.journal || "").trim() && !p.unwell;
 // "Tự thêm": thẻ việc trống, không qua AI. Tên lấy từ chữ đã gõ (nếu có).
 // Đang "Làm việc khác" thì giờ bắt đầu = đầu khối đang chạy, nhóm theo khối; không thì 30 phút trước.
@@ -995,13 +1009,13 @@ async function testConnection() {
   if (!S.settings.geminiKey) { const st = $("#sKeyState"); st.textContent = "Chưa nhập key"; st.className = "keystate is-bad"; return; }
   if ($("#sKeyState").classList.contains("is-bad")) return;
   S.settings.model = $("#sModel").value; saveSettings();
-  b.disabled = true; b.innerHTML = '<i class="ph ph-circle-notch spin"></i> Đang thử…';
+  const done = busy(b, "Đang thử kết nối");
   const st = $("#sKeyState");
   try {
     const p = await callGemini("vừa đi bộ 10 phút");
     st.innerHTML = `<i class="ph-fill ph-check-circle"></i> Kết nối được · ${esc(modelLabel(p.model || curModel()).split(" · ")[0])}`; st.className = "keystate is-ok";
   } catch (e) { st.textContent = e.message; st.className = "keystate is-bad"; }
-  b.disabled = false; b.innerHTML = '<i class="ph ph-plugs-connected"></i> Kiểm tra kết nối';
+  done();
 }
 // Key hợp lệ → đẩy lên Drive (nếu đã nối Google) để đồng bộ theo tài khoản
 function syncKey(key) {
@@ -1094,7 +1108,7 @@ async function savePending() {
   const p = S.pending; if (!p) return;
   syncPending();
   if (pendingEmpty(p) && !S.otherFor) { closeSheet(); toast("Không có gì để ghi"); return; }
-  const btn = $("#cSave"); btn.disabled = true;
+  const undoBusy = busy($("#cSave"), "Đang lưu");
   const today = todayStr(), created = [], prevRecs = {};
   const snap = d => { if (!(d in prevRecs)) prevRecs[d] = S.days[d] ? JSON.parse(JSON.stringify(S.days[d])) : null; };
   let jPrev = null, unwellOn = false;
@@ -1132,7 +1146,7 @@ async function savePending() {
       if (jPrev) { await api().saveJournal(today, jPrev.md, jPrev.file); if (S.jprev) delete S.jprev[today]; }
     });
     render();
-  } catch (e) { btn.disabled = false; handleErr(e); }
+  } catch (e) { undoBusy(); handleErr(e); }
 }
 // Trả bản ghi ngày về trạng thái cũ (giữ id sự kiện hiện có để không tạo trùng)
 async function restoreRec(d, prev) {
@@ -1375,8 +1389,18 @@ function setView(v) {
 // ============================================================ events
 function autosize() { const t = $("#inputText"); t.style.height = "auto"; t.style.height = Math.min(Math.round(innerHeight * 0.6), t.scrollHeight + 2) + "px"; }
 
-// Nút đang chạy: khoá + vòng quay + chữ trạng thái (render lại sẽ thay nút mới)
-function busy(el, label) { el.disabled = true; el.classList.add("is-busy"); el.innerHTML = `<i class="ph ph-circle-notch spin"></i> ${esc(label)}`; }
+// Nút đang chạy: khoá + chỉ còn vòng quay, giữ nguyên kích thước nút. label chỉ cho trình đọc màn hình.
+// Trả về hàm trả nút về như cũ (dùng khi lỗi; thành công thì render lại thay nút mới).
+function busy(el, label = "Đang xử lý") {
+  const html = el.innerHTML, w = el.style.width, h = el.style.height, aria = el.getAttribute("aria-label");
+  if (el.offsetWidth) { el.style.width = el.offsetWidth + "px"; el.style.height = el.offsetHeight + "px"; }
+  el.disabled = true; el.classList.add("is-busy"); el.setAttribute("aria-busy", "true"); el.setAttribute("aria-label", label);
+  el.innerHTML = `<i class="ph ph-circle-notch spin" aria-hidden="true"></i>`;
+  return () => {
+    el.disabled = false; el.classList.remove("is-busy"); el.removeAttribute("aria-busy"); el.innerHTML = html; el.style.width = w; el.style.height = h;
+    if (aria == null) el.removeAttribute("aria-label"); else el.setAttribute("aria-label", aria);
+  };
+}
 
 document.addEventListener("click", async e => {
   const el = e.target.closest("button, [data-close]");
@@ -1415,12 +1439,12 @@ document.addEventListener("click", async e => {
     closeSheet(); toast("Đã lưu cài đặt"); return render();
   }
   if (id === "btnOpenCal") return window.open("https://calendar.google.com/calendar/r/day", "_blank", "noopener");
-  if (id === "btnUnwell") { busy(el, "Đang chuyển sang ngày nhẹ nhàng…"); try { await setUnwell(true); toast("Unwell day. Nghỉ ngơi nhé", 2600, () => setUnwell(false)); } catch (er) { handleErr(er); } return render(); }
-  if (id === "eSave") { el.disabled = true; try { await saveActEdit(); } catch (er) { el.disabled = false; handleErr(er); } return renderToday(); }
-  if (id === "eDel") { el.disabled = true; try { await deleteAct(); } catch (er) { el.disabled = false; handleErr(er); } return renderToday(); }
-  if (id === "pAdd") { el.disabled = true; try { if (!(await savePlanAdd())) { el.disabled = false; return; } } catch (er) { el.disabled = false; handleErr(er); } return renderToday(); }
-  if (id === "pDel") { el.disabled = true; try { await deletePlanAdded(); } catch (er) { el.disabled = false; handleErr(er); } return renderToday(); }
-  if (id === "pSave") { el.disabled = true; try { await savePlanEdit(); } catch (er) { el.disabled = false; handleErr(er); } return renderToday(); }
+  if (id === "btnUnwell") { busy(el, "Đang chuyển sang ngày nhẹ nhàng"); try { await setUnwell(true); toast("Unwell day. Nghỉ ngơi nhé", 2600, () => setUnwell(false)); } catch (er) { handleErr(er); } return render(); }
+  if (id === "eSave") { const done = busy(el, "Đang lưu"); try { await saveActEdit(); } catch (er) { done(); handleErr(er); } return renderToday(); }
+  if (id === "eDel") { const done = busy(el, "Đang xoá"); try { await deleteAct(); } catch (er) { done(); handleErr(er); } return renderToday(); }
+  if (id === "pAdd") { const done = busy(el, "Đang thêm"); try { if (!(await savePlanAdd())) { done(); return; } } catch (er) { done(); handleErr(er); } return renderToday(); }
+  if (id === "pDel") { const done = busy(el, "Đang xoá"); try { await deletePlanAdded(); } catch (er) { done(); handleErr(er); } return renderToday(); }
+  if (id === "pSave") { const done = busy(el, "Đang lưu"); try { await savePlanEdit(); } catch (er) { done(); handleErr(er); } return renderToday(); }
   if (el.dataset.pid) { const p = S.today.plan.find(x => x.id === el.dataset.pid); if (p) renderPlanEdit(p); return; }
   if (el.dataset.aid) { const a = S.today.actual.find(x => x.id === el.dataset.aid); if (a) renderActEdit(a); return; }
   if (el.dataset.hview) { S.habView = el.dataset.hview; LS.set("habView", S.habView); return renderHabits(); }
@@ -1441,11 +1465,11 @@ document.addEventListener("click", async e => {
     try { await setHabit(S.dayDate, el.dataset.dh, el.dataset.lv || null); } catch (er) { handleErr(er); }
     renderDaySheet(S.dayDate); return S.view === "habits" ? renderHabits() : renderToday();
   }
-  if (id === "btnUnwellOff") { busy(el, "Đang bật lại lịch…"); try { await setUnwell(false); toast("Đã bật lại lịch bình thường"); } catch (er) { handleErr(er); } return render(); }
+  if (id === "btnUnwellOff") { busy(el, "Đang bật lại lịch"); try { await setUnwell(false); toast("Đã bật lại lịch bình thường"); } catch (er) { handleErr(er); } return render(); }
   if (id === "cSave") return savePending();
   if (el.dataset.act) {
     if (el.dataset.act === "other") { S.otherFor = el.dataset.id; return openCompose("Đang làm gì thay vào đó?"); }
-    el.disabled = true;
+    busy(el);
     try { if (el.dataset.act === "undo") await unmarkBlock(el.dataset.id); else await markBlock(el.dataset.id, el.dataset.act); } catch (er) { handleErr(er); }
     return render();
   }
@@ -1476,9 +1500,15 @@ document.addEventListener("click", async e => {
   if (el.dataset.jdate) {
     const f = (S.jfiles || []).find(x => x.date === el.dataset.jdate); if (!f) return;
     let j; try { j = parseJournal(await api().readJournal(f)); } catch (er) { return handleErr(er); }
-    const d = parseYmd(f.date);
-    return openSheet(`${DOW[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`, `<form id="jpast" data-date="${esc(f.date)}">${journalFormFields(j)}
-      <button class="btn btn--primary btn--block" type="submit"><i class="ph ph-floppy-disk"></i> Lưu</button></form>`);
+    S.jopen = j;
+    return journalSheet(f, j);
+  }
+  if (el.id === "jEditPage") {
+    const ds = el.dataset.date;
+    $("#sheetBody").innerHTML = `<form id="jpast" data-date="${esc(ds)}">${journalFormFields(S.jopen || {})}
+      <button class="btn btn--primary btn--block" type="submit"><i class="ph ph-floppy-disk"></i> Lưu</button></form>`;
+    const t = $("#jpast textarea"); if (t) t.focus();
+    return;
   }
 });
 
@@ -1486,21 +1516,26 @@ document.addEventListener("submit", async e => {
   e.preventDefault();
   if (e.target.id === "dock") return submitInput($("#inputText").value);
   if (e.target.id === "jform" || e.target.id === "jpast") {
-    const fd = new FormData(e.target), f = Object.fromEntries(fd.entries()), today = e.target.dataset.date || todayStr(), past = e.target.id === "jpast";
-    const lines = ["vui", "bietOn", "mai"].filter(k => (f[k] || "").trim()).length;
-    if (!lines && !(f.them || "").trim()) return toast("Viết ít nhất một dòng nhé");
-    const btn = $("button[type=submit]", e.target); btn.disabled = true;
+    // jform (form trống ở trang): nối vào trang hôm nay nếu đã có. jpast (Sửa trong sheet): ghi đè đúng trang đó.
+    const fd = new FormData(e.target), add = Object.fromEntries(fd.entries()), day = e.target.dataset.date || todayStr(), past = e.target.id === "jpast";
+    if (!JFIELDS.some(([k]) => (add[k] || "").trim())) return toast("Viết ít nhất một dòng nhé");
+    const done = busy($("button[type=submit]", e.target), "Đang lưu nhật ký");
     try {
-      const tf = (S.jfiles || []).find(x => x.date === today);
-      const saved = await api().saveJournal(today, journalMd(today, f), tf);
-      if (!tf) (S.jfiles = S.jfiles || []).unshift(saved);
-      await setHabit(today, "journal", lines >= 3 ? "full" : "min");
-      S.jprev = S.jprev || {}; S.jprev[today] = firstLine(f);
-      if (past) { closeSheet(); toast("Đã lưu"); return renderJournal(); }
+      S.jfiles = S.jfiles || [];
+      const tf = S.jfiles.find(x => x.date === day);
+      const f = past || !tf ? add : mergeJournal(parseJournal(await api().readJournal(tf)), add);
+      const saved = await api().saveJournal(day, journalMd(day, f), tf);
+      if (tf) tf.mod = saved.mod; else { S.jfiles.unshift(saved); S.jfiles.sort((a, b) => (a.date < b.date ? 1 : -1)); }
+      const lines = ["vui", "bietOn", "mai"].filter(k => (f[k] || "").trim()).length;
+      await setHabit(day, "journal", lines >= 3 ? "full" : "min");
+      S.jprev = S.jprev || {}; S.jprev[day] = firstLine(f);
       S.jdirty = false;
-      toast(lines >= 3 ? "Đã lưu. Ngủ ngon nhé" : "Đã lưu (bản tối thiểu)");
+      if (past) { closeSheet(); drawJournal(day); return toast("Đã lưu"); }
+      drawJournal(day);
+      const row = $("#view-journal .jlist .is-new"); if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
+      return toast(lines >= 3 ? "Đã lưu. Ngủ ngon nhé" : "Đã lưu (bản tối thiểu)");
     } catch (er) { handleErr(er); }
-    btn.disabled = false;
+    done();
   }
 });
 

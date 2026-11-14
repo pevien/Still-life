@@ -177,6 +177,8 @@ main { max-width: 720px; margin: 0 auto; padding: 0 var(--gutter); }
 .unwell-toggle { transition: transform .15s var(--ease), background-color .2s; }
 .unwell-toggle:active { transform: scale(.97); }
 .unwell-toggle.is-busy, .btn.is-busy { cursor: progress; opacity: 1; }
+/* đang chạy: chỉ còn vòng quay, nằm giữa nút (busy() giữ nguyên kích thước) */
+.is-busy { cursor: progress; justify-content: center; }
 .unwell-toggle.is-busy { border-style: solid; color: var(--ink); }
 .unwell-toggle.is-busy i { color: var(--ink-soft); }
 .unwell-toggle b { color: var(--ink); font-weight: 600; display: block; }
@@ -348,6 +350,13 @@ input[type=time]::-webkit-calendar-picker-indicator { opacity: .6; cursor: point
 .keystate:empty { display: none; }
 .keystate.is-ok { color: var(--good); font-weight: 600; }
 .keystate.is-bad { color: #B4473C; font-weight: 600; }
+.jsaved__meta { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--good); }
+/* trang vừa lưu: nháy nền một lần để mắt bắt được */
+.jlist li.is-new button { animation: jflash 1.6s var(--ease); }
+@keyframes jflash { 0%, 30% { background: var(--canvas); } 100% { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .jlist li.is-new button { animation: none; background: var(--canvas); } }
+.jread h3:first-child { margin-top: 4px; }
+.jnote { margin: 12px 0 0; font-size: 13px; line-height: 1.45; color: var(--ink-soft); }
 .jlist { list-style: none; margin: 0; padding: 0; border-radius: var(--r); background: var(--surface); box-shadow: var(--edge), var(--e1); overflow: hidden; }
 .jlist li + li { border-top: 1px solid var(--line); }
 .jlist button { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; background: none; border: 0; text-align: left; }

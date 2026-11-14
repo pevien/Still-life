@@ -95,6 +95,8 @@ S = {
   pending,                            // kết quả Gemini đang chờ xác nhận
   habView, habWeek, calMonth,         // đang xem tuần/tháng nào ở tab Thói quen
   editPlan, editAct, dayDate,         // id đang mở trong sheet sửa
+  jfiles, jprev, jopen,               // nhật ký: danh sách file {id,date,mod}, câu đầu mỗi trang, trang đang mở trong sheet
+  jdirty,                             // đang gõ dở trong form (quay lại tab không vẽ lại để khỏi mất chữ)
 }
 ```
 Quy tắc: **ghi vào Google/Demo trước, thành công rồi mới cập nhật `S`, sau đó render lại.** Lỗi thì `S` giữ nguyên.
@@ -151,7 +153,7 @@ sequenceDiagram
 - Gemini: thử model đang chọn, rồi lần lượt các model dự phòng nếu gặp 429, 5xx, 404 (`callGemini`).
   Thiếu key, key sai (401, 403, thông báo có "API key") → lỗi có `needKey`, toast hiện nút "Mở Cài đặt".
 - Sheet xác nhận: mỗi thẻ việc có ô ngày sửa được (`dateField`, giá trị qua `validDay`: không rỗng, không tương lai),
-  tô màu khi khác hôm nay; chip thói quen có `date` khác hôm nay hiện nhãn ngắn (`dayShort`: "Hôm qua" hoặc "T6 13/11"). Không còn gì để ghi (`pendingEmpty`)
+  tô màu khi khác hôm nay; chip thói quen có `date` khác hôm nay hiện nhãn ngắn (`dayShort`: "Hôm qua" hoặc "T6 13/11/2026"). Không còn gì để ghi (`pendingEmpty`)
   thì khoá Lưu, trừ chế độ "Làm việc khác". Bỏ hết dòng thì ẩn lời đáp cũ. Giờ ngược có cảnh báo (`timeWarn`), khi lưu thành 15 phút.
 - "Tự thêm" (`#btnManual` → `openManual()`): không gọi Gemini, `manualPending(text)` dựng sẵn một `pending` có 1 việc
   (`manual: true`) rồi đi chung `renderConfirm` → `savePending`, nên ngày, cảnh báo giờ, hoàn tác, "Làm việc khác" đều như luồng AI.
@@ -195,7 +197,15 @@ Máy khác mở app → `findConfig()` → `adoptCfg()` lấy key nếu máy đ�
 - Timeline: `TL = { H0: 5, H1: 23, PX: 56 }`. `top = (giờ - H0) * PX`, khối ≤40px thêm class `is-short` (1 dòng, cắt "…").
   Khối chồng nhau (theo vị trí vẽ, gồm cả chiều cao tối thiểu 22px) được `laneLayout()` chia làn, nằm cạnh nhau trong cột.
   `renderToday()` giữ `scrollTop` cũ khi render lại; lần đầu cuộn tới `data-now` (khi khung đã có chiều cao).
-- Nút đang chờ mạng: `busy(el, label)` khoá nút, hiện vòng quay.
+- Nút đang chờ mạng: `busy(el, label)` khoá nút, giữ nguyên kích thước, chỉ hiện vòng quay ở giữa (không chữ).
+  `label` thành `aria-label` cho trình đọc màn hình. Trả về hàm trả nút như cũ, gọi khi lỗi.
+  Dùng cho mọi nút gọi mạng: Lưu / Xoá / Thêm trong sheet, Kiểm tra kết nối, Unwell, nút khối kế hoạch, Lưu nhật ký.
+- Nhật ký: `renderJournal()` tải danh sách rồi gọi `drawJournal(flash)`. `drawJournal` không gọi mạng: form `#jform` luôn trống,
+  danh sách "Đã viết" gồm cả hôm nay, `flash` là ngày vừa lưu (dòng có class `is-new`).
+  Lưu từ `#jform`: hôm nay đã có trang thì đọc trang đó, `mergeJournal()` nối từng mục, rồi ghi. Lưu từ `#jpast` (Sửa trong sheet): ghi đè.
+  Chạm trang → `journalSheet()` hiện chữ thuần; `#jEditPage` thay thân sheet bằng form `#jpast`.
+  Giờ lưu lấy từ `modifiedTime` của Drive (`mod`); demo giữ trong `db.jmod`.
+- Ngày hiển thị: `dmy(d)` → `DD/MM/YYYY`, `fmtDate(d)` → "Thứ Bảy, 14/11/2026". Dữ liệu và tên file vẫn `ymd()` (`YYYY-MM-DD`).
 
 ## 5. Lỗi và hoàn tác
 - `g()` là cửa duy nhất gọi Google: gắn token, 401 → xoá token và báo `e.auth` để hiện banner "Đăng nhập lại", lỗi khác → `Error("Google lỗi <status>: <message>")`.

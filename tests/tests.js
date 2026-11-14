@@ -49,8 +49,9 @@
       eq(+new Date(s), +d, "parse lại ra đúng thời điểm");
     });
     test("fmtDate tiếng Việt", () => {
-      eq(fmtDate(new Date(2026, 10, 14)), "Thứ Bảy, 14 tháng 11");
-      eq(fmtDate(new Date(2026, 10, 15)), "Chủ nhật, 15 tháng 11");
+      eq(fmtDate(new Date(2026, 10, 14)), "Thứ Bảy, 14/11/2026");
+      eq(fmtDate(new Date(2026, 10, 15)), "Chủ nhật, 15/11/2026");
+      eq(dmy(new Date(2027, 0, 5)), "05/01/2027");
     });
     test("fmtDur: phút và giờ", () => {
       eq([0, 45, 60, 65, 130, 59.6].map(fmtDur), ["0p", "45p", "1g", "1g05", "2g10", "1g"]);
@@ -260,7 +261,7 @@
     test("journalMd → parseJournal đi vòng, bỏ mục trống", () => {
       const f = { vui: "Trời đẹp\nĂn ngon", bietOn: "", mai: "Đi bộ", them: "Ghi chú" };
       const md = journalMd("2026-11-14", f);
-      ok(md.startsWith("# Nhật ký · Thứ Bảy, 14 tháng 11 2026\n"), md.split("\n")[0]);
+      ok(md.startsWith("# Nhật ký · Thứ Bảy, 14/11/2026\n"), md.split("\n")[0]);
       ok(!md.includes("## Biết ơn"), "mục trống không ghi");
       eq(parseJournal(md), { vui: "Trời đẹp\nĂn ngon", mai: "Đi bộ", them: "Ghi chú" });
     });
@@ -487,11 +488,13 @@
       await setUnwell(false);
       eq([S.today.rec.unwell, S.today.rec.muted, S.today.plan.filter(p => p.muted).length], [false, [], 0]);
     });
-    test("busy(): khoá nút, hiện vòng quay và chữ trạng thái", () => {
-      const b = document.createElement("button"); b.textContent = "X";
-      busy(b, "Đang <chạy>");
+    test("busy(): khoá nút, chỉ còn vòng quay (không chữ), trả lại như cũ", () => {
+      const b = document.createElement("button"); b.innerHTML = '<i class="ph ph-check"></i> Lưu';
+      const done = busy(b, "Đang <chạy>");
       ok(b.disabled && b.classList.contains("is-busy") && b.querySelector(".spin"), b.outerHTML);
-      eq(b.textContent.trim(), "Đang <chạy>");
+      eq([b.textContent.trim(), b.getAttribute("aria-label")], ["", "Đang <chạy>"]);
+      done();
+      eq([b.disabled, b.textContent.trim(), b.hasAttribute("aria-label"), b.classList.contains("is-busy")], [false, "Lưu", false, false]);
     });
     test("bấm nút hiện trạng thái ngay, xong thì hiện thẻ Unwell", async () => {
       await reset(); renderToday();
@@ -500,12 +503,53 @@
       try {
         $("#btnUnwell").click(); await wait(20);
         const b = $("#btnUnwell");
-        ok(b && b.disabled && b.textContent.includes("Đang chuyển"), b && b.outerHTML);
+        ok(b && b.disabled && b.querySelector(".spin") && !b.textContent.trim(), b && b.outerHTML);
         release(); await wait(80);
         ok($(".unwell-card"), "có thẻ Unwell day");
         $("#btnUnwellOff").click(); await wait(80);
         ok($("#btnUnwell"), "quay lại nút không ổn");
       } finally { Demo.mutePlan = orig; release(); }
+    });
+  });
+
+  describe("Trang Nhật ký: form chỉ để viết, đọc trong sheet", () => {
+    const openJ = async () => { S.jdirty = false; setView("journal"); for (let i = 0; i < 40 && !$("#jform"); i++) await wait(20); };
+    const fill = vals => { for (const [k, v] of Object.entries(vals)) $(`#jform [name="${k}"]`).value = v; };
+    const areas = () => [...document.querySelectorAll("#jform textarea")];
+    const openToday = async () => { $(`[data-jdate="${todayStr()}"]`).click(); for (let i = 0; i < 40 && $("#sheet").hidden; i++) await wait(20); };
+    test("mergeJournal: nối từng mục, mục trống giữ nguyên", () => {
+      eq(mergeJournal({ vui: "A", mai: "M" }, { vui: "B", bietOn: "C", mai: " " }), { vui: "A\nB", mai: "M", bietOn: "C" });
+    });
+    test("bấm Lưu: nút quay, xong form trống, hôm nay nằm đầu danh sách; mở lại vẫn trống", async () => {
+      await reset(); await openJ();
+      fill({ vui: "Test vui", bietOn: "Test biết ơn", mai: "Test mai" });
+      const orig = Demo.saveJournal; let release; const gate = new Promise(r => (release = r));
+      Demo.saveJournal = async (...a) => { await gate; return orig.apply(Demo, a); };
+      try {
+        $("#jform").requestSubmit(); await frame();
+        const btn = $('#jform button[type="submit"]');
+        ok(btn.disabled && btn.querySelector(".spin") && !btn.textContent.trim(), "nút chỉ còn vòng quay");
+        release(); await wait(80);
+      } finally { Demo.saveJournal = orig; release(); }
+      ok(areas().every(t => !t.value), "form trống sau khi lưu");
+      const first = $("#view-journal .jlist li");
+      ok(first.classList.contains("is-new") && first.textContent.includes("Hôm nay"), first.outerHTML);
+      setView("today"); await openJ();
+      ok(areas().every(t => !t.value), "mở lại vẫn trống");
+    });
+    test("lưu lần nữa trong ngày: nối vào trang hôm nay, không mất phần cũ", async () => {
+      await openJ(); fill({ vui: "Thêm vui" }); $("#jform").requestSubmit(); await wait(80);
+      const j = parseJournal(await api().readJournal({ id: todayStr(), date: todayStr() }));
+      eq([j.vui.endsWith("Test vui\nThêm vui"), j.bietOn.endsWith("Test biết ơn")], [true, true]);
+    });
+    test("chạm trang: sheet chữ thuần (không form); Sửa mới ra form điền sẵn", async () => {
+      await openJ(); await openToday();
+      ok(!$("#sheetBody form") && !$("#sheetBody textarea"), "không có form");
+      ok($("#sheetBody .jread").textContent.includes("Thêm vui"), "thấy nội dung");
+      ok($("#sheetBody").textContent.includes("Đã lưu vào Google Drive lúc"), "có giờ lưu");
+      $("#jEditPage").click(); await frame();
+      ok($('#jpast [name="vui"]').value.includes("Thêm vui"), "form Sửa điền sẵn");
+      closeSheet(); await reset();
     });
   });
 
@@ -529,7 +573,7 @@
       eq([$('[data-f="date"]').value, $(".act__dayhint").textContent], [ymd(day(-1)), "Hôm qua"]);
       ok($(".act__date").classList.contains("is-other"), "tô màu ngày khác");
       eq($(".hpick__day") && $(".hpick__day").textContent, "Hôm qua", "nhãn ngày cho thói quen gọn");
-      const d3 = day(-3); eq(dayShort(ymd(d3)), `${DOW_SHORT[d3.getDay()]} ${d3.getDate()}/${d3.getMonth() + 1}`);
+      const d3 = day(-3); eq(dayShort(ymd(d3)), `${DOW_SHORT[d3.getDay()]} ${dmy(d3)}`);
       eq(dayShort(todayStr()), "");
       renderConfirm(P({ activities: [act("Ăn trưa", "11:30", "13:30")] }));
       eq([$('[data-f="date"]').value, $(".act__dayhint").textContent], [todayStr(), "Hôm nay"]);
