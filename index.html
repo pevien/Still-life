@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <title>Still life</title>
+  <meta name="description" content="Hệ thống sinh hoạt cá nhân: kế hoạch, thực tế, thói quen, nhật ký.">
+  <meta name="theme-color" content="#0F1813" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#EEF0EA" media="(prefers-color-scheme: light)">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="top">
+    <div class="top__date">
+      <p class="top__greet" id="greet"></p>
+      <h1 class="top__title" id="dateTitle">Still life</h1>
+    </div>
+    <button class="icon-btn" id="btnSettings" aria-label="Cài đặt"><i class="ph ph-gear-six"></i></button>
+  </header>
+
+  <div id="banner"></div>
+
+  <main id="main" tabindex="-1">
+    <section class="view" id="view-today" aria-label="Hôm nay"></section>
+    <section class="view" id="view-habits" aria-label="Thói quen" hidden></section>
+    <section class="view" id="view-journal" aria-label="Nhật ký" hidden></section>
+  </main>
+
+  <form class="dock" id="dock" autocomplete="off">
+    <label class="sr-only" for="inputText">Bạn vừa làm gì?</label>
+    <textarea id="inputText" rows="1" placeholder="Bạn vừa làm gì?"></textarea>
+    <button type="button" class="icon-btn dock__mic" id="btnMic" aria-label="Nói"><i class="ph ph-microphone"></i></button>
+    <button type="submit" class="icon-btn dock__send" id="btnSend" aria-label="Gửi"><i class="ph ph-paper-plane-tilt"></i></button>
+  </form>
+
+  <nav class="tabs" aria-label="Điều hướng">
+    <button class="tab is-on" data-view="today"><i class="ph ph-sun"></i><span>Hôm nay</span></button>
+    <button class="tab" data-view="habits"><i class="ph ph-squares-four"></i><span>Thói quen</span></button>
+    <button class="tab" data-view="journal"><i class="ph ph-notebook"></i><span>Nhật ký</span></button>
+  </nav>
+
+  <div class="sheet" id="sheet" hidden>
+    <div class="sheet__backdrop" data-close></div>
+    <div class="sheet__panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+      <div class="sheet__grip" aria-hidden="true"></div>
+      <div class="sheet__head">
+        <h2 id="sheetTitle"></h2>
+        <button class="icon-btn" data-close aria-label="Đóng"><i class="ph ph-x"></i></button>
+      </div>
+      <div class="sheet__body" id="sheetBody"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
