@@ -18,13 +18,13 @@ const ALL = [0, 1, 2, 3, 4, 5, 6];
 
 // Màu khớp với colorId của Google Calendar
 const CATS = {
-  health: { name: "Sức khỏe", color: "10", hex: "#0B8043", icon: "ph-heartbeat" },
-  korean: { name: "Tiếng Hàn", color: "3", hex: "#8E24AA", icon: "ph-translate" },
-  build:  { name: "Build & Learn", color: "9", hex: "#3F51B5", icon: "ph-code" },
-  life:   { name: "Sinh hoạt", color: "5", hex: "#E3AE1B", icon: "ph-house-line", lightInk: true },
-  people: { name: "Người thân & bạn bè", color: "4", hex: "#D9685E", icon: "ph-users-three" },
-  fun:    { name: "Giải trí có chủ đích", color: "6", hex: "#E8592A", icon: "ph-film-strip" },
-  scroll: { name: "Lướt vô thức", color: "8", hex: "#616161", icon: "ph-device-mobile" },
+  health: { name: "Sức khỏe", short: "Sức khỏe", color: "10", hex: "#0B8043", icon: "ph-heartbeat" },
+  korean: { name: "Tiếng Hàn", short: "Tiếng Hàn", color: "3", hex: "#8E24AA", icon: "ph-translate" },
+  build:  { name: "Build & Learn", short: "Build", color: "9", hex: "#3F51B5", icon: "ph-code" },
+  life:   { name: "Sinh hoạt", short: "Sinh hoạt", color: "5", hex: "#E3AE1B", icon: "ph-house-line", lightInk: true },
+  people: { name: "Người thân & bạn bè", short: "Người thân", color: "4", hex: "#D9685E", icon: "ph-users-three" },
+  fun:    { name: "Giải trí có chủ đích", short: "Giải trí", color: "6", hex: "#E8592A", icon: "ph-film-strip" },
+  scroll: { name: "Lướt vô thức", short: "Lướt", color: "8", hex: "#616161", icon: "ph-device-mobile" },
 };
 
 const HABITS = [
@@ -81,10 +81,14 @@ const fmtDate = d => `${DOW[d.getDay()]}, ${d.getDate()} tháng ${d.getMonth() +
 const LV = { full: 3, min: 2, skip: 1 };
 const better = (a, b) => ((LV[a] || 0) >= (LV[b] || 0) ? a : b);
 
-function toast(msg, ms = 2600) {
-  const t = $("#toast"); t.textContent = msg; t.classList.add("is-on");
-  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("is-on"), ms);
+// undo: hàm async để hoàn tác; có thì toast hiện nút "Hoàn tác" và ở lâu hơn
+function toast(msg, ms = 2600, undo = null) {
+  const t = $("#toast");
+  t.innerHTML = `<span>${esc(msg)}</span>` + (undo ? `<button class="toast__undo" type="button"><i class="ph ph-arrow-counter-clockwise"></i> Hoàn tác</button>` : "");
+  toast._undo = undo; t.classList.toggle("has-undo", !!undo); t.classList.add("is-on");
+  clearTimeout(toast._t); toast._t = setTimeout(() => { t.classList.remove("is-on"); toast._undo = null; }, undo ? Math.max(ms, 6000) : ms);
 }
+function hideToast() { clearTimeout(toast._t); $("#toast").classList.remove("is-on"); toast._undo = null; }
 
 // ============================================================ state
 const LS = {
@@ -154,6 +158,7 @@ function evToItem(ev, kind) {
     id: ev.id, kind, key, title: (ev.summary || "").replace(/^💤 /, ""), start, end,
     cat: p.cat || (key && TPL[key] && TPL[key].cat) || "life",
     habit: p.habit || (key && TPL[key] && TPL[key].habit) || "",
+    plan: p.plan || "",
     ess: p.ess === "1" || !!(key && TPL[key] && TPL[key].ess),
     muted: (ev.summary || "").startsWith("💤 "),
   };
@@ -241,7 +246,18 @@ const Google = {
       extendedProperties: { private: { sl: "act", cat: a.cat, habit: a.habit || "", plan: a.plan || "" } },
     };
     const ev = await g(`${CAL}/calendars/${encodeURIComponent(S.cfg.actualCal)}/events`, { method: "POST", body: JSON.stringify(body) });
-    return evToItem(ev, "act");
+    const it = evToItem(ev, "act"); it.plan = a.plan || ""; return it;
+  },
+  async updateActual(a) {
+    const body = {
+      summary: a.title, start: { dateTime: rfc(a.start), timeZone: TZ }, end: { dateTime: rfc(a.end), timeZone: TZ },
+      colorId: CATS[a.cat].color, extendedProperties: { private: { sl: "act", cat: a.cat, habit: a.habit || "", plan: a.plan || "" } },
+    };
+    const ev = await g(`${CAL}/calendars/${encodeURIComponent(S.cfg.actualCal)}/events/${encodeURIComponent(a.id)}`, { method: "PATCH", body: JSON.stringify(body) });
+    const it = evToItem(ev, "act"); it.plan = a.plan || ""; return it;
+  },
+  async deleteActual(id) {
+    await g(`${CAL}/calendars/${encodeURIComponent(S.cfg.actualCal)}/events/${encodeURIComponent(id)}`, { method: "DELETE" });
   },
   async saveDay(rec) {
     const d = parseYmd(rec.date);
@@ -320,6 +336,8 @@ const Demo = (() => {
     async listActual(from, to) { return db.actual.filter(a => a.start >= from && a.start < to).sort((a, b) => a.start - b.start); },
     async listDays(from, to) { const o = {}; for (const [k, v] of Object.entries(db.days)) { const d = parseYmd(k); if (d >= startOfDay(from) && d <= to) o[k] = v; } return o; },
     async addActual(a) { const it = Object.assign({ id: "a" + Date.now() + Math.random(), kind: "act" }, a); db.actual.push(it); persist(); return it; },
+    async updateActual(a) { const i = db.actual.findIndex(x => x.id === a.id); if (i >= 0) db.actual[i] = Object.assign({}, db.actual[i], a); persist(); return Object.assign({}, db.actual[i]); },
+    async deleteActual(id) { db.actual = db.actual.filter(x => x.id !== id); persist(); },
     async saveDay(rec) { rec = Object.assign({}, rec, { id: rec.id || "d" + rec.date }); db.days[rec.date] = rec; persist(); return rec; },
     async mutePlan(items, mute) { for (const it of items) { db.muted = db.muted.filter(x => x !== it.id); if (mute) db.muted.push(it.id); } persist(); },
     async listJournal() { return Object.keys(db.journal).sort().reverse().map(date => ({ id: date, date })); },
@@ -448,69 +466,96 @@ function renderToday() {
   if (cur) {
     const pct = Math.min(100, Math.max(0, (now - cur.start) / (cur.end - cur.start) * 100));
     html += `<article class="now fade-in ${done ? "now--done" : ""}" style="${catVars(cur.cat)}">
-      <p class="now__label"><span class="dot"></span> Bây giờ · ${esc(CATS[cur.cat].name)} ${done ? `<span class="badge ${skipped ? "" : "badge--good"}">${skipped ? "Đã bỏ qua" : "Đã làm"}</span>` : ""}</p>
       <h2 class="now__title">${esc(cur.title)}</h2>
       <p class="now__time num">${hm(cur.start)} – ${hm(cur.end)} · còn ${Math.max(0, Math.round((cur.end - now) / 60000))} phút</p>
       <div class="bar" aria-hidden="true"><span style="transform:scaleX(${pct / 100})"></span></div>
-      ${done ? "" : `<div class="now__actions">
+      ${done ? `<div class="now__done"><span class="badge ${skipped ? "" : "badge--good"}"><i class="ph${skipped ? "" : "-fill"} ${skipped ? "ph-skip-forward" : "ph-check-circle"}"></i> ${skipped ? "Đã bỏ qua" : "Đã làm"}</span>
+          <button class="btn btn--icon" data-act="undo" data-id="${esc(cur.id)}" aria-label="Hoàn tác" title="Hoàn tác"><i class="ph ph-arrow-counter-clockwise"></i></button></div>`
+        : `<div class="now__actions">
         <button class="btn btn--primary" data-act="done" data-id="${esc(cur.id)}"><i class="ph ph-check"></i> Đã làm</button>
-        <button class="btn" data-act="skip" data-id="${esc(cur.id)}"><i class="ph ph-skip-forward"></i> Bỏ qua</button>
-        <button class="btn" data-act="other"><i class="ph ph-pencil-simple"></i> Việc khác</button>
+        <button class="btn btn--icon" data-act="skip" data-id="${esc(cur.id)}" aria-label="Bỏ qua" title="Bỏ qua"><i class="ph ph-skip-forward"></i></button>
+        <button class="btn btn--icon" data-act="other" data-id="${esc(cur.id)}" aria-label="Đang làm việc khác" title="Đang làm việc khác"><i class="ph ph-pencil-simple"></i></button>
       </div>`}
-      ${next ? `<p class="now__next"><i class="ph ph-arrow-right"></i> Tiếp theo <b>${esc(next.title)}</b> <span class="num">${hm(next.start)}</span></p>` : ""}
+      ${next ? `<p class="now__next"><i class="ph ph-arrow-right"></i> <b>${esc(next.title)}</b> <span class="num">${hm(next.start)}</span></p>` : ""}
     </article>`;
   } else {
-    const msg = next ? `Khối tiếp theo là <b>${esc(next.title)}</b> lúc <span class="num">${hm(next.start)}</span>.` : now.getHours() >= 22 || now.getHours() < 5 ? "Hết lịch hôm nay. Cất điện thoại, ngủ ngon nhé." : "Không có khối nào trong lịch lúc này.";
+    const msg = next ? `Tiếp theo <b>${esc(next.title)}</b> lúc <span class="num">${hm(next.start)}</span>.` : now.getHours() >= 22 || now.getHours() < 5 ? "Hết lịch hôm nay. Ngủ ngon nhé." : "Không có khối nào lúc này.";
     html += `<article class="now fade-in" style="${next ? catVars(next.cat) : ""}">
-      <p class="now__label"><span class="dot"></span> Khoảng trống</p>
       <h2 class="now__title">${next ? "Thở một chút." : "Ngày đã khép lại."}</h2>
       <p class="now__time">${msg}</p>
     </article>`;
   }
 
-  if (!rec.unwell) html += `<button class="unwell-toggle" id="btnUnwell"><i class="ph-fill ph-hand-heart"></i><span><b>Hôm nay mình không ổn</b>Chuyển sang lịch nhẹ, không gãy chuỗi</span></button>`;
+  if (!rec.unwell) html += `<button class="unwell-toggle" id="btnUnwell"><i class="ph-fill ph-hand-heart"></i> Hôm nay mình không ổn</button>`;
 
-  // habits today
+  // habits today: chưa làm lên đầu. Chạm thẻ = đạt, nút ½ = tối thiểu.
   const t = startOfDay(new Date());
-  const doneCount = HABITS.filter(h => ["full", "min"].includes(cellStatus(h, t))).length;
-  const todays = HABITS.filter(h => scheduled(h, t));
-  html += `<h2 class="h2">Thói quen hôm nay <small class="num">${doneCount}/${todays.length}</small></h2><div class="chips">`;
-  for (const hb of HABITS) {
-    const st = cellStatus(hb, t), on = scheduled(hb, t);
-    if (!on && st !== "full" && st !== "min") continue;
-    const sub = st === "full" ? (rec.v[hb.id] ? `${rec.v[hb.id]} ${hb.id === "walk" ? "bước" : ""}` : "Đạt") : st === "min" ? `Tối thiểu · ${hb.min || ""}` : st === "rest" ? "Nghỉ có chủ đích" : (hb.min ? `Tối thiểu: ${hb.min}` : hb.full);
-    html += `<button class="chip" data-habit="${hb.id}" data-st="${st}" aria-label="${esc(hb.name)}: ${esc(sub)}">
-      <i class="ph${st === "full" || st === "min" ? "-fill" : ""} ${hb.icon} chip__ic"></i>
-      <span><span class="chip__t">${esc(hb.name)}</span><span class="chip__s">${esc(sub)}</span></span></button>`;
+  const ORDER = { pending: 0, miss: 0, rest: 1, off: 1, min: 2, full: 3 };
+  const list = HABITS.map(hb => ({ hb, st: cellStatus(hb, t) }))
+    .filter(x => scheduled(x.hb, t) || x.st === "full" || x.st === "min")
+    .sort((a, b) => (ORDER[a.st] ?? 0) - (ORDER[b.st] ?? 0));
+  const left = list.filter(x => x.st === "pending" || x.st === "miss").length;
+  html += `<h2 class="h2">Thói quen hôm nay <small class="num">${left ? `còn ${left}` : '<i class="ph-fill ph-check-circle ok-c"></i> xong'}</small></h2><div class="chips">`;
+  for (const { hb, st } of list) {
+    const val = rec.v[hb.id];
+    const sub = st === "full" ? (val ? `${val}${hb.id === "walk" ? " bước" : ""}` : "") : st === "min" ? (hb.min || "") : st === "rest" ? "nghỉ" : "";
+    const label = st === "full" ? "đạt" : st === "min" ? "đạt tối thiểu" : "chưa";
+    html += `<div class="chip" data-st="${st}">
+      <button class="chip__main" data-habit="${hb.id}" aria-pressed="${st === "full"}" aria-label="${esc(hb.name)}: ${label}">
+        <i class="ph${st === "full" || st === "min" ? "-fill" : ""} ${hb.icon} chip__ic"></i>
+        <span class="chip__t">${esc(hb.name)}</span>${sub ? `<span class="chip__s">${esc(sub)}</span>` : ""}
+      </button>
+      ${hb.min ? `<button class="chip__half" data-habit-min="${hb.id}" aria-pressed="${st === "min"}" aria-label="Tối thiểu: ${esc(hb.min)}" title="Tối thiểu: ${esc(hb.min)}"><i class="ph${st === "min" ? "-fill" : ""} ph-circle-half"></i></button>` : `<span class="chip__half" aria-hidden="true"></span>`}
+    </div>`;
   }
-  html += `</div><p class="faint" style="font-size:12px;margin:8px 2px 0">Chạm để đổi: chưa · đạt · tối thiểu</p>`;
+  html += `</div>`;
 
-  // timeline
-  html += `<h2 class="h2">Kế hoạch và thực tế <button class="link" id="btnOpenCal">Mở Google Calendar</button></h2>
-    <div class="tl-legend"><span><i style="border:1px dashed var(--ink-faint)"></i> Kế hoạch</span><span><i style="background:var(--ink-soft)"></i> Thực tế</span></div>
-    ${timelineHTML()}`;
+  // thời gian theo nhóm + timeline
+  html += `<h2 class="h2">Thời gian hôm nay <span class="h2__acts">
+      <button class="icon-btn" id="btnTlToggle" aria-label="${S.tlFull ? "Thu gọn" : "Xem cả ngày"}" title="${S.tlFull ? "Thu gọn" : "Xem cả ngày"}"><i class="ph ph-arrows-${S.tlFull ? "in" : "out"}-line-vertical"></i></button>
+      <button class="icon-btn" id="btnOpenCal" aria-label="Mở Google Calendar" title="Mở Google Calendar"><i class="ph ph-calendar-blank"></i></button>
+    </span></h2>
+    ${summaryHTML()}${timelineHTML()}`;
   v.innerHTML = html;
 }
 
+const fmtDur = m => { m = Math.round(m); return m < 60 ? `${m}p` : `${Math.floor(m / 60)}g${m % 60 ? pad(m % 60) : ""}`; };
+function summaryHTML() {
+  const now = new Date(), mins = {};
+  for (const a of S.today.actual) { const m = (Math.min(+a.end, +now) - a.start) / 60000; if (m > 0) mins[a.cat] = (mins[a.cat] || 0) + m; }
+  const rows = Object.entries(mins).filter(([k]) => CATS[k]).sort((a, b) => b[1] - a[1]);
+  if (!rows.length) return "";
+  return `<div class="sum fade-in">
+    <div class="sum__bar" aria-hidden="true">${rows.map(([k, m]) => `<span style="flex:${m};--cat:${CATS[k].hex}"></span>`).join("")}</div>
+    <ul class="sum__list">${rows.map(([k, m]) => `<li class="${k === "scroll" ? "is-warn" : ""}" style="--cat:${CATS[k].hex}"><span class="dot"></span>${esc(CATS[k].short)}<b class="num">${fmtDur(m)}</b></li>`).join("")}</ul>
+  </div>`;
+}
+
 function timelineHTML() {
-  const rec = S.today.rec || {}, H0 = 5, H1 = 23, PX = 52, t0 = startOfDay(new Date());
+  const rec = S.today.rec || {}, PX = 56, t0 = startOfDay(new Date()), now = new Date();
+  let H0 = 5, H1 = 23;
+  if (!S.tlFull) { const nh = now.getHours() + now.getMinutes() / 60; H0 = Math.max(5, Math.min(17, Math.floor(nh) - 3)); H1 = H0 + 6; }
   const y = d => ((d - t0) / 3600000 - H0) * PX;
   const height = (H1 - H0) * PX;
-  const evHTML = (it, cls) => {
-    const top = Math.max(0, y(it.start)), h = Math.max(20, Math.min(height, y(it.end)) - top - 2);
+  const evHTML = it => {
+    if (y(it.end) <= 0 || y(it.start) >= height) return "";
+    const top = Math.max(0, y(it.start)), h = Math.max(22, Math.min(height, y(it.end)) - top - 2);
     const c = CATS[it.cat] || CATS.life;
-    const extra = it.kind === "plan" ? ((rec.skip || []).includes(it.id) ? " is-skip" : "") + (it.muted || (rec.unwell && !it.ess) ? " is-muted" : "") : (c.lightInk ? " light-ink" : "");
-    return `<div class="tl__ev${extra}" style="top:${top}px;height:${h}px;--cat:${c.hex}" title="${esc(it.title)}">${esc(it.title)}${h > 34 ? `<small class="num">${hm(it.start)}–${hm(it.end)}</small>` : ""}</div>`;
+    const time = h > 40 ? `<small class="num">${hm(it.start)}–${hm(it.end)}</small>` : "";
+    if (it.kind === "plan") {
+      const extra = ((rec.skip || []).includes(it.id) ? " is-skip" : "") + (it.muted || (rec.unwell && !it.ess) ? " is-muted" : "");
+      return `<div class="tl__ev${extra}" style="top:${top}px;height:${h}px;--cat:${c.hex}" title="${esc(it.title)}">${esc(it.title)}${time}</div>`;
+    }
+    return `<button class="tl__ev${c.lightInk ? " light-ink" : ""}" data-aid="${esc(it.id)}" style="top:${top}px;height:${h}px;--cat:${c.hex}" aria-label="Sửa: ${esc(it.title)} ${hm(it.start)}–${hm(it.end)}">${esc(it.title)}${time}</button>`;
   };
   let hours = "", grid = "";
   for (let h = H0; h <= H1; h++) { hours += `<div class="tl__hour num" style="top:${(h - H0) * PX}px">${pad(h)}:00</div>`; grid += `<div class="tl__grid" style="top:${(h - H0) * PX + 26}px"></div>`; }
-  const now = new Date(), nowY = y(now);
+  const nowY = y(now);
   const nowLine = nowY > 0 && nowY < height ? `<div class="tl__nowline" style="top:${nowY + 26}px"></div>` : "";
-  const acts = S.today.actual.map(a => evHTML(a)).join("") || "";
   return `<div class="tl">
     <div><div class="tl__head">&nbsp;</div><div class="tl__hours" style="height:${height}px">${hours}</div></div>
-    <div><div class="tl__head">Kế hoạch</div><div class="tl__col tl__col--plan" style="height:${height}px">${S.today.plan.map(p => evHTML(p)).join("")}</div></div>
-    <div><div class="tl__head">Thực tế</div><div class="tl__col tl__col--act" style="height:${height}px">${acts}</div></div>
+    <div><div class="tl__head">Kế hoạch</div><div class="tl__col tl__col--plan" style="height:${height}px">${S.today.plan.map(evHTML).join("")}</div></div>
+    <div><div class="tl__head">Thực tế</div><div class="tl__col tl__col--act" style="height:${height}px">${S.today.actual.map(evHTML).join("")}</div></div>
     ${grid}${nowLine}
   </div>`;
 }
@@ -534,40 +579,84 @@ function renderOnboarding(v) {
 }
 
 // ============================================================ render: habits
+const HSHORT = { eat: "Ăn 3 bữa", wake: "Dậy 5:30", korean: "Tiếng Hàn", walk: "Đi bộ", yoga: "Yoga", gym: "Gym", phone: "Cất máy", journal: "Nhật ký" };
+const editable = d => d <= startOfDay(new Date()) && d >= trackStart();
 function renderHabits() {
   const v = $("#view-habits");
   if (!ready()) { v.innerHTML = `<div class="empty"><h2>Chưa có dữ liệu</h2><p>Kết nối Google ở tab Hôm nay trước nhé.</p></div>`; return; }
   const t = startOfDay(new Date()), mon = mondayOf(t);
   let html = `<h2 class="h2" style="margin-top:8px">Tuần này <small>${mon.getDate()}/${mon.getMonth() + 1} – ${addDays(mon, 6).getDate()}/${addDays(mon, 6).getMonth() + 1}</small></h2>
     <div class="week fade-in"><table><thead><tr><th></th>`;
-  for (let i = 0; i < 7; i++) { const d = addDays(mon, i); html += `<th class="${+d === +t ? "is-today" : ""}">${DOW_SHORT[d.getDay()]}</th>`; }
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(mon, i);
+    html += `<th class="${+d === +t ? "is-today" : ""}">${editable(d) ? `<button class="wday" data-day="${ymd(d)}" aria-label="Sửa thói quen ${DOW[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}">${DOW_SHORT[d.getDay()]}</button>` : DOW_SHORT[d.getDay()]}</th>`;
+  }
   html += `</tr></thead><tbody>`;
   for (const hb of HABITS) {
     const wc = weekCount(hb, mon);
-    html += `<tr><td class="name"><span><i class="ph ${hb.icon}"></i>${esc(hb.name.replace(" 10 phút", "").replace(" 3000 bước", "").replace(" 22:00", ""))}</span><small class="num">${wc.label}${wc.star ? " ★" : ""}</small></td>`;
-    for (let i = 0; i < 7; i++) { const d = addDays(mon, i); html += `<td><div class="cell" data-st="${cellStatus(hb, d)}" title="${ymd(d)}"></div></td>`; }
+    html += `<tr><td class="name"><span><i class="ph ${hb.icon}"></i>${esc(HSHORT[hb.id] || hb.name)}</span><small class="num">${wc.label}${wc.star ? " ★" : ""}</small></td>`;
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(mon, i), st = cellStatus(hb, d);
+      html += editable(d)
+        ? `<td><button class="cell" data-st="${st}" data-day="${ymd(d)}" aria-label="${esc(hb.name)} ${DOW_SHORT[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}"></button></td>`
+        : `<td><div class="cell" data-st="${st}"></div></td>`;
+    }
     html += `</tr>`;
   }
   html += `</tbody></table>
-    <div class="legend"><span><i class="cell" data-st="full"></i>Đạt</span><span><i class="cell" data-st="min"></i>Tối thiểu</span><span><i class="cell" data-st="rest"></i>Unwell</span><span><i class="cell" data-st="miss"></i>Bỏ</span><span><i class="cell" data-st="pending"></i>Hôm nay</span></div></div>`;
+    <div class="legend"><span><i class="cell" data-st="full"></i>Đạt</span><span><i class="cell" data-st="min"></i>Tối thiểu</span><span><i class="cell" data-st="rest"></i>Unwell</span><span><i class="cell" data-st="miss"></i>Bỏ</span><span class="legend__tap"><i class="ph ph-hand-tap"></i>Chạm ô để sửa</span></div></div>`;
 
-  html += `<h2 class="h2">Chuỗi ngày <small>16 tuần gần nhất</small></h2>`;
-  const W = 16, first = addDays(mon, -7 * (W - 1));
+  // Lịch theo tháng, có nút ‹ › để đổi tháng. Mỗi hàng 1 tuần, mỗi ô ghi số ngày.
+  const cm = S.calMonth || (S.calMonth = { y: t.getFullYear(), m: t.getMonth() });
+  const mStart = new Date(cm.y, cm.m, 1), mEnd = new Date(cm.y, cm.m + 1, 0);
+  const canPrev = mStart > trackStart(), canNext = mEnd < t;
+  const first = mondayOf(mStart), W = Math.ceil((addDays(mEnd, 1) - first) / (7 * 864e5));
+  html += `<h2 class="h2 monthnav"><button class="icon-btn" data-month="-1" aria-label="Tháng trước" ${canPrev ? "" : "disabled"}><i class="ph ph-caret-left"></i></button>
+    <span>Tháng ${cm.m + 1}<small>/ ${cm.y}</small></span>
+    <button class="icon-btn" data-month="1" aria-label="Tháng sau" ${canNext ? "" : "disabled"}><i class="ph ph-caret-right"></i></button></h2>`;
   for (const hb of HABITS) {
     const s = streak(hb);
-    let cells = "";
-    for (let w = 0; w < W; w++) for (let i = 0; i < 7; i++) { const d = addDays(first, w * 7 + i); cells += `<div class="cell" data-st="${cellStatus(hb, d)}" title="${ymd(d)}"></div>`; }
-    const m1 = first, m2 = addDays(first, 7 * Math.floor(W / 2)), m3 = t;
+    const n = { full: 0, min: 0, miss: 0 };
+    let rows = `<div class="mcal__row mcal__row--head">${[1, 2, 3, 4, 5, 6, 0].map(k => `<span>${DOW_SHORT[k]}</span>`).join("")}</div>`;
+    for (let w = 0; w < W; w++) {
+      rows += `<div class="mcal__row">`;
+      for (let i = 0; i < 7; i++) {
+        const d = addDays(first, w * 7 + i);
+        if (d.getMonth() !== cm.m) { rows += `<span class="mcal__d mcal__d--out"></span>`; continue; }
+        const st = cellStatus(hb, d);
+        if (st in n) n[st]++;
+        const label = `${esc(hb.name)} ${d.getDate()}/${d.getMonth() + 1}`;
+        rows += editable(d)
+          ? `<button class="mcal__d" data-st="${st}" data-day="${ymd(d)}" aria-label="${label}">${d.getDate()}</button>`
+          : `<span class="mcal__d" data-st="${st}">${d.getDate()}</span>`;
+      }
+      rows += `</div>`;
+    }
+    const streakTxt = `<i class="ph${s.n > 0 ? "-fill" : ""} ph-fire"></i> ${s.n}`;
     html += `<article class="hcard fade-in">
       <div class="hcard__head"><i class="ph ${hb.icon} big"></i>
-        <div class="hcard__name">${esc(hb.name)}<small>${esc(hb.freq === "daily" ? "Hằng ngày" : hb.full)}${hb.min ? " · tối thiểu " + esc(hb.min) : ""}</small></div>
-        <div class="streak"><b class="num">${s.n > 0 ? '<i class="ph-fill ph-fire"></i>' : ""}${s.n}</b><small>${s.unit} liên tiếp</small></div>
+        <div class="hcard__name">${esc(hb.name)}</div>
+        <div class="streak2 ${s.n > 0 ? "is-on" : ""}" aria-label="${s.n} ${s.unit} liên tiếp">${streakTxt}</div>
       </div>
-      <div class="heat" style="grid-template-columns:repeat(${W},1fr)">${cells}</div>
-      <div class="heat-months"><span>${m1.getDate()}/${m1.getMonth() + 1}</span><span>${m2.getDate()}/${m2.getMonth() + 1}</span><span>Hôm nay</span></div>
+      <p class="hcard__stats"><span><i class="sdot" data-st="full"></i>${n.full} đạt</span>${hb.min ? `<span><i class="sdot" data-st="min"></i>${n.min} tối thiểu</span>` : ""}<span><i class="sdot" data-st="miss"></i>${n.miss} bỏ</span></p>
+      <div class="mcal">${rows}</div>
     </article>`;
   }
   v.innerHTML = html;
+}
+
+// Sheet sửa thói quen của một ngày (hôm nay hoặc ngày cũ)
+function renderDaySheet(date) {
+  S.dayDate = date;
+  const d = parseYmd(date), rec = S.days[date] || blankRec(date);
+  const rows = HABITS.filter(hb => scheduled(hb, d) || rec.h[hb.id]).map(hb => {
+    const cur = rec.h[hb.id] === "full" || rec.h[hb.id] === "min" ? rec.h[hb.id] : "";
+    const opts = [["", "ph-x", "Chưa"], ["min", "ph-circle-half", "Tối thiểu"], ["full", "ph-check", "Đạt"]];
+    return `<div class="dayrow"><i class="ph ${hb.icon}"></i><span>${esc(hb.name)}</span><div class="seg" role="group" aria-label="${esc(hb.name)}">
+      ${opts.map(([lv, ic, lab]) => lv === "min" && !hb.min ? `<span class="seg__gap"></span>` : `<button data-dh="${hb.id}" data-lv="${lv}" aria-pressed="${cur === lv}" aria-label="${lab}" title="${lab}"><i class="ph ${ic}"></i></button>`).join("")}
+    </div></div>`;
+  }).join("");
+  openSheet(`${DOW[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`, `<div class="daylist">${rows}</div>`);
 }
 
 // ============================================================ render: journal
@@ -601,13 +690,26 @@ async function renderJournal() {
   let html = `<form class="jcard fade-in" id="jform">
     <p class="now__label"><i class="ph ph-moon"></i> ${fmtDate(new Date())} · trước khi ngủ</p>
     <h2 class="now__title" style="font-size:28px;margin-bottom:16px">Ba dòng cho hôm nay.</h2>`;
-  for (const [k, label] of JFIELDS) html += `<label class="field"><span>${label}</span><textarea name="${k}" rows="${k === "them" ? 3 : 2}">${esc(cur[k] || "")}</textarea></label>`;
-  html += `<button class="btn btn--primary btn--block" type="submit"><i class="ph ph-floppy-disk"></i> Lưu nhật ký</button>
-    <p class="faint" style="font-size:12px;margin:10px 0 0">Lưu vào Drive · Still life / Nhật ký / ${today}.md</p></form>`;
+  html += journalFormFields(cur);
+  html += `<button class="btn btn--primary btn--block" type="submit"><i class="ph ph-floppy-disk"></i> Lưu nhật ký</button></form>`;
   const past = files.filter(f => f.date !== today);
-  html += `<h2 class="h2">Những ngày trước <small>${past.length} trang</small></h2>`;
-  html += past.length ? `<ul class="jlist">${past.map(f => { const d = parseYmd(f.date); return `<li><button data-jdate="${esc(f.date)}"><b>${DOW_SHORT[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}</b><span>${d.getFullYear()}</span><i class="ph ph-caret-right"></i></button></li>`; }).join("")}</ul>` : `<p class="muted">Trang đầu tiên sẽ là hôm nay.</p>`;
+  html += `<h2 class="h2">Những ngày trước <small>${past.length}</small></h2>`;
+  html += past.length ? `<ul class="jlist">${past.map(f => { const d = parseYmd(f.date); return `<li><button data-jdate="${esc(f.date)}"><b>${DOW_SHORT[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}</b><span class="jprev" data-prev="${esc(f.date)}">${esc((S.jprev || {})[f.date] || "")}</span><i class="ph ph-caret-right"></i></button></li>`; }).join("")}</ul>` : `<p class="muted">Trang đầu tiên sẽ là hôm nay.</p>`;
   v.innerHTML = html;
+  loadPreviews(past.slice(0, 20));
+}
+// Câu đầu tiên của mỗi trang cũ, tải dần sau khi hiện danh sách
+const firstLine = j => (JFIELDS.map(([k]) => j[k]).find(Boolean) || "").split("\n")[0];
+async function loadPreviews(files) {
+  S.jprev = S.jprev || {};
+  for (const f of files) {
+    if (S.jprev[f.date] != null) continue;
+    try { S.jprev[f.date] = firstLine(parseJournal(await api().readJournal(f))); } catch { S.jprev[f.date] = ""; }
+    const el = document.querySelector(`.jprev[data-prev="${f.date}"]`); if (el) el.textContent = S.jprev[f.date];
+  }
+}
+function journalFormFields(j) {
+  return JFIELDS.map(([k, label]) => `<label class="field"><span>${label}</span><textarea name="${k}" rows="${k === "them" ? 3 : 2}">${esc(j[k] || "")}</textarea></label>`).join("");
 }
 
 // ============================================================ sheet
@@ -629,7 +731,7 @@ function renderSettings() {
       ${S.cfg && !s.demo ? `<p class="faint" style="font-size:13px;margin:10px 0 0">Đang theo dõi từ ${esc(S.cfg.start)}. <a class="link" href="https://drive.google.com/drive/folders/${esc(S.cfg.folderId)}" target="_blank" rel="noopener">Mở thư mục Drive</a></p>` : ""}
     </div>
     <div class="set-group">
-      <label class="field"><span>Gemini API key</span><input id="sKey" type="password" autocomplete="off" value="${esc(s.geminiKey)}" placeholder="AIza…"><small>Lưu trên máy này. Lấy miễn phí ở aistudio.google.com/apikey</small></label>
+      <label class="field"><span>Gemini API key</span><input id="sKey" type="password" autocomplete="off" value="${esc(s.geminiKey)}" placeholder="AIza…"><small>Lưu trên máy này. Lấy miễn phí ở <a class="link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a></small></label>
       <label class="field"><span>Model Gemini</span><input id="sModel" value="${esc(s.model)}"><small>Mặc định gemini-2.5-flash. Nếu quá tải, app tự thử gemini-2.5-flash-lite.</small></label>
       <label class="field"><span>Google OAuth Client ID</span><input id="sClient" value="${esc(s.clientId)}"><small>Cùng client với app Korean. Cần thêm địa chỉ app này vào “Authorized JavaScript origins”.</small></label>
       <button class="btn btn--primary btn--block" id="sSave">Lưu cài đặt</button>
@@ -762,7 +864,7 @@ async function submitInput(text) {
     const p = S.settings.demo && !S.settings.geminiKey ? demoParse(text) : await callGemini(text);
     p.activities = p.activities.filter(a => CATS[a.category] && /^\d\d:\d\d$/.test(a.start) && /^\d\d:\d\d$/.test(a.end));
     p.raw = text;
-    renderConfirm(p);
+    closeCompose(true); renderConfirm(p);
   } catch (e) { handleErr(e); }
   finally { dock.classList.remove("is-busy"); ic.className = "ph ph-paper-plane-tilt"; }
 }
@@ -776,38 +878,71 @@ async function savePending() {
   });
   const jt = $("#cJournal"); if (jt) p.journal = jt.value;
   const btn = $("#cSave"); btn.disabled = true;
+  const today = todayStr(), created = [], prevRecs = {};
+  const snap = d => { if (!(d in prevRecs)) prevRecs[d] = S.days[d] ? JSON.parse(JSON.stringify(S.days[d])) : null; };
+  let jPrev = null, unwellOn = false;
   try {
     for (const a of p.activities) {
-      const day = parseYmd(a.date || todayStr());
+      const day = parseYmd(a.date || today);
       let s = atTime(day, a.start), e = atTime(day, a.end);
       if (e <= s) e = new Date(s.getTime() + 15 * 60000);
       const item = await api().addActual({ title: a.title, cat: a.category, start: s, end: e });
-      if (a.date === todayStr() || !a.date) S.today.actual.push(item);
+      created.push(item.id);
+      if (a.date === today || !a.date) S.today.actual.push(item);
     }
     const byDate = {};
-    for (const h of p.habits) { const d = h.date || todayStr(); (byDate[d] = byDate[d] || []).push(h); }
-    if (p.journal && p.journal.trim()) (byDate[todayStr()] = byDate[todayStr()] || []).push({ id: "journal", level: "min" });
+    for (const h of p.habits) { const d = h.date || today; (byDate[d] = byDate[d] || []).push(h); }
+    if (p.journal && p.journal.trim()) (byDate[today] = byDate[today] || []).push({ id: "journal", level: "min" });
+    // "Việc khác": khối kế hoạch đang chạy được đánh dấu bỏ qua
+    const other = S.otherFor && !(S.today.rec && (S.today.rec.skip || []).includes(S.otherFor)) ? S.otherFor : null;
+    if (other) byDate[today] = byDate[today] || [];
     for (const [d, hs] of Object.entries(byDate)) {
+      snap(d);
       const rec = Object.assign(blankRec(d), S.days[d] || {}); rec.h = Object.assign({}, rec.h); rec.v = Object.assign({}, rec.v);
       for (const h of hs) { rec.h[h.id] = h.level === "skip" ? (rec.h[h.id] === "full" || rec.h[h.id] === "min" ? rec.h[h.id] : "skip") : better(h.level, rec.h[h.id]); if (h.value) rec.v[h.id] = h.value; }
+      if (d === today && other) rec.skip = [...new Set([...(rec.skip || []), other])];
       await saveRec(rec);
     }
-    if (p.journal && p.journal.trim()) await appendJournal(p.journal.trim());
-    if (p.unwell && !(S.today.rec && S.today.rec.unwell)) await setUnwell(true);
-    closeSheet(); $("#inputText").value = ""; autosize();
-    toast(S.settings.demo ? "Đã ghi (dữ liệu mẫu)" : "Đã ghi vào Google Calendar");
+    if (p.journal && p.journal.trim()) jPrev = await appendJournal(p.journal.trim());
+    if (p.unwell && !(S.today.rec && S.today.rec.unwell)) { snap(today); await setUnwell(true); unwellOn = true; }
+    closeSheet(); $("#inputText").value = ""; resetOther(); autosize();
+    toast(S.settings.demo ? "Đã ghi (dữ liệu mẫu)" : "Đã ghi vào Google Calendar", 2600, async () => {
+      if (unwellOn) await setUnwell(false);
+      for (const id of created) { await api().deleteActual(id); S.today.actual = S.today.actual.filter(a => a.id !== id); }
+      for (const [d, prev] of Object.entries(prevRecs)) await restoreRec(d, prev);
+      if (jPrev) { await api().saveJournal(today, jPrev.md, jPrev.file); if (S.jprev) delete S.jprev[today]; }
+    });
     render();
   } catch (e) { btn.disabled = false; handleErr(e); }
+}
+// Trả bản ghi ngày về trạng thái cũ (giữ id sự kiện hiện có để không tạo trùng)
+async function restoreRec(d, prev) {
+  const curId = S.days[d] && S.days[d].id;
+  await saveRec(Object.assign(prev ? JSON.parse(JSON.stringify(prev)) : blankRec(d), { id: curId || (prev && prev.id) || null }));
+}
+function resetOther() { S.otherFor = null; $("#inputText").placeholder = "Bạn vừa làm gì?"; }
+// Ô nhập: thu gọn thành nút tròn, bấm thì mở popup từ dưới lên
+function openCompose(placeholder) {
+  const t = $("#inputText");
+  if (placeholder) t.placeholder = placeholder;
+  $("#dock").classList.add("is-open"); $("#dockBackdrop").hidden = false;
+  autosize(); t.focus();
+}
+function closeCompose(keepOther) {
+  $("#dock").classList.remove("is-open"); $("#dockBackdrop").hidden = true;
+  if (!keepOther && !$("#inputText").value.trim()) resetOther();
 }
 
 async function appendJournal(text) {
   const today = todayStr();
   const files = S.jfiles || await api().listJournal();
   const tf = files.find(f => f.date === today);
-  const cur = tf ? parseJournal(await api().readJournal(tf)) : {};
+  const prevMd = tf ? await api().readJournal(tf) : "";
+  const cur = parseJournal(prevMd);
   cur.them = [cur.them, text].filter(Boolean).join("\n");
   const saved = await api().saveJournal(today, journalMd(today, cur), tf);
   if (!tf) (S.jfiles = files).unshift(saved);
+  return { md: prevMd, file: tf || saved };
 }
 
 // ============================================================ actions
@@ -829,13 +964,57 @@ async function markBlock(id, how) {
     const end = new Date() < blk.end ? new Date() : blk.end;
     const item = await api().addActual({ title: blk.title, cat: blk.cat, start: blk.start, end: end > blk.start ? end : blk.end, plan: blk.id, habit: blk.habit });
     item.plan = blk.id; S.today.actual.push(item);
-    if (blk.habit && blk.habit !== "walk") await setHabit(todayStr(), blk.habit, better("full", (S.today.rec || {}).h?.[blk.habit]));
-    toast(`Đã ghi: ${blk.title}`);
+    const prevLv = blk.habit ? (S.today.rec || {}).h?.[blk.habit] : undefined;
+    if (blk.habit && blk.habit !== "walk") await setHabit(todayStr(), blk.habit, better("full", prevLv));
+    toast(`Đã ghi: ${blk.title}`, 2600, async () => {
+      await api().deleteActual(item.id); S.today.actual = S.today.actual.filter(a => a.id !== item.id);
+      if (blk.habit && blk.habit !== "walk") await setHabit(todayStr(), blk.habit, prevLv || null);
+    });
   } else {
     const rec = Object.assign(blankRec(todayStr()), S.today.rec || {});
     rec.skip = [...new Set([...(rec.skip || []), id])];
-    await saveRec(rec); toast("Đã bỏ qua khối này");
+    await saveRec(rec); toast("Đã bỏ qua", 2600, () => unmarkBlock(id));
   }
+}
+// Bỏ trạng thái đã làm / đã bỏ qua của một khối kế hoạch
+async function unmarkBlock(id) {
+  const rec = Object.assign(blankRec(todayStr()), S.today.rec || {});
+  if ((rec.skip || []).includes(id)) { rec.skip = rec.skip.filter(x => x !== id); await saveRec(rec); }
+  for (const a of S.today.actual.filter(a => a.plan === id)) await api().deleteActual(a.id);
+  S.today.actual = S.today.actual.filter(a => a.plan !== id);
+}
+
+// Sửa / xoá một việc đã ghi
+function renderActEdit(a) {
+  S.editAct = a.id;
+  const catOpts = Object.entries(CATS).map(([k, c]) => `<option value="${k}" ${k === a.cat ? "selected" : ""}>${c.name}</option>`).join("");
+  openSheet("Sửa việc đã làm", `<div class="act" style="${catVars(a.cat)}">
+      <input class="input" type="text" id="eTitle" value="${esc(a.title)}" aria-label="Tên việc">
+      <button type="button" class="icon-btn act__rm" id="eDel" aria-label="Xoá việc này"><i class="ph ph-trash"></i></button>
+      <div class="act__times"><input class="input num" type="time" id="eStart" value="${hm(a.start)}" aria-label="Bắt đầu"><span class="faint">–</span><input class="input num" type="time" id="eEnd" value="${hm(a.end)}" aria-label="Kết thúc"></div>
+      <select class="input" id="eCat" aria-label="Nhóm">${catOpts}</select>
+    </div>
+    <div class="sheet-actions"><button class="btn" data-close>Hủy</button><button class="btn btn--primary" id="eSave"><i class="ph ph-check"></i> Lưu</button></div>`);
+}
+async function saveActEdit() {
+  const old = S.today.actual.find(a => a.id === S.editAct); if (!old) return closeSheet();
+  const day = startOfDay(old.start);
+  let s = atTime(day, $("#eStart").value || hm(old.start)), e = atTime(day, $("#eEnd").value || hm(old.end));
+  if (e <= s) e = new Date(s.getTime() + 15 * 60000);
+  const next = Object.assign({}, old, { title: $("#eTitle").value.trim() || old.title, cat: $("#eCat").value, start: s, end: e });
+  const prev = Object.assign({}, old);
+  const swap = it => { S.today.actual = S.today.actual.map(a => (a.id === it.id ? Object.assign({}, it, { plan: it.plan || prev.plan, kind: "act" }) : a)); };
+  swap(await api().updateActual(next)); closeSheet();
+  toast("Đã sửa", 2600, async () => swap(await api().updateActual(prev)));
+}
+async function deleteAct() {
+  const old = S.today.actual.find(a => a.id === S.editAct); if (!old) return closeSheet();
+  await api().deleteActual(old.id);
+  S.today.actual = S.today.actual.filter(a => a.id !== old.id); closeSheet();
+  toast("Đã xoá", 2600, async () => {
+    const it = await api().addActual({ title: old.title, cat: old.cat, start: old.start, end: old.end, plan: old.plan, habit: old.habit });
+    it.plan = old.plan || ""; S.today.actual.push(it);
+  });
 }
 
 function handleErr(e) {
@@ -880,6 +1059,11 @@ function render() {
   if (S.view === "journal") renderJournal();
 }
 async function refresh() {
+  // Đã đăng nhập nhưng máy này chưa có cấu hình (vd máy thứ hai): tự tìm bộ lịch có sẵn trên Drive
+  if (!S.settings.demo && !S.cfg && signedIn()) {
+    try { const found = await Google.findConfig(); if (found) { S.cfg = found; LS.set("cfg", S.cfg); toast("Đã nối vào lịch Still life của bạn"); } }
+    catch (e) { handleErr(e); }
+  }
   if (!ready()) return render();
   try { await loadToday(); render(); loadHistory().then(() => { if (S.view === "habits") renderHabits(); }).catch(handleErr); }
   catch (e) { handleErr(e); render(); }
@@ -888,18 +1072,25 @@ function setView(v) {
   S.view = v;
   $$(".tab").forEach(t => t.classList.toggle("is-on", t.dataset.view === v));
   $$(".view").forEach(s => (s.hidden = s.id !== "view-" + v));
-  $("#dock").hidden = v === "journal";
-  document.body.classList.toggle("no-dock", v === "journal");
+  closeCompose(); $("#btnCompose").hidden = v !== "today";
+  document.body.classList.toggle("no-dock", v !== "today");
   window.scrollTo({ top: 0 });
   render();
 }
 
 // ============================================================ events
-function autosize() { const t = $("#inputText"); t.style.height = "auto"; t.style.height = Math.min(140, t.scrollHeight + 2) + "px"; }
+function autosize() { const t = $("#inputText"); t.style.height = "auto"; t.style.height = Math.min(Math.round(innerHeight * 0.6), t.scrollHeight + 2) + "px"; }
 
 document.addEventListener("click", async e => {
   const el = e.target.closest("button, [data-close]"); if (!el) return;
   if (el.matches("[data-close]")) return closeSheet();
+  if (el.id === "btnCompose") return openCompose();
+  if (el.id === "dockBackdrop") return closeCompose();
+  if (el.classList.contains("toast__undo")) {
+    const fn = toast._undo; hideToast(); if (!fn) return;
+    try { await fn(); toast("Đã hoàn tác"); } catch (er) { handleErr(er); }
+    return render();
+  }
   if (el.classList.contains("tab")) return setView(el.dataset.view);
   const id = el.id;
   if (id === "btnSettings") return renderSettings();
@@ -914,18 +1105,38 @@ document.addEventListener("click", async e => {
     S.settings.clientId = $("#sClient").value.trim() || DEFAULT_CLIENT_ID; saveSettings(); closeSheet(); toast("Đã lưu cài đặt"); return render();
   }
   if (id === "btnOpenCal") return window.open("https://calendar.google.com/calendar/r/day", "_blank", "noopener");
-  if (id === "btnUnwell") { el.disabled = true; try { await setUnwell(true); toast("Unwell day. Nghỉ ngơi nhé"); } catch (er) { handleErr(er); } return render(); }
+  if (id === "btnUnwell") { el.disabled = true; try { await setUnwell(true); toast("Unwell day. Nghỉ ngơi nhé", 2600, () => setUnwell(false)); } catch (er) { handleErr(er); } return render(); }
+  if (id === "btnTlToggle") { S.tlFull = !S.tlFull; return renderToday(); }
+  if (id === "eSave") { el.disabled = true; try { await saveActEdit(); } catch (er) { el.disabled = false; handleErr(er); } return renderToday(); }
+  if (id === "eDel") { el.disabled = true; try { await deleteAct(); } catch (er) { el.disabled = false; handleErr(er); } return renderToday(); }
+  if (el.dataset.aid) { const a = S.today.actual.find(x => x.id === el.dataset.aid); if (a) renderActEdit(a); return; }
+  if (el.dataset.month) {
+    const cm = S.calMonth, d = new Date(cm.y, cm.m + +el.dataset.month, 1);
+    S.calMonth = { y: d.getFullYear(), m: d.getMonth() };
+    // tháng cũ hơn phần lịch sử đã tải thì tải thêm
+    const from = mondayOf(d), to = addDays(new Date(d.getFullYear(), d.getMonth() + 1, 0), 7);
+    if (!S.days[ymd(from)] && from >= addDays(trackStart(), -7)) { try { Object.assign(S.days, await api().listDays(from, to)); } catch (er) { handleErr(er); } }
+    return renderHabits();
+  }
+  if (el.dataset.day) return renderDaySheet(el.dataset.day);
+  if (el.dataset.dh) {
+    try { await setHabit(S.dayDate, el.dataset.dh, el.dataset.lv || null); } catch (er) { handleErr(er); }
+    renderDaySheet(S.dayDate); return S.view === "habits" ? renderHabits() : renderToday();
+  }
   if (id === "btnUnwellOff") { el.disabled = true; try { await setUnwell(false); toast("Đã bật lại lịch bình thường"); } catch (er) { handleErr(er); } return render(); }
   if (id === "cSave") return savePending();
   if (el.dataset.act) {
-    if (el.dataset.act === "other") { const t = $("#inputText"); t.placeholder = "Bạn đang làm gì thay vào đó?"; t.focus(); return; }
-    el.disabled = true; try { await markBlock(el.dataset.id, el.dataset.act); } catch (er) { handleErr(er); } return render();
+    if (el.dataset.act === "other") { S.otherFor = el.dataset.id; return openCompose("Đang làm gì thay vào đó?"); }
+    el.disabled = true;
+    try { if (el.dataset.act === "undo") await unmarkBlock(el.dataset.id); else await markBlock(el.dataset.id, el.dataset.act); } catch (er) { handleErr(er); }
+    return render();
   }
-  if (el.dataset.habit) {
-    const hb = H[el.dataset.habit], cur = (S.today.rec || {}).h?.[hb.id];
-    const nextLv = cur === "full" ? "min" : cur === "min" ? null : "full";
-    el.dataset.st = nextLv || (scheduled(hb, new Date()) ? "pending" : "off");
-    try { await setHabit(todayStr(), hb.id, nextLv); } catch (er) { handleErr(er); }
+  if (el.dataset.habit || el.dataset.habitMin) {
+    const isMin = !!el.dataset.habitMin, hid = el.dataset.habit || el.dataset.habitMin;
+    const cur = (S.today.rec || {}).h?.[hid], want = isMin ? "min" : "full";
+    const nextLv = cur === want ? null : want;
+    const chip = el.closest(".chip"); if (chip) chip.dataset.st = nextLv || "pending";
+    try { await setHabit(todayStr(), hid, nextLv); } catch (er) { handleErr(er); }
     return renderToday();
   }
   if (el.dataset.rm != null && S.pending) { S.pending.activities.splice(+el.dataset.rm, 1); return renderConfirm(S.pending); }
@@ -937,16 +1148,16 @@ document.addEventListener("click", async e => {
   if (el.dataset.jdate) {
     const f = (S.jfiles || []).find(x => x.date === el.dataset.jdate); if (!f) return;
     const d = parseYmd(f.date), j = parseJournal(await api().readJournal(f));
-    const body = JFIELDS.map(([k, label]) => j[k] ? `<h3>${label}</h3><p>${esc(j[k])}</p>` : "").join("") || `<p class="muted">Trang trống.</p>`;
-    return openSheet(`${DOW[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`, `<div class="md">${body}</div>`);
+    return openSheet(`${DOW[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`, `<form id="jpast" data-date="${esc(f.date)}">${journalFormFields(j)}
+      <button class="btn btn--primary btn--block" type="submit"><i class="ph ph-floppy-disk"></i> Lưu</button></form>`);
   }
 });
 
 document.addEventListener("submit", async e => {
   e.preventDefault();
   if (e.target.id === "dock") return submitInput($("#inputText").value);
-  if (e.target.id === "jform") {
-    const fd = new FormData(e.target), f = Object.fromEntries(fd.entries()), today = todayStr();
+  if (e.target.id === "jform" || e.target.id === "jpast") {
+    const fd = new FormData(e.target), f = Object.fromEntries(fd.entries()), today = e.target.dataset.date || todayStr(), past = e.target.id === "jpast";
     const lines = ["vui", "bietOn", "mai"].filter(k => (f[k] || "").trim()).length;
     if (!lines && !(f.them || "").trim()) return toast("Viết ít nhất một dòng nhé");
     const btn = $("button[type=submit]", e.target); btn.disabled = true;
@@ -955,6 +1166,8 @@ document.addEventListener("submit", async e => {
       const saved = await api().saveJournal(today, journalMd(today, f), tf);
       if (!tf) (S.jfiles = S.jfiles || []).unshift(saved);
       await setHabit(today, "journal", lines >= 3 ? "full" : "min");
+      S.jprev = S.jprev || {}; S.jprev[today] = firstLine(f);
+      if (past) { closeSheet(); toast("Đã lưu"); return renderJournal(); }
       toast(lines >= 3 ? "Đã lưu. Ngủ ngon nhé" : "Đã lưu (bản tối thiểu)");
     } catch (er) { handleErr(er); }
     btn.disabled = false;
@@ -962,8 +1175,9 @@ document.addEventListener("submit", async e => {
 });
 
 $("#inputText").addEventListener("input", autosize);
+
 $("#inputText").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && matchMedia("(pointer: fine)").matches) { e.preventDefault(); submitInput(e.target.value); } });
-document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#sheet").hidden) closeSheet(); });
+document.addEventListener("keydown", e => { if (e.key !== "Escape") return; if (!$("#sheet").hidden) closeSheet(); else if ($("#dock").classList.contains("is-open")) closeCompose(); });
 
 // Giọng nói (Web Speech, tiếng Việt)
 (() => {
