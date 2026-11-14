@@ -509,6 +509,158 @@
     });
   });
 
+  describe("Sheet xác nhận (sau khi Gemini đọc câu)", () => {
+    const P = extra => Object.assign({ reply: "", activities: [], habits: [], journal: "", unwell: false }, extra);
+    const act = (title, start, end, date) => ({ title, category: "life", date: date || todayStr(), start, end });
+    test("dayHint / validDay", () => {
+      eq([dayHint(todayStr()), dayHint(ymd(day(-1))), dayHint(ymd(day(-3)))], ["Hôm nay", "Hôm qua", DOW[day(-3).getDay()]]);
+      eq([validDay(ymd(day(-2))), validDay(ymd(day(2))), validDay(""), validDay("13/11")], [ymd(day(-2)), todayStr(), todayStr(), todayStr()]);
+    });
+    test("thẻ việc theo thứ tự: tên, nhóm, giờ, ngày", async () => {
+      await reset();
+      renderConfirm(P({ activities: [act("Ăn trưa", "11:30", "13:30")] }));
+      const order = [...$("#sheetBody .act").children].map(el => el.dataset.f || el.className.split(" ")[0] || el.tagName);
+      eq(order, ["title", "icon-btn", "category", "act__times", "act__date"]);
+      closeSheet();
+    });
+    test("ô ngày: hôm nay bình thường, hôm qua tô màu và ghi 'Hôm qua'", async () => {
+      await reset();
+      renderConfirm(P({ activities: [act("Lớp tiếng Hàn", "19:00", "21:00", ymd(day(-1)))], habits: [{ id: "korean", level: "full", date: ymd(day(-1)) }] }));
+      eq([$('[data-f="date"]').value, $(".act__dayhint").textContent], [ymd(day(-1)), "Hôm qua"]);
+      ok($(".act__date").classList.contains("is-other"), "tô màu ngày khác");
+      eq($(".hpick__day") && $(".hpick__day").textContent, "Hôm qua", "nhãn ngày cho thói quen gọn");
+      const d3 = day(-3); eq(dayShort(ymd(d3)), `${DOW_SHORT[d3.getDay()]} ${d3.getDate()}/${d3.getMonth() + 1}`);
+      eq(dayShort(todayStr()), "");
+      renderConfirm(P({ activities: [act("Ăn trưa", "11:30", "13:30")] }));
+      eq([$('[data-f="date"]').value, $(".act__dayhint").textContent], [todayStr(), "Hôm nay"]);
+      ok(!$(".act__date").classList.contains("is-other"));
+      eq($('[data-f="date"]').max, todayStr(), "không chọn được ngày tương lai");
+      closeSheet();
+    });
+    test("đổi ngày trong form: cập nhật chữ, màu; ngày tương lai về hôm nay", async () => {
+      await reset();
+      renderConfirm(P({ activities: [act("Ăn trưa", "11:30", "13:30")] }));
+      const inp = $('[data-f="date"]');
+      inp.value = ymd(day(-1)); inp.dispatchEvent(new Event("change", { bubbles: true }));
+      eq([$(".act__dayhint").textContent, $(".act__date").classList.contains("is-other")], ["Hôm qua", true]);
+      inp.value = ymd(day(3)); inp.dispatchEvent(new Event("change", { bubbles: true }));
+      eq([inp.value, $(".act__dayhint").textContent], [todayStr(), "Hôm nay"]);
+      closeSheet();
+    });
+    test("lưu với ngày đã đổi sang hôm qua: ghi vào hôm qua, không hiện ở hôm nay", async () => {
+      await reset();
+      renderConfirm(P({ activities: [act("Test ngày", "19:00", "20:00")] }));
+      const inp = $('[data-f="date"]'); inp.value = ymd(day(-1)); inp.dispatchEvent(new Event("change", { bubbles: true }));
+      await savePending();
+      const y = (await Demo.listActual(day(-1), today)).find(a => a.title === "Test ngày");
+      ok(y && ymd(y.start) === ymd(day(-1)) && hm(y.start) === "19:00", "đã ghi vào hôm qua");
+      ok(!S.today.actual.some(a => a.title === "Test ngày"), "không lẫn vào hôm nay");
+      await toast._undo();
+      ok(!(await Demo.listActual(day(-1), today)).some(a => a.title === "Test ngày"), "hoàn tác xoá");
+    });
+    test("đổi nhóm trong form: viền đổi màu theo", async () => {
+      await reset();
+      renderConfirm(P({ activities: [act("Ăn trưa", "11:30", "13:30")] }));
+      const sel = $('[data-f="category"]'); sel.value = "people"; sel.dispatchEvent(new Event("change", { bubbles: true }));
+      eq($("#sheetBody .act").getAttribute("style"), catVars("people"));
+      closeSheet();
+    });
+    test("không có gì để ghi: nút Lưu bị khoá", async () => {
+      await reset();
+      renderConfirm(P({ reply: "Mình chưa hiểu lắm." }));
+      ok($("#cSave").disabled, "Lưu bị khoá");
+      ok($(".reply"), "vẫn hiện lời đáp của AI khi chưa bỏ gì");
+      closeSheet();
+    });
+    test("chế độ Làm việc khác: trống vẫn lưu được (để đánh dấu bỏ qua)", async () => {
+      await reset();
+      S.otherFor = S.today.plan[0].id;
+      try { renderConfirm(P({})); ok(!$("#cSave").disabled); ok($("#sheetBody").textContent.includes("bỏ qua khối đang chạy")); }
+      finally { closeSheet(); resetOther(); }
+    });
+    test("bỏ hết việc: ẩn lời đáp cũ, khoá Lưu, giữ chỗ đã sửa", async () => {
+      await reset();
+      renderConfirm(P({ reply: "Chúc bạn bữa trưa ngon miệng nhé.", activities: [act("Ăn trưa", "11:30", "13:30"), act("Đi bộ", "17:00", "17:30")] }));
+      $$("#sheetBody .act")[1].querySelector('[data-f="title"]').value = "Đi bộ quanh hồ";
+      document.querySelector('[data-rm="0"]').click(); await wait(20);
+      eq(S.pending.activities.map(a => a.title), ["Đi bộ quanh hồ"], "chỗ đã sửa không mất khi bỏ dòng khác");
+      ok($(".reply"), "còn việc thì vẫn giữ lời đáp");
+      document.querySelector('[data-rm="0"]').click(); await wait(20);
+      ok(!$(".reply"), "lời đáp cũ bị ẩn");
+      ok($("#cSave").disabled, "Lưu bị khoá");
+      ok($("#sheetBody").textContent.includes("Đã bỏ hết"));
+      closeSheet();
+    });
+    test("savePending khi không còn gì: không ghi, báo rõ", async () => {
+      await reset();
+      const orig = Demo.addActual; let called = 0; Demo.addActual = async x => { called++; return orig(x); };
+      try {
+        renderConfirm(P({ journal: "   " }));
+        await savePending();
+        eq([called, sheetOpen()], [0, false]);
+        eq($("#toast span").textContent, "Không có gì để ghi");
+      } finally { Demo.addActual = orig; }
+    });
+    test("giờ ngược: cảnh báo ngay, nói rõ sẽ lưu thành gì, sửa đúng thì tắt", async () => {
+      await reset();
+      renderConfirm(P({ activities: [act("Học 8 từ mới", "14:25", "14:05")] }));
+      const box = $("#sheetBody .act"), w = $(".act__warn", box);
+      ok(w && w.textContent.includes("14:25–14:40"), w ? w.textContent : "không có cảnh báo");
+      const end = $('[data-f="end"]', box); end.value = "14:45"; end.dispatchEvent(new Event("input", { bubbles: true }));
+      ok(!$(".act__warn", box), "hết cảnh báo khi giờ đúng");
+      end.value = "14:25"; end.dispatchEvent(new Event("input", { bubbles: true }));
+      ok($(".act__warn", box), "bằng nhau cũng cảnh báo");
+      closeSheet();
+    });
+    test("cảnh báo giờ ngược có cả ở sheet Thêm kế hoạch", async () => {
+      await reset();
+      renderPlanAdd(at("10:00"));
+      $("#pEnd").value = "09:00"; $("#pEnd").dispatchEvent(new Event("input", { bubbles: true }));
+      ok($(".act__warn"), "có cảnh báo");
+      closeSheet();
+    });
+    test("lỗi thiếu Gemini key: toast có nút Mở Cài đặt", async () => {
+      await reset();
+      handleErr(Object.assign(new Error("Chưa có Gemini API key"), { needKey: true }));
+      const b = $(".toast__undo");
+      ok(b && b.textContent.includes("Mở Cài đặt"), b ? b.textContent : "không có nút");
+      b.click(); await wait(30);
+      eq([sheetOpen(), sheetTitle()], [true, "Cài đặt"]);
+      ok(!$("#toast").classList.contains("is-on"), "không hiện 'Đã hoàn tác'");
+      closeSheet();
+    });
+  });
+
+  describe("Timeline: khối chồng giờ", () => {
+    const g = it => ({ top: +it.start / 60000, bot: +it.end / 60000 });
+    const b = (id, s, e) => ({ id, start: new Date(s * 60000), end: new Date(e * 60000) });
+    test("laneLayout: chồng nhau thì chia làn, không chồng thì 1 làn", () => {
+      const m = laneLayout([b("a", 0, 30), b("b", 10, 40), b("c", 50, 60)], g);
+      eq([m.get("a"), m.get("b"), m.get("c")], [{ lane: 0, n: 2 }, { lane: 1, n: 2 }, { lane: 0, n: 1 }]);
+    });
+    test("laneLayout: làn trống được dùng lại trong cùng cụm", () => {
+      const m = laneLayout([b("a", 0, 20), b("b", 10, 60), b("c", 25, 40)], g);
+      eq([m.get("a").lane, m.get("b").lane, m.get("c").lane, m.get("c").n], [0, 1, 0, 2]);
+    });
+    test("timeline: 2 việc chồng giờ nằm cạnh nhau, việc riêng giữ toàn bề ngang", () => {
+      S.today = { plan: [], rec: blankRec(todayStr()), actual: [
+        { id: "x", kind: "act", title: "Học 8 từ mới", start: at("14:05"), end: at("14:25"), cat: "korean" },
+        { id: "y", kind: "act", title: "Đọc sách", start: at("14:12"), end: at("14:52"), cat: "build" },
+        { id: "z", kind: "act", title: "Ăn tối", start: at("18:30"), end: at("19:00"), cat: "life" }] };
+      const bd = html(timelineHTML()), X = bd.querySelector('[data-aid="x"]'), Y = bd.querySelector('[data-aid="y"]'), Z = bd.querySelector('[data-aid="z"]');
+      eq([X.style.left, Y.style.left], ["0%", "50%"]);
+      ok(X.style.width.includes("50%") && Y.style.width.includes("50%"), X.style.width);
+      eq(Z.style.width, "", "việc không chồng giữ nguyên");
+    });
+    test("khối cao tối thiểu (22px) đè khối sau cũng được tách làn", () => {
+      S.today = { plan: [], rec: blankRec(todayStr()), actual: [
+        { id: "p", kind: "act", title: "A", start: at("10:00"), end: at("10:05"), cat: "life" },
+        { id: "q", kind: "act", title: "B", start: at("10:10"), end: at("10:40"), cat: "life" }] };
+      const bd = html(timelineHTML());
+      eq(bd.querySelector('[data-aid="q"]').style.left, "50%");
+    });
+  });
+
   describe("Màn hình", () => {
     test("thanh dưới có 4 ô; Cài đặt mở sheet, không đổi tab", async () => {
       await reset();

@@ -443,6 +443,14 @@ input[type=time]::-webkit-calendar-picker-indicator { opacity: .6; cursor: point
 .act input[type=text] { grid-column: 1; grid-row: 1; }
 .act__times { grid-column: 1 / -1; display: flex; gap: 6px; align-items: center; }
 .act__times input { flex: 1; min-width: 0; }
+.act__warn { grid-column: 1 / -1; margin: -2px 0 0; display: flex; gap: 6px; align-items: flex-start; font-size: 13px; line-height: 1.4; color: var(--miss-ink, #B4554B); }
+.act__warn i { font-size: 16px; flex: none; margin-top: 1px; }
+.act__date { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--ink-soft); }
+.act__date input { flex: 1; min-width: 0; }
+.act__dayhint { flex: none; font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--ink-soft); }
+.act__date.is-other input { border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
+.act__date.is-other .act__dayhint { background: color-mix(in srgb, var(--accent) 22%, var(--surface)); color: var(--ink); }
+.hpick__day { margin-left: 2px; padding: 1px 7px; border-radius: 999px; font-size: 12px; font-weight: 600; background: color-mix(in srgb, var(--accent) 22%, transparent); }
 .act select { grid-column: 1 / -1; min-width: 0; }
 .act .input { padding: 9px 10px; font-size: 15px; }
 .act select.input { padding-right: 40px; }

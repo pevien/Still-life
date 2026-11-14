@@ -81,11 +81,12 @@ const fmtDate = d => `${DOW[d.getDay()]}, ${d.getDate()} tháng ${d.getMonth() +
 const LV = { full: 3, min: 2, skip: 1 };
 const better = (a, b) => ((LV[a] || 0) >= (LV[b] || 0) ? a : b);
 
-// undo: hàm async để hoàn tác; có thì toast hiện nút "Hoàn tác" và ở lâu hơn
-function toast(msg, ms = 2600, undo = null) {
-  const t = $("#toast");
-  t.innerHTML = `<span>${esc(msg)}</span>` + (undo ? `<button class="toast__undo" type="button"><i class="ph ph-arrow-counter-clockwise"></i> Hoàn tác</button>` : "");
-  toast._undo = undo; t.classList.toggle("has-undo", !!undo); t.classList.add("is-on");
+// undo: hàm async để hoàn tác; có thì toast hiện nút "Hoàn tác" và ở lâu hơn.
+// opt: { label, icon, done } để dùng nút cho việc khác (vd "Mở Cài đặt"); done = câu báo sau khi chạy, null = không báo.
+function toast(msg, ms = 2600, undo = null, opt = {}) {
+  const t = $("#toast"), label = opt.label || "Hoàn tác", icon = opt.icon || "ph-arrow-counter-clockwise";
+  t.innerHTML = `<span>${esc(msg)}</span>` + (undo ? `<button class="toast__undo" type="button"><i class="ph ${icon}"></i> ${esc(label)}</button>` : "");
+  toast._undo = undo; toast._done = "done" in opt ? opt.done : "Đã hoàn tác"; t.classList.toggle("has-undo", !!undo); t.classList.add("is-on");
   clearTimeout(toast._t); toast._t = setTimeout(() => { t.classList.remove("is-on"); toast._undo = null; }, undo ? Math.max(ms, 6000) : ms);
 }
 function hideToast() { clearTimeout(toast._t); $("#toast").classList.remove("is-on"); toast._undo = null; }
@@ -585,22 +586,41 @@ function summaryHTML() {
 }
 
 const TL = { H0: 5, H1: 23, PX: 56 };
+// Xếp các khối chồng nhau (theo vị trí vẽ, kể cả chiều cao tối thiểu) thành làn cạnh nhau.
+// geo(it) → { top, bot } hoặc null nếu không vẽ. Trả Map id → { lane, n }.
+function laneLayout(items, geo) {
+  const out = new Map(); let cluster = [], ends = [], cEnd = -Infinity;
+  const flush = () => { for (const [id, lane] of cluster) out.set(id, { lane, n: ends.length }); cluster = []; ends = []; };
+  for (const it of [...items].sort((a, b) => a.start - b.start || b.end - a.end)) {
+    const g = geo(it); if (!g) continue;
+    if (g.top >= cEnd) { flush(); cEnd = -Infinity; }
+    let lane = ends.findIndex(e => e <= g.top); if (lane < 0) { lane = ends.length; ends.push(0); }
+    ends[lane] = g.bot; cEnd = Math.max(cEnd, g.bot); cluster.push([it.id, lane]);
+  }
+  flush(); return out;
+}
 function timelineHTML() {
   const rec = S.today.rec || {}, t0 = startOfDay(new Date()), now = new Date();
   const { H0, H1, PX } = TL, PAD = 10;
   const y = d => ((d - t0) / 3600000 - H0) * PX;
   const height = (H1 - H0) * PX;
-  const evHTML = it => {
-    if (y(it.end) <= 0 || y(it.start) >= height) return "";
+  const geo = it => {
+    if (y(it.end) <= 0 || y(it.start) >= height) return null;
     const top = Math.max(0, y(it.start)), h = Math.max(22, Math.min(height, y(it.end)) - top - 2);
-    const c = CATS[it.cat] || CATS.life;
+    return { top, h, bot: top + h + 2 };
+  };
+  const lanes = new Map([...laneLayout(S.today.plan, geo), ...laneLayout(S.today.actual, geo)]);
+  const evHTML = it => {
+    const g = geo(it); if (!g) return "";
+    const { top, h } = g, c = CATS[it.cat] || CATS.life, L = lanes.get(it.id);
+    const lane = L && L.n > 1 ? `left:${(L.lane * 100 / L.n).toFixed(3)}%;right:auto;width:calc(${(100 / L.n).toFixed(3)}% - 3px);` : "";
     const time = h > 40 ? `<small class="num">${hm(it.start)}–${hm(it.end)}</small>` : "";
     const short = h <= 40 ? " is-short" : "", tt = `<span class="tl__t">${esc(it.title)}</span>`;
     if (it.kind === "plan") {
       const extra = ((rec.skip || []).includes(it.id) ? " is-skip" : "") + (it.muted || (rec.unwell && !it.ess) ? " is-muted" : "");
-      return `<button class="tl__ev${extra}${short}" data-pid="${esc(it.id)}" style="top:${top}px;height:${h}px;--cat:${c.hex}" title="${esc(it.title)} ${hm(it.start)}–${hm(it.end)}" aria-label="Chi tiết: ${esc(it.title)} ${hm(it.start)}–${hm(it.end)}">${tt}${time}</button>`;
+      return `<button class="tl__ev${extra}${short}" data-pid="${esc(it.id)}" style="top:${top}px;height:${h}px;${lane}--cat:${c.hex}" title="${esc(it.title)} ${hm(it.start)}–${hm(it.end)}" aria-label="Chi tiết: ${esc(it.title)} ${hm(it.start)}–${hm(it.end)}">${tt}${time}</button>`;
     }
-    return `<button class="tl__ev${c.lightInk ? " light-ink" : ""}${short}" title="${esc(it.title)} ${hm(it.start)}–${hm(it.end)}" data-aid="${esc(it.id)}" style="top:${top}px;height:${h}px;--cat:${c.hex}" aria-label="Sửa: ${esc(it.title)} ${hm(it.start)}–${hm(it.end)}">${tt}${time}</button>`;
+    return `<button class="tl__ev${c.lightInk ? " light-ink" : ""}${short}" title="${esc(it.title)} ${hm(it.start)}–${hm(it.end)}" data-aid="${esc(it.id)}" style="top:${top}px;height:${h}px;${lane}--cat:${c.hex}" aria-label="Sửa: ${esc(it.title)} ${hm(it.start)}–${hm(it.end)}">${tt}${time}</button>`;
   };
   let hours = "", grid = "";
   for (let h = H0; h <= H1; h++) { hours += `<div class="tl__hour num" style="top:${(h - H0) * PX}px">${pad(h)}:00</div>`; grid += `<div class="tl__grid" style="top:${(h - H0) * PX + PAD}px"></div>`; }
@@ -791,7 +811,17 @@ function journalFormFields(j) {
 // ============================================================ sheet
 function openSheet(title, html) {
   $("#sheetTitle").textContent = title; $("#sheetBody").innerHTML = html;
+  $$("#sheetBody .act").forEach(timeWarn);
   $("#sheet").hidden = false; document.body.style.overflow = "hidden";
+}
+// Giờ kết thúc không sau giờ bắt đầu: báo ngay dưới ô giờ, nói rõ khi lưu sẽ thành gì
+function timeWarn(box) {
+  const [a, b] = $$('.act__times input[type="time"]', box); if (!a || !b) return;
+  let w = $(".act__warn", box);
+  const bad = a.value && b.value && b.value <= a.value;
+  if (!bad) { if (w) w.remove(); return; }
+  if (!w) { w = document.createElement("p"); w.className = "act__warn"; $(".act__times", box).after(w); }
+  w.innerHTML = `<i class="ph ph-warning"></i> Giờ kết thúc phải sau giờ bắt đầu. Để vậy thì lưu thành ${esc(a.value)}–${esc(hm(new Date(+atTime(new Date(), a.value) + 15 * 60000)))}.`;
 }
 function closeSheet() { $("#sheet").hidden = true; document.body.style.overflow = ""; S.pending = null; }
 
@@ -816,30 +846,46 @@ function renderSettings() {
     </div>`);
 }
 
+// Ngày hợp lệ để ghi việc đã làm: định dạng YYYY-MM-DD và không ở tương lai; sai thì về hôm nay
+const validDay = ds => (/^\d{4}-\d\d-\d\d$/.test(ds || "") && ds <= todayStr() ? ds : todayStr());
+const dayHint = ds => (ds === todayStr() ? "Hôm nay" : ds === ymd(addDays(startOfDay(new Date()), -1)) ? "Hôm qua" : DOW[parseYmd(ds).getDay()]);
+// Ô ngày trong thẻ việc: ngày khác hôm nay thì tô màu để không lưu nhầm ngày
+function dateField(ds) {
+  return `<label class="act__date${ds !== todayStr() ? " is-other" : ""}">
+    <input class="input num" type="date" data-f="date" value="${esc(ds)}" max="${todayStr()}" aria-label="Ngày">
+    <span class="act__dayhint">${esc(dayHint(ds))}</span></label>`;
+}
+// Nhãn ngày ngắn cho chip thói quen: "Hôm qua" hoặc "T6 13/11" ("" = hôm nay)
+const dayShort = ds => (!ds || ds === todayStr() ? "" : dayHint(ds) === "Hôm qua" ? "Hôm qua" : (d => `${DOW_SHORT[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`)(parseYmd(ds)));
+const pendingEmpty = p => !p.activities.length && !p.habits.length && !(p.journal || "").trim() && !p.unwell;
 function renderConfirm(p) {
   S.pending = p;
   const catOpts = sel => Object.entries(CATS).map(([k, c]) => `<option value="${k}" ${k === sel ? "selected" : ""}>${c.name}</option>`).join("");
-  let html = p.reply ? `<p class="reply"><i class="ph-fill ph-sparkle"></i>${esc(p.reply)}</p>` : "";
+  const empty = pendingEmpty(p), canSave = !empty || !!S.otherFor;
+  // Bỏ hết dòng rồi thì lời đáp cũ (nói về những dòng đó) không còn đúng
+  let html = p.reply && !(empty && p.edited) ? `<p class="reply"><i class="ph-fill ph-sparkle"></i>${esc(p.reply)}</p>` : "";
   if (p.activities.length) {
     html += `<p class="group-t">Thời gian thực tế</p>`;
     p.activities.forEach((a, i) => {
+      const ds = validDay(a.date);
       html += `<div class="act" style="${catVars(a.category)}" data-i="${i}">
         <input class="input" type="text" data-f="title" value="${esc(a.title)}" aria-label="Tên việc">
         <button type="button" class="icon-btn act__rm" data-rm="${i}" aria-label="Bỏ dòng này"><i class="ph ph-trash"></i></button>
-        <div class="act__times"><input class="input num" type="time" data-f="start" value="${esc(a.start)}" aria-label="Bắt đầu"><span class="faint">–</span><input class="input num" type="time" data-f="end" value="${esc(a.end)}" aria-label="Kết thúc"></div>
         <select class="input" data-f="category" aria-label="Nhóm">${catOpts(a.category)}</select>
+        <div class="act__times"><input class="input num" type="time" data-f="start" value="${esc(a.start)}" aria-label="Bắt đầu"><span class="faint">–</span><input class="input num" type="time" data-f="end" value="${esc(a.end)}" aria-label="Kết thúc"></div>
+        ${dateField(ds)}
       </div>`;
     });
   }
   if (p.habits.length) {
     html += `<p class="group-t">Thói quen</p><div class="hpick">`;
-    p.habits.forEach((h, i) => { const hb = H[h.id]; if (!hb) return; html += `<button type="button" data-hi="${i}" data-lv="${h.level}"><i class="ph ${hb.icon}"></i>${esc(hb.name)} · ${h.level === "full" ? "Đạt" : h.level === "min" ? "Tối thiểu" : "Bỏ"}${h.value ? ` (${h.value})` : ""}</button>`; });
+    p.habits.forEach((h, i) => { const hb = H[h.id]; if (!hb) return; const tag = dayShort(h.date); html += `<button type="button" data-hi="${i}" data-lv="${h.level}"><i class="ph ${hb.icon}"></i>${esc(hb.name)} · ${h.level === "full" ? "Đạt" : h.level === "min" ? "Tối thiểu" : "Bỏ"}${h.value ? ` (${h.value})` : ""}${tag ? `<span class="hpick__day">${esc(tag)}</span>` : ""}</button>`; });
     html += `</div>`;
   }
   if (p.journal) html += `<p class="group-t">Thêm vào nhật ký</p><label class="field"><textarea id="cJournal" rows="3">${esc(p.journal)}</textarea></label>`;
   if (p.unwell) html += `<p class="care"><b>Bật unwell day cho hôm nay?</b>Lịch sẽ nhẹ lại và chuỗi ngày không gãy.</p>`;
-  if (!p.activities.length && !p.habits.length && !p.journal && !p.unwell) html += `<p class="muted">Mình chưa thấy việc nào để ghi. Thử kể cụ thể hơn, ví dụ “vừa đi bộ 20 phút”.</p>`;
-  html += `<div class="sheet-actions"><button class="btn" data-close>Hủy</button><button class="btn btn--primary" id="cSave"><i class="ph ph-check"></i> Lưu</button></div>`;
+  if (empty) html += `<p class="muted">${p.edited ? "Đã bỏ hết, không còn gì để ghi." : "Mình chưa thấy việc nào để ghi. Thử kể cụ thể hơn, ví dụ “vừa đi bộ 20 phút”."}${S.otherFor ? " Lưu sẽ chỉ đánh dấu bỏ qua khối đang chạy." : ""}</p>`;
+  html += `<div class="sheet-actions"><button class="btn" data-close>Hủy</button><button class="btn btn--primary" id="cSave"${canSave ? "" : " disabled"}><i class="ph ph-check"></i> Lưu</button></div>`;
   openSheet("Mình hiểu là…", html);
 }
 
@@ -960,7 +1006,7 @@ async function saveKey(raw, quiet) {
 }
 async function callGemini(text) {
   const key = cleanKey(S.settings.geminiKey);
-  if (!key) throw new Error("Chưa có Gemini API key (vào Cài đặt)");
+  if (!key) throw Object.assign(new Error("Chưa có Gemini API key"), { needKey: true });
   const models = [curModel(), ...modelList(), "gemini-flash-latest"].filter((m, i, a) => a.indexOf(m) === i);
   let last;
   for (const model of models) {
@@ -972,7 +1018,11 @@ async function callGemini(text) {
       });
       if (r.status === 429 || r.status >= 500) { last = new Error(`Gemini đang bận (${r.status})`); continue; }
       if (r.status === 404) { last = new Error(`Model ${model} không còn dùng được`); continue; }
-      if (!r.ok) { let m = ""; try { m = (await r.json()).error.message; } catch {} throw new Error(`Gemini lỗi ${r.status}${m ? ": " + m : ""}`); }
+      if (!r.ok) {
+        let m = ""; try { m = (await r.json()).error.message; } catch {}
+        const bad = r.status === 401 || r.status === 403 || /api key/i.test(m);   // key sai / bị khoá → mở Cài đặt để sửa
+        throw Object.assign(new Error(bad ? "Gemini key không dùng được, kiểm tra lại trong Cài đặt" : `Gemini lỗi ${r.status}${m ? ": " + m : ""}`), { needKey: bad });
+      }
       const j = await r.json();
       const out = j.candidates && j.candidates[0] && j.candidates[0].content.parts.map(p => p.text || "").join("");
       const p = JSON.parse(out);
@@ -1021,18 +1071,20 @@ async function savePending() {
     $$("[data-f]", el).forEach(inp => (a[inp.dataset.f] = inp.value));
   });
   const jt = $("#cJournal"); if (jt) p.journal = jt.value;
+  if (pendingEmpty(p) && !S.otherFor) { closeSheet(); toast("Không có gì để ghi"); return; }
   const btn = $("#cSave"); btn.disabled = true;
   const today = todayStr(), created = [], prevRecs = {};
   const snap = d => { if (!(d in prevRecs)) prevRecs[d] = S.days[d] ? JSON.parse(JSON.stringify(S.days[d])) : null; };
   let jPrev = null, unwellOn = false;
   try {
     for (const a of p.activities) {
-      const day = parseYmd(a.date || today);
+      a.date = validDay(a.date);
+      const day = parseYmd(a.date);
       let s = atTime(day, a.start), e = atTime(day, a.end);
       if (e <= s) e = new Date(s.getTime() + 15 * 60000);
       const item = await api().addActual({ title: a.title, cat: a.category, start: s, end: e });
       created.push(item.id);
-      if (a.date === today || !a.date) S.today.actual.push(item);
+      if (a.date === today) S.today.actual.push(item);
     }
     const byDate = {};
     for (const h of p.habits) { const d = h.date || today; (byDate[d] = byDate[d] || []).push(h); }
@@ -1232,6 +1284,7 @@ async function deleteAct() {
 
 function handleErr(e) {
   console.error(e);
+  if (e.needKey) return toast(e.message, 6000, () => renderSettings(), { label: "Mở Cài đặt", icon: "ph-gear-six", done: null });
   toast(e.message || "Có lỗi xảy ra", 4200);
   if (e.auth) showBanner();
 }
@@ -1315,8 +1368,9 @@ document.addEventListener("click", async e => {
   if (el.id === "btnCompose") return openCompose();
   if (el.id === "dockBackdrop") return closeCompose();
   if (el.classList.contains("toast__undo")) {
-    const fn = toast._undo; hideToast(); if (!fn) return;
-    try { await fn(); toast("Đã hoàn tác"); } catch (er) { handleErr(er); }
+    const fn = toast._undo, done = toast._done; hideToast(); if (!fn) return;
+    if (done === null) return fn();
+    try { await fn(); toast(done); } catch (er) { handleErr(er); }
     return render();
   }
   if (el.classList.contains("tab") && el.dataset.view) return setView(el.dataset.view);
@@ -1379,7 +1433,11 @@ document.addEventListener("click", async e => {
     try { await setHabit(todayStr(), hid, nextLv); } catch (er) { handleErr(er); }
     return renderToday();
   }
-  if (el.dataset.rm != null && S.pending) { S.pending.activities.splice(+el.dataset.rm, 1); return renderConfirm(S.pending); }
+  if (el.dataset.rm != null && S.pending) {
+    $$("#sheetBody .act").forEach(a => { const it = S.pending.activities[+a.dataset.i]; $$("[data-f]", a).forEach(inp => (it[inp.dataset.f] = inp.value)); });
+    const jt = $("#cJournal"); if (jt) S.pending.journal = jt.value;
+    S.pending.activities.splice(+el.dataset.rm, 1); S.pending.edited = true; return renderConfirm(S.pending);
+  }
   if (el.dataset.hi != null && S.pending) {
     $$("#sheetBody .act").forEach(a => { const it = S.pending.activities[+a.dataset.i]; $$("[data-f]", a).forEach(inp => (it[inp.dataset.f] = inp.value)); });
     const h = S.pending.habits[+el.dataset.hi]; h.level = h.level === "full" ? "min" : h.level === "min" ? "skip" : "full";
@@ -1418,6 +1476,17 @@ document.addEventListener("submit", async e => {
 
 $("#inputText").addEventListener("input", autosize);
 document.addEventListener("input", e => { if (e.target.closest("#jform")) S.jdirty = true; });
+document.addEventListener("input", e => { if (e.target.type === "time" && e.target.closest(".act")) timeWarn(e.target.closest(".act")); });
+// Thẻ việc trong sheet xác nhận: đổi ngày → cập nhật chữ "Hôm qua"/thứ và màu; đổi nhóm → đổi màu viền
+document.addEventListener("change", e => {
+  const box = e.target.closest("#sheetBody .act"); if (!box) return;
+  if (e.target.dataset.f === "date") {
+    const ds = validDay(e.target.value); e.target.value = ds;
+    box.querySelector(".act__date").classList.toggle("is-other", ds !== todayStr());
+    box.querySelector(".act__dayhint").textContent = dayHint(ds);
+  }
+  if (e.target.dataset.f === "category") box.setAttribute("style", catVars(e.target.value));
+});
 // Key tự lưu ngay khi dán hoặc rời ô, không cần nhớ bấm "Lưu cài đặt"
 document.addEventListener("change", e => { if (e.target.id === "pCat") $("#pAddBox").setAttribute("style", catVars(e.target.value)); });
 document.addEventListener("change", e => { if (e.target.id === "sModel") { S.settings.model = e.target.value; saveSettings(); } });

@@ -65,6 +65,11 @@ Thanh dưới có 4 ô: Hôm nay · Thói quen · Nhật ký · Cài đặt (Cà
      dài 30 phút hoặc tới khối kế tiếp, chọn nhóm. Chỉ cho hôm nay.
    - Bấm khối Thực tế → sửa, xoá việc đã ghi.
 2. **Nhập** (nút bút nổi ở tab Hôm nay): gõ hoặc nói → Gemini hiểu → thẻ xác nhận (sửa được) → lưu.
+   - Thẻ việc theo thứ tự Tên, Nhóm, Giờ, Ngày. Ngày sửa được (không chọn ngày tương lai), khác hôm nay thì được tô màu.
+     Chip thói quen của ngày khác có nhãn ngày.
+   - Không còn gì để ghi thì không lưu được. Giờ kết thúc không sau giờ bắt đầu thì cảnh báo ngay, lưu thành 15 phút.
+   - Thiếu hoặc sai Gemini key: thông báo có nút mở Cài đặt.
+   - Trên timeline, các việc chồng giờ nằm cạnh nhau.
 3. **Thói quen**: chuyển Tuần / Tháng, lùi tới từng tuần, tháng (không quá ngày bắt đầu, không quá hiện tại).
    Chú thích trạng thái nằm dưới tiêu đề, căn giữa. Chạm ô một ngày để sửa habit ngày đó. Chuỗi 🔥.
 4. **Nhật ký**: viết hôm nay, xem các ngày trước.

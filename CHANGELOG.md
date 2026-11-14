@@ -5,6 +5,50 @@ Mới nhất ở trên. Số `vNN` là phiên bản cache trong `sw.js`.
 
 ---
 
+## 2026-11-14 · Ngày nằm trong form thẻ việc · v25
+**Đổi gì**: thẻ việc trong sheet xác nhận theo thứ tự Tên → Nhóm → Giờ → Ngày. Ngày là ô chọn ngày sửa được, kèm chữ "Hôm nay", "Hôm qua"
+hoặc thứ; ngày khác hôm nay thì ô được tô màu nhấn. Bỏ nhãn "Ghi vào Hôm qua" nằm ngoài thẻ (bản v24). Đổi nhóm thì viền thẻ đổi màu theo.
+
+**Vì sao**: nhãn ngày nằm ngoài thẻ trông như tiêu đề nhóm, tách rời khỏi việc nó nói tới, và chỉ xem được chứ không sửa được.
+Người dùng muốn ngày là một trường của form như tên, nhóm, giờ.
+
+**Logic**
+- Ô ngày luôn hiện (kể cả hôm nay) để form có cấu trúc cố định, nhưng chỉ tô màu khi khác hôm nay nên vẫn giữ được tác dụng cảnh báo của v24.
+- `max` = hôm nay, và `validDay()` đưa ngày rỗng, sai định dạng hay ở tương lai về hôm nay, cả lúc đổi trong form lẫn lúc lưu
+  (việc đã làm không thể ở tương lai, giống luật trong prompt Gemini).
+- Việc chỉ được thêm vào timeline hôm nay khi ngày đúng là hôm nay; đổi sang hôm qua thì chỉ ghi vào Calendar ngày đó.
+- Chip thói quen vẫn giữ nhãn ngày, vì chip không có chỗ cho một ô nhập, nhưng rút gọn (`dayShort`): "Hôm qua", ngày cũ hơn
+  là "T6 13/11". Ngày đầy đủ đã có ở ô ngày phía trên nên chip chỉ cần nhắc. `dayTag` của v24 bị bỏ.
+- Thêm 4 test (tổng 91).
+
+## 2026-11-14 · Sửa 6 lỗi của luồng nhập · v24
+**Đổi gì**
+1. Việc, thói quen không phải hôm nay có nhãn "Ghi vào Hôm qua · Thứ Sáu 13/11" trong sheet xác nhận.
+2. Không có gì để ghi thì nút Lưu bị khoá; `savePending` cũng tự chặn và báo "Không có gì để ghi".
+3. Bấm thùng rác bỏ hết việc thì ẩn lời đáp cũ của AI, báo "Đã bỏ hết". Bỏ một dòng không còn làm mất chỗ đã sửa ở dòng khác.
+4. Giờ kết thúc không sau giờ bắt đầu: cảnh báo ngay dưới ô giờ, nói rõ sẽ lưu thành gì. Có ở mọi sheet có ô giờ.
+5. Timeline: các khối chồng giờ chia làn nằm cạnh nhau thay vì đè lên nhau.
+6. Lỗi thiếu hoặc sai Gemini key: toast có nút "Mở Cài đặt".
+
+**Vì sao**: chụp lại toàn bộ luồng nhập (21 trường hợp) thì thấy 6 chỗ làm người dùng hiểu sai hoặc mất dữ liệu:
+lưu nhầm ngày mà không biết, bấm Lưu khi trống vẫn báo "Đã ghi", lời đáp nói về việc đã bỏ, giờ bị đổi âm thầm,
+việc bị che mất trên timeline, và lỗi bảo "vào Cài đặt" nhưng không đưa tới đó.
+
+**Logic**
+- Nhãn ngày dùng `dayTag(ds)`: hôm nay trả chuỗi rỗng nên giao diện quen thuộc không đổi, chỉ ngày khác mới có nhãn.
+- "Trống" = không việc, không thói quen, nhật ký rỗng, không unwell (`pendingEmpty`). Ngoại lệ chế độ "Làm việc khác":
+  lưu khi trống vẫn có ý nghĩa (đánh dấu bỏ qua khối đang chạy) nên không khoá.
+- Lời đáp chỉ ẩn khi người dùng **đã bỏ** hết (`p.edited`). Nếu AI không tìm được gì từ đầu thì lời đáp của AI vẫn hữu ích nên giữ.
+- Trước khi bỏ một dòng, đọc lại giá trị đang có trong các ô vào `S.pending`, vì sheet được dựng lại từ `S.pending`.
+- Giờ ngược: không tự sửa và không chặn lưu (đôi khi người dùng chủ ý để vậy), chỉ nói trước kết quả. `timeWarn` gắn vào mọi `.act`
+  khi mở sheet và mỗi lần đổi ô giờ, nên sheet Thêm, Sửa kế hoạch và Sửa việc đã làm đều có.
+- Chia làn theo **vị trí vẽ** chứ không theo giờ thật, vì khối ngắn được vẽ cao tối thiểu 22px và có thể đè khối sau dù giờ không chồng.
+  Thuật toán gom cụm khối chồng nhau, xếp từng khối vào làn trống đầu tiên; mọi khối trong cụm chia đều bề ngang theo số làn của cụm.
+  Khối không chồng ai giữ nguyên toàn bề ngang.
+- Toast nhận thêm `{ label, icon, done }` để nút dùng được cho việc khác ngoài hoàn tác; `done: null` nghĩa là chạy xong không báo "Đã hoàn tác".
+  Lỗi Gemini 401/403 hoặc thông báo có "API key" cũng được đánh dấu `needKey`.
+- Thêm 13 test (tổng 87).
+
 ## 2026-11-14 · Unit test và tài liệu
 **Đổi gì**
 - Thêm `tests/` (74 test) và `tests/run.py` chạy bằng Chrome headless.

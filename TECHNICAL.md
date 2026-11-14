@@ -149,6 +149,10 @@ sequenceDiagram
   App->>U: toast "Đã ghi", có Hoàn tác
 ```
 - Gemini: thử model đang chọn, rồi lần lượt các model dự phòng nếu gặp 429, 5xx, 404 (`callGemini`).
+  Thiếu key, key sai (401, 403, thông báo có "API key") → lỗi có `needKey`, toast hiện nút "Mở Cài đặt".
+- Sheet xác nhận: mỗi thẻ việc có ô ngày sửa được (`dateField`, giá trị qua `validDay`: không rỗng, không tương lai),
+  tô màu khi khác hôm nay; chip thói quen có `date` khác hôm nay hiện nhãn ngắn (`dayShort`: "Hôm qua" hoặc "T6 13/11"). Không còn gì để ghi (`pendingEmpty`)
+  thì khoá Lưu, trừ chế độ "Làm việc khác". Bỏ hết dòng thì ẩn lời đáp cũ. Giờ ngược có cảnh báo (`timeWarn`), khi lưu thành 15 phút.
 - Chế độ demo không có key thì dùng `demoParse()` (bắt từ khoá đơn giản) để vẫn thử được luồng.
 - Hoàn tác: xoá các việc vừa tạo, trả bản ghi ngày về bản chụp trước khi lưu (`restoreRec`), trả lại nhật ký cũ.
 
@@ -186,12 +190,14 @@ Máy khác mở app → `findConfig()` → `adoptCfg()` lấy key nếu máy đ�
 - Mọi nút đi qua **một** `click` listener ở `document`, phân theo `id` hoặc `data-*` (`data-pid`, `data-aid`, `data-day`, `data-week`, `data-hview`…).
 - Sheet (`openSheet` / `closeSheet`) dùng chung cho Cài đặt, sửa, thêm, xác nhận.
 - Timeline: `TL = { H0: 5, H1: 23, PX: 56 }`. `top = (giờ - H0) * PX`, khối ≤40px thêm class `is-short` (1 dòng, cắt "…").
+  Khối chồng nhau (theo vị trí vẽ, gồm cả chiều cao tối thiểu 22px) được `laneLayout()` chia làn, nằm cạnh nhau trong cột.
   `renderToday()` giữ `scrollTop` cũ khi render lại; lần đầu cuộn tới `data-now` (khi khung đã có chiều cao).
 - Nút đang chờ mạng: `busy(el, label)` khoá nút, hiện vòng quay.
 
 ## 5. Lỗi và hoàn tác
 - `g()` là cửa duy nhất gọi Google: gắn token, 401 → xoá token và báo `e.auth` để hiện banner "Đăng nhập lại", lỗi khác → `Error("Google lỗi <status>: <message>")`.
 - `handleErr(e)` hiện toast lỗi. Các thao tác ghi đều có toast "Hoàn tác" chạy hàm ngược (xoá, ghi lại bản cũ).
+  `toast(msg, ms, fn, { label, icon, done })` dùng chung nút đó cho việc khác, ví dụ "Mở Cài đặt".
 
 ## 6. PWA và cập nhật
 `sw.js` network-first cho file cùng origin (luôn lấy bản mới khi có mạng, mất mạng thì dùng cache), không chạm tới request Google hay Gemini.
