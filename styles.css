@@ -1,4 +1,4 @@
-/* Still life · deep forest, bone, amber. Mobile first. */
+/* Still life · deep forest, bone, silver. Mobile first. */
 :root {
   --canvas: #EEF0EA;
   --surface: #F8F9F5;
@@ -7,9 +7,9 @@
   --ink: #17251D;
   --ink-soft: #55665B;
   --ink-faint: #8A998F;
-  --accent: #D9862A;
-  --accent-ink: #1E1306;
-  --accent-soft: #F4DDBE;
+  --accent: #7D8B94;
+  --accent-ink: #11191D;
+  --accent-soft: #DDE2E5;
   --good: #3F8A55;
   --min: #A9C9A2;
   --miss: #E7C9BF;
@@ -36,9 +36,9 @@
     --ink: #E8ECE2;
     --ink-soft: #A3B3A7;
     --ink-faint: #6E8075;
-    --accent: #F0A647;
-    --accent-ink: #1A1105;
-    --accent-soft: #3A2A14;
+    --accent: #C7CFD4;
+    --accent-ink: #11191D;
+    --accent-soft: #263037;
     --good: #5DB273;
     --min: #2F5A3A;
     --miss: #4A2D27;
@@ -53,9 +53,10 @@
 
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
+html { background: var(--canvas); }
 body {
   margin: 0; min-height: 100dvh;
-  background: var(--canvas); color: var(--ink);
+  background: transparent; color: var(--ink);
   font: 400 16px/1.55 var(--f-text);
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
@@ -162,7 +163,7 @@ main { max-width: 720px; margin: 0 auto; padding: 0 var(--gutter); }
   margin-top: 12px; width: 100%;
   display: flex; align-items: center; gap: 12px; text-align: left;
   padding: 12px 14px; border-radius: var(--r); border: 1px dashed var(--line);
-  background: transparent; color: var(--ink-soft); font-size: 14px;
+  background: var(--canvas); color: var(--ink-soft); font-size: 14px;
 }
 .unwell-toggle i { font-size: 22px; color: var(--rest); }
 .unwell-toggle b { color: var(--ink); font-weight: 600; display: block; }
@@ -389,6 +390,53 @@ body.no-dock .toast { bottom: calc(var(--tabs-h) + var(--safe-b) + 16px); }
   .chips { grid-template-columns: repeat(4, 1fr); }
   .top__title { font-size: 36px; }
 }
+/* ---------- Bầu trời sao: nền lấp lánh + ánh bạc ---------- */
+:root { --star: rgb(125 139 148 / .5); --star-2: rgb(125 139 148 / .3); --sheen: rgb(255 255 255 / .55); }
+@media (prefers-color-scheme: dark) { :root { --star: rgb(236 241 244 / .95); --star-2: rgb(226 232 236 / .55); --sheen: rgb(255 255 255 / .7); } }
+body::before, body::after {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+}
+/* lớp sao tĩnh, nhỏ li ti */
+body::before {
+  background-image:
+    radial-gradient(circle at 23px 41px, var(--star-2) 0 1.1px, transparent 2.6px),
+    radial-gradient(circle at 131px 97px, var(--star-2) 0 0.9px, transparent 2.2px),
+    radial-gradient(circle at 187px 19px, var(--star-2) 0 1.2px, transparent 2.9px),
+    radial-gradient(circle at 71px 163px, var(--star-2) 0 0.9px, transparent 2.2px),
+    radial-gradient(circle at 211px 181px, var(--star-2) 0 1.1px, transparent 2.6px),
+    radial-gradient(circle at 157px 227px, var(--star-2) 0 0.9px, transparent 2.2px),
+    radial-gradient(circle at 103px 9px, var(--star-2) 0 0.8px, transparent 1.9px);
+  background-size: 240px 240px;
+}
+/* lớp sao to hơn, nhấp nháy chậm */
+body::after {
+  background-image:
+    radial-gradient(circle at 97px 53px, var(--star) 0 1.7px, transparent 4.1px),
+    radial-gradient(circle at 283px 151px, var(--star) 0 2.2px, transparent 5.3px),
+    radial-gradient(circle at 41px 251px, var(--star) 0 1.6px, transparent 3.8px),
+    radial-gradient(circle at 331px 307px, var(--star) 0 1.9px, transparent 4.6px),
+    radial-gradient(circle at 199px 337px, var(--star) 0 1.6px, transparent 3.8px);
+  background-size: 380px 380px;
+  animation: twinkle 5s ease-in-out infinite alternate;
+}
+@keyframes twinkle { from { opacity: .45; } to { opacity: 1; } }
+
+/* nút chính: ánh bạc kim loại + vệt sáng lướt qua thỉnh thoảng */
+.btn--primary, .dock__send {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 70%, #fff) 0%, var(--accent) 45%, color-mix(in srgb, var(--accent) 82%, #000) 100%);
+  position: relative; overflow: hidden; isolation: isolate;
+}
+.btn--primary::after, .dock__send::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(115deg, transparent 35%, var(--sheen) 50%, transparent 65%);
+  transform: translateX(-120%); animation: sheen 6s var(--ease) infinite;
+}
+@keyframes sheen { 0%, 70% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+
+/* ngọn lửa chuỗi ngày → lấp lánh nhẹ */
+.streak b i { animation: glint 2.8s ease-in-out infinite; }
+@keyframes glint { 0%, 100% { filter: drop-shadow(0 0 0 transparent); } 50% { filter: drop-shadow(0 0 5px var(--accent)); } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
