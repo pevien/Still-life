@@ -255,7 +255,8 @@ button.tl__ev:active { filter: brightness(.95); }
 }
 .week table { border-collapse: separate; border-spacing: 4px; width: 100%; }
 .week th { font-size: 12px; font-weight: 600; color: var(--ink-faint); text-align: center; }
-.week th.is-today { color: var(--accent); }
+.week th.is-today { color: var(--ink); }
+.week th.is-today .wday, .week th.is-today { text-decoration: underline 2px var(--accent); text-underline-offset: 4px; }
 .week table { table-layout: fixed; }
 .week col.c-name { width: 34%; }
 .week td.name { font-size: 13px; font-weight: 600; line-height: 1.2; padding-right: 4px; }
@@ -331,6 +332,10 @@ button.mcal__d:active { transform: scale(.92); }
 .field textarea { resize: vertical; min-height: 64px; }
 .field textarea:focus, .field input:focus, .field select:focus, .input:focus { outline: none; border-color: var(--silver); }
 .field small { display: block; margin-top: 6px; color: var(--ink-soft); font-size: 12px; }
+.keystate { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; color: var(--ink-soft); }
+.keystate:empty { display: none; }
+.keystate.is-ok { color: var(--good); font-weight: 600; }
+.keystate.is-bad { color: #B4473C; font-weight: 600; }
 .jlist { list-style: none; margin: 0; padding: 0; border-radius: var(--r); background: var(--surface); box-shadow: var(--edge), var(--e1); overflow: hidden; }
 .jlist li + li { border-top: 1px solid var(--line); }
 .jlist button { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; background: none; border: 0; text-align: left; }
@@ -386,6 +391,8 @@ button.mcal__d:active { transform: scale(.92); }
 .dock.is-busy .dock__send i { animation: spin 0.9s linear infinite; }
 @keyframes pulse { 50% { box-shadow: 0 0 0 6px rgb(201 71 58 / .25); } }
 @keyframes spin { to { transform: rotate(360deg); } }
+.spin { display: inline-block; animation: spin .9s linear infinite; }
+#sTest { margin: 4px 0 14px; }
 
 /* ---------- tabs ---------- */
 .tabs {
@@ -519,6 +526,12 @@ html::after {
 }
 @keyframes sheen { 0%, 70% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
 .fab { position: fixed; }
+/* màn rộng: nút bút bám theo cột nội dung 720px, không dạt ra mép màn hình */
+@media (min-width: 752px) { .fab { right: calc((100vw - 720px) / 2 + var(--gutter)); } }
+/* .icon-btn:hover đổi nền sang surface-2 → giữ ánh vàng cho nút gửi */
+@media (hover: hover) and (pointer: fine) {
+  .dock__send:hover { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 55%, #fff) 0%, var(--accent) 45%, color-mix(in srgb, var(--accent) 86%, #000) 100%); filter: brightness(1.06); }
+}
 
 /* ngọn lửa chuỗi ngày → lấp lánh nhẹ */
 .streak b i { animation: glint 2.8s ease-in-out infinite; }

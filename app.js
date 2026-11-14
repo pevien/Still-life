@@ -96,7 +96,7 @@ const LS = {
   set(k, v) { try { localStorage.setItem("sl." + k, JSON.stringify(v)); } catch {} },
 };
 const S = {
-  settings: Object.assign({ clientId: DEFAULT_CLIENT_ID, geminiKey: "", model: "gemini-2.5-flash", demo: false }, LS.get("settings", {})),
+  settings: Object.assign({ clientId: DEFAULT_CLIENT_ID, geminiKey: "", model: "", demo: false }, LS.get("settings", {})),
   cfg: LS.get("cfg", null),         // { planCal, actualCal, folderId, journalFolderId, configFileId, start }
   tok: LS.get("tok", null),         // { t, exp }
   view: "today",
@@ -106,6 +106,7 @@ const S = {
 };
 if (new URLSearchParams(location.search).has("demo")) S.settings.demo = true;
 const saveSettings = () => LS.set("settings", S.settings);
+if (S.settings.model === "gemini-2.5-flash") S.settings.model = "";   // mặc định cũ → để app tự chọn model
 
 // ============================================================ Google API
 function gisReady() { return !!(window.google && google.accounts && google.accounts.oauth2); }
@@ -188,8 +189,19 @@ const Google = {
   async findConfig() {
     const r = await g(`${DRIVE}/files?${q({ q: "name='still-life-config.json' and trashed=false", fields: "files(id)", spaces: "drive" })}`);
     if (!r.files.length) return null;
-    const c = JSON.parse(await g(`${DRIVE}/files/${r.files[0].id}?alt=media`));
+    const c = await this.readConfig(r.files[0].id);
     c.configFileId = r.files[0].id; return c;
+  },
+  async readConfig(id) {
+    const v = await g(`${DRIVE}/files/${id}?alt=media`);   // Drive trả application/json nên g() có thể đã parse sẵn
+    return typeof v === "string" ? JSON.parse(v) : v;
+  },
+  // Ghi Gemini key vào file cấu hình trên Drive để máy khác cùng tài khoản dùng chung
+  async pushKey(key) {
+    const c = await this.readConfig(S.cfg.configFileId);
+    if (c.geminiKey === key) return;
+    c.geminiKey = key;
+    await this.writeFile("still-life-config.json", null, JSON.stringify(c, null, 2), "application/json", S.cfg.configFileId);
   },
   async folder(name, parent) {
     const qs = `name='${name.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and trashed=false` + (parent ? ` and '${parent}' in parents` : "");
@@ -218,7 +230,7 @@ const Google = {
       let first = today; while (!t.days.includes(first.getDay())) first = addDays(first, 1);
       await g(`${CAL}/calendars/${encodeURIComponent(plan.id)}/events`, { method: "POST", body: JSON.stringify(planBody(t, first)) });
     }
-    const cfg = { planCal: plan.id, actualCal: act.id, folderId, journalFolderId, start: ymd(today), v: 1 };
+    const cfg = { planCal: plan.id, actualCal: act.id, folderId, journalFolderId, start: ymd(today), v: 1, geminiKey: cleanKey(S.settings.geminiKey) };
     const f = await this.writeFile("still-life-config.json", folderId, JSON.stringify(cfg, null, 2), "application/json");
     cfg.configFileId = f.id; return cfg;
   },
@@ -681,6 +693,9 @@ function parseJournal(md) {
 async function renderJournal() {
   const v = $("#view-journal");
   if (!ready()) { v.innerHTML = `<div class="empty"><h2>Chưa kết nối</h2><p>Kết nối Google ở tab Hôm nay trước nhé.</p></div>`; return; }
+  // Đang viết dở (vd vừa chuyển app rồi quay lại): không vẽ lại để khỏi mất chữ
+  if (S.jdirty && $("#jform", v)) return;
+  S.jdirty = false;
   v.innerHTML = `<p class="muted">Đang mở nhật ký…</p>`;
   let files = [];
   try { files = await api().listJournal(); } catch (e) { return handleErr(e); }
@@ -721,6 +736,7 @@ function closeSheet() { $("#sheet").hidden = true; document.body.style.overflow 
 
 function renderSettings() {
   const s = S.settings;
+  setTimeout(() => { if (s.geminiKey && $("#sKeyState")) saveKey(s.geminiKey, true); }, 0);
   openSheet("Cài đặt", `
     <div class="set-group">
       <div class="status-line">${s.demo ? '<i class="ph-fill ph-flask warn-c"></i> Đang ở chế độ xem thử (dữ liệu mẫu)' : signedIn() ? '<i class="ph-fill ph-check-circle ok-c"></i> Đã đăng nhập Google' : '<i class="ph ph-warning-circle warn-c"></i> Chưa đăng nhập Google'}</div>
@@ -731,8 +747,9 @@ function renderSettings() {
       ${S.cfg && !s.demo ? `<p class="faint" style="font-size:13px;margin:10px 0 0">Đang theo dõi từ ${esc(S.cfg.start)}. <a class="link" href="https://drive.google.com/drive/folders/${esc(S.cfg.folderId)}" target="_blank" rel="noopener">Mở thư mục Drive</a></p>` : ""}
     </div>
     <div class="set-group">
-      <label class="field"><span>Gemini API key</span><input id="sKey" type="password" autocomplete="off" value="${esc(s.geminiKey)}" placeholder="AIza…"><small>Lưu trên máy này. Lấy miễn phí ở <a class="link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a></small></label>
-      <label class="field"><span>Model Gemini</span><input id="sModel" value="${esc(s.model)}"><small>Mặc định gemini-2.5-flash. Nếu quá tải, app tự thử gemini-2.5-flash-lite.</small></label>
+      <label class="field"><span>Gemini API key</span><input id="sKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(s.geminiKey)}" placeholder="AIza…"><span class="keystate" id="sKeyState" role="status"></span><small>Đồng bộ theo tài khoản Google. Lấy miễn phí ở <a class="link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a></small></label>
+      <label class="field"><span>Model</span><select id="sModel">${modelOptions()}</select><small>${MODEL_HINT}</small></label>
+      <button class="btn btn--block" id="sTest" type="button"><i class="ph ph-plugs-connected"></i> Kiểm tra kết nối</button>
       <label class="field"><span>Google OAuth Client ID</span><input id="sClient" value="${esc(s.clientId)}"><small>Cùng client với app Korean. Cần thêm địa chỉ app này vào “Authorized JavaScript origins”.</small></label>
       <button class="btn btn--primary btn--block" id="sSave">Lưu cài đặt</button>
     </div>`);
@@ -815,10 +832,75 @@ ${plan || "(trống)"}
 Câu của người dùng:
 """${text}"""`;
 }
+// Key dán từ chỗ khác hay dính khoảng trắng, xuống dòng, dấu ngoặc
+const cleanKey = k => String(k || "").replace(/[\s"'`]/g, "");
+// Danh sách model lấy theo key của bạn (giống app Korean). Flash-Lite trước: rẻ, nhanh, nhiều lượt miễn phí.
+const MODEL_FALLBACK = ["gemini-2.5-flash-lite", "gemini-2.5-flash"];
+let MODELS = LS.get("models", []);
+const modelVer = id => parseFloat((id.match(/^gemini-(\d+(?:\.\d+)?)/) || [])[1] || 0);
+const isLite = id => /flash-lite/.test(id), isPreview = id => /preview|exp/.test(id);
+const modelRank = (a, b) => (isLite(b) - isLite(a)) || (isPreview(a) - isPreview(b)) || (modelVer(b) - modelVer(a)) || a.localeCompare(b);
+const modelList = () => (MODELS.length ? MODELS : MODEL_FALLBACK);
+const curModel = () => (S.settings.model || "").trim() || modelList()[0];
+const modelLabel = id => id.replace(/^gemini-/, "Gemini ").replace(/-flash-lite/, " Flash-Lite").replace(/-flash/, " Flash").replace(/-preview.*$/, " (preview)")
+  + (isLite(id) ? " · rẻ, nhanh" : " · hiểu câu tốt hơn");
+const MODEL_HINT = "<b>Flash-Lite:</b> nhanh, nhiều lượt miễn phí nhất. <b>Flash:</b> hiểu câu kể dài, lộn xộn tốt hơn.";
+function modelOptions() {
+  const list = modelList(), cur = (S.settings.model || "").trim();
+  return [`<option value="" ${cur ? "" : "selected"}>Tự chọn · ${esc(modelLabel(list[0]).split(" · ")[0])}</option>`]
+    .concat(list.map(id => `<option value="${esc(id)}" ${id === cur ? "selected" : ""}>${esc(modelLabel(id))}</option>`))
+    .concat(cur && !list.includes(cur) ? [`<option value="${esc(cur)}" selected>${esc(cur)}</option>`] : []).join("");
+}
+async function loadModels(key) {
+  const r = await fetch(`${GEMINI}?pageSize=1000`, { headers: { "x-goog-api-key": key } });
+  if (!r.ok) {
+    let m = ""; try { m = (await r.json()).error.message; } catch {}
+    throw new Error(r.status === 400 || r.status === 403 ? "Key không hợp lệ. Kiểm tra lại ở aistudio.google.com/apikey" : `Không kiểm tra được key (${r.status}${m ? ": " + m : ""})`);
+  }
+  const ids = ((await r.json()).models || [])
+    .filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
+    .map(m => m.name.replace(/^models\//, ""))
+    .filter(id => /^gemini-[\d.]+-flash/.test(id) && !/latest|tts|image|live|audio|embed|robotics|computer|thinking/.test(id))
+    .sort(modelRank);
+  if (ids.length) { MODELS = ids; LS.set("models", ids); }
+  const sel = $("#sModel"); if (sel) sel.innerHTML = modelOptions();
+  return MODELS;
+}
+const testKey = loadModels;
+// Gửi thử 1 câu thật qua đúng model đang chọn
+async function testConnection() {
+  const b = $("#sTest"); if (!b) return;
+  await saveKey($("#sKey").value, true);
+  if (!S.settings.geminiKey) { const st = $("#sKeyState"); st.textContent = "Chưa nhập key"; st.className = "keystate is-bad"; return; }
+  if ($("#sKeyState").classList.contains("is-bad")) return;
+  S.settings.model = $("#sModel").value; saveSettings();
+  b.disabled = true; b.innerHTML = '<i class="ph ph-circle-notch spin"></i> Đang thử…';
+  const st = $("#sKeyState");
+  try {
+    const p = await callGemini("vừa đi bộ 10 phút");
+    st.innerHTML = `<i class="ph-fill ph-check-circle"></i> Kết nối được · ${esc(modelLabel(p.model || curModel()).split(" · ")[0])}`; st.className = "keystate is-ok";
+  } catch (e) { st.textContent = e.message; st.className = "keystate is-bad"; }
+  b.disabled = false; b.innerHTML = '<i class="ph ph-plugs-connected"></i> Kiểm tra kết nối';
+}
+// Key hợp lệ → đẩy lên Drive (nếu đã nối Google) để đồng bộ theo tài khoản
+function syncKey(key) {
+  if (S.settings.demo || !S.cfg || !S.cfg.configFileId || !signedIn() || S.cfg.geminiKey === key) return;
+  Google.pushKey(key).then(() => { S.cfg.geminiKey = key; LS.set("cfg", S.cfg); }).catch(handleErr);
+}
+async function saveKey(raw, quiet) {
+  const key = cleanKey(raw);
+  S.settings.geminiKey = key; saveSettings();
+  const inp = $("#sKey"); if (inp && inp.value !== key) inp.value = key;
+  const st = $("#sKeyState"); if (!st) return;
+  if (!key) { st.textContent = ""; st.className = "keystate"; return; }
+  st.textContent = "Đang kiểm tra key…"; st.className = "keystate";
+  try { await testKey(key); st.innerHTML = '<i class="ph-fill ph-check-circle"></i> Key dùng được'; st.className = "keystate is-ok"; if (!quiet) toast("Đã lưu key"); syncKey(key); }
+  catch (e) { st.textContent = e.message; st.className = "keystate is-bad"; }
+}
 async function callGemini(text) {
-  const key = S.settings.geminiKey.trim();
+  const key = cleanKey(S.settings.geminiKey);
   if (!key) throw new Error("Chưa có Gemini API key (vào Cài đặt)");
-  const models = [S.settings.model || "gemini-2.5-flash", "gemini-2.5-flash-lite"].filter((m, i, a) => a.indexOf(m) === i);
+  const models = [curModel(), ...modelList(), "gemini-flash-latest"].filter((m, i, a) => a.indexOf(m) === i);
   let last;
   for (const model of models) {
     try {
@@ -828,12 +910,13 @@ async function callGemini(text) {
           generationConfig: { responseMimeType: "application/json", responseSchema: geminiSchema(), temperature: 0.2 } }),
       });
       if (r.status === 429 || r.status >= 500) { last = new Error(`Gemini đang bận (${r.status})`); continue; }
+      if (r.status === 404) { last = new Error(`Model ${model} không còn dùng được`); continue; }
       if (!r.ok) { let m = ""; try { m = (await r.json()).error.message; } catch {} throw new Error(`Gemini lỗi ${r.status}${m ? ": " + m : ""}`); }
       const j = await r.json();
       const out = j.candidates && j.candidates[0] && j.candidates[0].content.parts.map(p => p.text || "").join("");
       const p = JSON.parse(out);
-      return { activities: p.activities || [], habits: p.habits || [], journal: p.journal || "", unwell: !!p.unwell, reply: p.reply || "" };
-    } catch (e) { last = e; if (!/bận/.test(e.message)) throw e; }
+      return { activities: p.activities || [], habits: p.habits || [], journal: p.journal || "", unwell: !!p.unwell, reply: p.reply || "", model };
+    } catch (e) { last = e; if (!/bận|không còn dùng/.test(e.message)) throw e; }
   }
   throw last;
 }
@@ -1028,14 +1111,19 @@ function showBanner() {
   else b.innerHTML = "";
 }
 
+// Nhận cấu hình tìm thấy trên Drive; lấy luôn Gemini key nếu máy này chưa có
+function adoptCfg(found) {
+  S.cfg = found; LS.set("cfg", S.cfg);
+  if (found.geminiKey && !S.settings.geminiKey) { S.settings.geminiKey = found.geminiKey; saveSettings(); }
+}
 async function startFlow() {
   const s = S.settings;
   try {
-    if (!s.geminiKey) return renderSettings();
     if (!signedIn()) { await signIn(true); toast("Đã đăng nhập Google"); }
     if (!S.cfg) {
       const found = await Google.findConfig();
-      if (found) { S.cfg = found; LS.set("cfg", S.cfg); toast("Đã tìm thấy lịch Still life của bạn"); }
+      if (found) { adoptCfg(found); toast("Đã tìm thấy lịch Still life của bạn"); }
+      else if (!s.geminiKey) return renderSettings();
       else {
         openSheet("Đang dựng hệ thống", `<p class="muted" id="setupStep">Bắt đầu…</p>`);
         S.cfg = await Google.setup(m => { const el = $("#setupStep"); if (el) el.textContent = m; });
@@ -1061,7 +1149,7 @@ function render() {
 async function refresh() {
   // Đã đăng nhập nhưng máy này chưa có cấu hình (vd máy thứ hai): tự tìm bộ lịch có sẵn trên Drive
   if (!S.settings.demo && !S.cfg && signedIn()) {
-    try { const found = await Google.findConfig(); if (found) { S.cfg = found; LS.set("cfg", S.cfg); toast("Đã nối vào lịch Still life của bạn"); } }
+    try { const found = await Google.findConfig(); if (found) { adoptCfg(found); toast("Đã nối vào lịch Still life của bạn"); } }
     catch (e) { handleErr(e); }
   }
   if (!ready()) return render();
@@ -1100,9 +1188,13 @@ document.addEventListener("click", async e => {
   if (id === "sOut") { signOut(); closeSheet(); return render(); }
   if (id === "sDemoOff") { S.settings.demo = false; saveSettings(); closeSheet(); return refresh(); }
   if (id === "sDemoReset") { Demo.reset(); location.reload(); return; }
+  if (id === "sTest") return testConnection();
   if (id === "sSave") {
-    S.settings.geminiKey = $("#sKey").value.trim(); S.settings.model = $("#sModel").value.trim() || "gemini-2.5-flash";
-    S.settings.clientId = $("#sClient").value.trim() || DEFAULT_CLIENT_ID; saveSettings(); closeSheet(); toast("Đã lưu cài đặt"); return render();
+    S.settings.model = $("#sModel").value;
+    S.settings.clientId = $("#sClient").value.trim() || DEFAULT_CLIENT_ID; saveSettings();
+    await saveKey($("#sKey").value, true);
+    if ($("#sKeyState").classList.contains("is-bad")) return;   // giữ sheet mở để sửa key
+    closeSheet(); toast("Đã lưu cài đặt"); return render();
   }
   if (id === "btnOpenCal") return window.open("https://calendar.google.com/calendar/r/day", "_blank", "noopener");
   if (id === "btnUnwell") { el.disabled = true; try { await setUnwell(true); toast("Unwell day. Nghỉ ngơi nhé", 2600, () => setUnwell(false)); } catch (er) { handleErr(er); } return render(); }
@@ -1147,7 +1239,8 @@ document.addEventListener("click", async e => {
   }
   if (el.dataset.jdate) {
     const f = (S.jfiles || []).find(x => x.date === el.dataset.jdate); if (!f) return;
-    const d = parseYmd(f.date), j = parseJournal(await api().readJournal(f));
+    let j; try { j = parseJournal(await api().readJournal(f)); } catch (er) { return handleErr(er); }
+    const d = parseYmd(f.date);
     return openSheet(`${DOW[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`, `<form id="jpast" data-date="${esc(f.date)}">${journalFormFields(j)}
       <button class="btn btn--primary btn--block" type="submit"><i class="ph ph-floppy-disk"></i> Lưu</button></form>`);
   }
@@ -1168,6 +1261,7 @@ document.addEventListener("submit", async e => {
       await setHabit(today, "journal", lines >= 3 ? "full" : "min");
       S.jprev = S.jprev || {}; S.jprev[today] = firstLine(f);
       if (past) { closeSheet(); toast("Đã lưu"); return renderJournal(); }
+      S.jdirty = false;
       toast(lines >= 3 ? "Đã lưu. Ngủ ngon nhé" : "Đã lưu (bản tối thiểu)");
     } catch (er) { handleErr(er); }
     btn.disabled = false;
@@ -1175,6 +1269,11 @@ document.addEventListener("submit", async e => {
 });
 
 $("#inputText").addEventListener("input", autosize);
+document.addEventListener("input", e => { if (e.target.closest("#jform")) S.jdirty = true; });
+// Key tự lưu ngay khi dán hoặc rời ô, không cần nhớ bấm "Lưu cài đặt"
+document.addEventListener("change", e => { if (e.target.id === "sModel") { S.settings.model = e.target.value; saveSettings(); } });
+document.addEventListener("change", e => { if (e.target.id === "sKey") saveKey(e.target.value).then(() => { if (S.view === "today" && !ready()) renderToday(); }); });
+document.addEventListener("paste", e => { if (e.target.id === "sKey") setTimeout(() => saveKey(e.target.value).then(() => { if (S.view === "today" && !ready()) renderToday(); }), 0); });
 
 $("#inputText").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && matchMedia("(pointer: fine)").matches) { e.preventDefault(); submitInput(e.target.value); } });
 document.addEventListener("keydown", e => { if (e.key !== "Escape") return; if (!$("#sheet").hidden) closeSheet(); else if ($("#dock").classList.contains("is-open")) closeCompose(); });
