@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Still life · Test</title>
+<style>
+  :root { color-scheme: light dark; --bg: #fafaf7; --ink: #1d1d1b; --soft: #6b6b66; --ok: #1f7a3d; --bad: #b3261e; --line: #e2e1da; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #141413; --ink: #ecebe4; --soft: #9b9a93; --ok: #6fcf8f; --bad: #f2867c; --line: #2c2b28; } }
+  body { margin: 0; padding: 20px 16px 40px; background: var(--bg); color: var(--ink); font: 14px/1.5 system-ui, sans-serif; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  #sum { color: var(--soft); margin: 0 0 16px; }
+  #sum.is-ok { color: var(--ok); } #sum.is-bad { color: var(--bad); }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--soft); margin: 18px 0 6px; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { padding: 4px 0; border-bottom: 1px solid var(--line); }
+  li.ok::before { content: "✓ "; color: var(--ok); }
+  li.bad::before { content: "✗ "; color: var(--bad); }
+  li pre { margin: 4px 0 0 18px; white-space: pre-wrap; color: var(--bad); font-size: 12px; }
+  iframe { position: fixed; left: -10000px; top: 0; width: 420px; height: 900px; border: 0; }
+</style>
+</head>
+<body>
+<h1>Still life · Unit test</h1>
+<p id="sum">Đang chạy…</p>
+<div id="out"></div>
+<script>
+// Chạy app (chế độ demo) trong iframe cùng origin, rồi chèn tests.js vào iframe để test thấy được
+// các hằng số / hàm toàn cục của app.js (const ở top-level không gắn vào window).
+(async () => {
+  const backup = {};
+  for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith("sl.")) backup[k] = localStorage.getItem(k); }
+  const clearSl = () => { for (const k of Object.keys(localStorage)) if (k.startsWith("sl.")) localStorage.removeItem(k); };
+  clearSl();   // demo seed mới, kết quả không phụ thuộc dữ liệu cũ
+
+  const frame = document.createElement("iframe");
+  frame.src = "../index.html?demo";
+  document.body.appendChild(frame);
+  await new Promise(r => frame.addEventListener("load", r, { once: true }));
+  const w = frame.contentWindow, d = frame.contentDocument;
+  for (let i = 0; i < 100 && !d.querySelector("#view-today .tl"); i++) await new Promise(r => setTimeout(r, 50));
+
+  const results = await new Promise(resolve => {
+    w.__testDone = resolve;
+    const s = d.createElement("script"); s.src = "tests/tests.js?" + Date.now();   // đường dẫn tính từ index.html của app
+    s.onerror = () => resolve([{ group: "runner", name: "tải tests.js", ok: false, err: "không tải được tests/tests.js" }]);
+    d.body.appendChild(s);
+  });
+
+  frame.remove(); clearSl();
+  for (const [k, v] of Object.entries(backup)) localStorage.setItem(k, v);
+
+  const fails = results.filter(r => !r.ok);
+  const sum = document.getElementById("sum");
+  sum.textContent = `${results.length - fails.length}/${results.length} test qua` + (fails.length ? ` · ${fails.length} hỏng` : "");
+  sum.className = fails.length ? "is-bad" : "is-ok";
+  const groups = {};
+  for (const r of results) (groups[r.group] = groups[r.group] || []).push(r);
+  const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  document.getElementById("out").innerHTML = Object.entries(groups).map(([g, rs]) =>
+    `<h2>${esc(g)}</h2><ul>${rs.map(r => `<li class="${r.ok ? "ok" : "bad"}">${esc(r.name)}${r.ok ? "" : `<pre>${esc(r.err)}</pre>`}</li>`).join("")}</ul>`).join("");
+  window.__results = results;   // để tests/run.py đọc
+})();
+</script>
+</body>
+</html>

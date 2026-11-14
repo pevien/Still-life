@@ -1,0 +1,571 @@
+// Still life · unit test. Chạy bên trong iframe của app (chế độ demo), được tests/index.html chèn vào,
+// nên thấy trực tiếp các hằng số / hàm toàn cục của app.js. Không gọi Google, không gọi Gemini.
+(async () => {
+  const T = [];
+  let group = "";
+  const describe = (g, fn) => { group = g; fn(); };
+  const test = (name, fn) => T.push({ group, name, fn });
+  const J = v => JSON.stringify(v);
+  const eq = (got, want, msg) => { if (J(got) !== J(want)) throw new Error(`${msg ? msg + ": " : ""}mong ${J(want)}, nhận ${J(got)}`); };
+  const ok = (v, msg) => { if (!v) throw new Error(msg || "điều kiện sai"); };
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const frame = () => new Promise(r => requestAnimationFrame(() => r()));
+
+  const today = startOfDay(new Date());
+  const day = n => addDays(today, n);
+  const rec = (date, extra) => Object.assign(blankRec(ymd(date)), extra);
+  const setDays = list => { S.days = {}; for (const r of list) S.days[r.date] = r; };
+  const block = (title, s, e, extra) => Object.assign({ id: "t_" + title, kind: "plan", title, start: s, end: e, cat: "build", habit: "", ess: false, muted: false }, extra);
+  const at = (t, base = today) => atTime(base, t);
+  const html = s => new DOMParser().parseFromString(`<body>${s}</body>`, "text/html").body;
+
+  // ------------------------------------------------------------ helpers ngày giờ
+  describe("Ngày giờ", () => {
+    test("ymd / parseYmd đi vòng", () => {
+      eq(ymd(parseYmd("2026-03-09")), "2026-03-09");
+      eq(ymd(new Date(2026, 0, 5)), "2026-01-05");
+    });
+    test("addDays qua cuối tháng, cuối năm", () => {
+      eq(ymd(addDays(new Date(2026, 0, 31), 1)), "2026-02-01");
+      eq(ymd(addDays(new Date(2026, 11, 31), 1)), "2027-01-01");
+      eq(ymd(addDays(new Date(2026, 2, 1), -1)), "2026-02-28");
+    });
+    test("mondayOf: Chủ nhật lùi về thứ Hai, thứ Hai giữ nguyên", () => {
+      eq(ymd(mondayOf(new Date(2026, 10, 15))), "2026-11-09");
+      eq(ymd(mondayOf(new Date(2026, 10, 9, 23, 59))), "2026-11-09");
+      eq(ymd(mondayOf(new Date(2026, 10, 14))), "2026-11-09");
+    });
+    test("atTime / hm / pad", () => {
+      const d = atTime(new Date(2026, 10, 14, 20), "07:45");
+      eq([d.getHours(), d.getMinutes(), d.getDate()], [7, 45, 14]);
+      eq(hm(d), "07:45");
+      eq(pad(5), "05"); eq(pad(12.9), "12");
+    });
+    test("rfc có offset đúng múi giờ máy", () => {
+      const d = new Date(2026, 0, 5, 9, 7), s = rfc(d);
+      ok(s.startsWith("2026-01-05T09:07:00"), s);
+      const off = -d.getTimezoneOffset(), sign = off >= 0 ? "+" : "-", a = Math.abs(off);
+      ok(s.endsWith(`${sign}${pad(a / 60)}:${pad(a % 60)}`), s);
+      eq(+new Date(s), +d, "parse lại ra đúng thời điểm");
+    });
+    test("fmtDate tiếng Việt", () => {
+      eq(fmtDate(new Date(2026, 10, 14)), "Thứ Bảy, 14 tháng 11");
+      eq(fmtDate(new Date(2026, 10, 15)), "Chủ nhật, 15 tháng 11");
+    });
+    test("fmtDur: phút và giờ", () => {
+      eq([0, 45, 60, 65, 130, 59.6].map(fmtDur), ["0p", "45p", "1g", "1g05", "2g10", "1g"]);
+    });
+  });
+
+  // ------------------------------------------------------------ helpers chung
+  describe("Tiện ích", () => {
+    test("esc thoát đủ 5 ký tự HTML", () => {
+      eq(esc(`<a href="x">'&`), "&lt;a href=&quot;x&quot;&gt;&#39;&amp;");
+      eq(esc(null), ""); eq(esc(0), "0");
+    });
+    test("better chọn mức cao hơn: full > min > skip", () => {
+      eq(better("min", "full"), "full");
+      eq(better("full", undefined), "full");
+      eq(better(undefined, "skip"), "skip");
+      eq(better("min", "skip"), "min");
+    });
+    test("cleanKey bỏ khoảng trắng, nháy", () => {
+      eq(cleanKey(` "AIza 12\`3"\n`), "AIza123");
+      eq(cleanKey(undefined), "");
+    });
+    test("modelRank: Flash-Lite trước, preview sau, bản mới trước", () => {
+      const list = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3.0-flash-lite-preview", "gemini-2.0-flash-lite"];
+      eq(list.slice().sort(modelRank), ["gemini-2.5-flash-lite", "gemini-2.0-flash-lite", "gemini-3.0-flash-lite-preview", "gemini-2.5-flash"]);
+    });
+    test("modelLabel dễ đọc", () => {
+      eq(modelLabel("gemini-2.5-flash-lite"), "Gemini 2.5 Flash-Lite · rẻ, nhanh");
+      eq(modelLabel("gemini-3-flash-preview-05"), "Gemini 3 Flash (preview) · hiểu câu tốt hơn");
+    });
+  });
+
+  // ------------------------------------------------------------ cấu hình tĩnh
+  describe("Tuần mẫu & habit", () => {
+    test("key tuần mẫu không trùng", () => eq(new Set(TEMPLATE.map(t => t.key)).size, TEMPLATE.length));
+    test("mỗi khối có nhóm hợp lệ, habit hợp lệ, giờ bắt đầu < kết thúc", () => {
+      for (const t of TEMPLATE) {
+        ok(CATS[t.cat], `${t.key}: nhóm ${t.cat}`);
+        ok(!t.habit || H[t.habit], `${t.key}: habit ${t.habit}`);
+        ok(t.s < t.e, `${t.key}: ${t.s}–${t.e}`);
+        ok(t.days.length && t.days.every(d => d >= 0 && d <= 6), `${t.key}: days`);
+      }
+    });
+    test("không có 2 khối chồng giờ trong cùng một ngày", () => {
+      for (let dow = 0; dow < 7; dow++) {
+        const bs = TEMPLATE.filter(t => t.days.includes(dow)).sort((a, b) => a.s.localeCompare(b.s));
+        for (let i = 1; i < bs.length; i++) ok(bs[i].s >= bs[i - 1].e, `${DOW[dow]}: ${bs[i - 1].key} ${bs[i - 1].e} > ${bs[i].key} ${bs[i].s}`);
+      }
+    });
+    test("habit theo ngày / theo tuần có lịch, mức theo tuần hợp lệ", () => {
+      for (const hb of HABITS) {
+        if (hb.freq !== "daily") ok(Array.isArray(hb.days) && hb.days.length, hb.id);
+        if (hb.freq === "weekly") ok(hb.perWeekMin >= 1 && hb.perWeekMin <= hb.perWeekFull, hb.id);
+      }
+    });
+    test("mỗi habit đều có tên ngắn cho bảng tuần", () => { for (const hb of HABITS) ok(HSHORT[hb.id], hb.id); });
+  });
+
+  // ------------------------------------------------------------ Calendar mapping
+  describe("Chuyển đổi sự kiện Calendar", () => {
+    const ev = (summary, priv) => ({ id: "e1", summary, start: { dateTime: "2026-11-16T06:00:00+07:00" }, end: { dateTime: "2026-11-16T07:00:00+07:00" }, extendedProperties: { private: priv } });
+    test("evToItem: lấy nhóm, habit theo key của tuần mẫu", () => {
+      const it = evToItem(ev("Yoga", { key: "yoga" }), "plan");
+      eq([it.kind, it.title, it.cat, it.habit, it.ess, it.muted, it.added], ["plan", "Yoga", "health", "yoga", false, false, false]);
+      eq(+it.end - +it.start, 3600000);
+    });
+    test("evToItem: 💤 nghĩa là đang tắt, tên bỏ 💤", () => {
+      const it = evToItem(ev("💤 Ăn sáng", { key: "breakfast" }), "plan");
+      eq([it.title, it.muted, it.ess], ["Ăn sáng", true, true]);
+    });
+    test("evToItem: khối thêm trong app (added=1), không key", () => {
+      const it = evToItem(ev("Gọi mẹ", { sl: "plan", cat: "people", added: "1" }), "plan");
+      eq([it.cat, it.added, it.habit, it.key], ["people", true, "", undefined]);
+    });
+    test("evToItem: thiếu extendedProperties vẫn chạy, nhóm mặc định Sinh hoạt", () => {
+      const it = evToItem({ id: "x", summary: "A", start: { dateTime: "2026-11-16T06:00:00Z" }, end: { dateTime: "2026-11-16T07:00:00Z" } }, "act");
+      eq([it.cat, it.plan, it.added], ["life", "", false]);
+    });
+    test("recToProps → recFromEv đi vòng giữ nguyên dữ liệu", () => {
+      const r = { id: "d1", date: "2026-11-14", h: { eat: "full", walk: "min" }, v: { walk: 2400 }, unwell: true, reason: "mệt", skip: ["a"], muted: ["b", "c"] };
+      const back = recFromEv({ id: "d1", extendedProperties: { private: recToProps(r) } });
+      eq(back, r);
+    });
+    test("recToProps cắt lý do quá 500 ký tự", () => {
+      eq(recToProps(blankRec("2026-11-14")).reason, "");
+      eq(recToProps(Object.assign(blankRec("x"), { reason: "a".repeat(600) })).reason.length, 500);
+    });
+    test("recFromEv chịu được JSON hỏng", () => {
+      const r = recFromEv({ id: "d", extendedProperties: { private: { date: "2026-11-14", h: "{oops", skip: "nope" } } });
+      eq([r.h, r.skip, r.unwell], [{}, [], false]);
+    });
+    test("planBody: lặp hằng tuần đúng thứ, màu, nhắc", () => {
+      const mon = new Date(2026, 10, 16);
+      const b = planBody(TPL.yoga, mon);
+      eq(b.recurrence, ["RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR"]);
+      eq(b.colorId, CATS.health.color);
+      eq(b.reminders.overrides, [{ method: "popup", minutes: 0 }]);
+      ok(b.start.dateTime.startsWith("2026-11-16T06:00:00"), b.start.dateTime);
+      eq(b.extendedProperties.private.key, "yoga");
+      eq(planBody(TPL.phone, mon).reminders.overrides.map(o => o.minutes), [30, 0]);
+      eq(planBody(TPL.lunch, mon).extendedProperties.private.ess, "1");
+    });
+  });
+
+  // ------------------------------------------------------------ logic habit
+  describe("Trạng thái ô habit", () => {
+    const eat = H.eat;
+    test("tương lai / hôm nay chưa làm / hôm qua bỏ", () => {
+      setDays([]);
+      eq(cellStatus(eat, day(1)), "future");
+      eq(cellStatus(eat, today), "pending");
+      eq(cellStatus(eat, day(-1)), "miss");
+    });
+    test("đạt / tối thiểu / unwell", () => {
+      setDays([rec(day(-1), { h: { eat: "full" } }), rec(day(-2), { h: { eat: "min" } }), rec(day(-3), { unwell: true })]);
+      eq([cellStatus(eat, day(-1)), cellStatus(eat, day(-2)), cellStatus(eat, day(-3))], ["full", "min", "rest"]);
+    });
+    test("trước ngày bắt đầu theo dõi là none, nhưng đã ghi thì vẫn hiện", () => {
+      const before = addDays(trackStart(), -1);
+      setDays([]);
+      eq(cellStatus(eat, before), "none");
+      setDays([rec(before, { h: { eat: "full" } })]);
+      eq(cellStatus(eat, before), "full");
+    });
+    test("ngày không có lịch là off (Yoga chỉ T2-4-6)", () => {
+      setDays([]);
+      let d = day(-1); while (H.yoga.days.includes(d.getDay())) d = addDays(d, -1);
+      eq(cellStatus(H.yoga, d), "off");
+    });
+    test("Gym tính theo tuần: ngày cũ chưa tập là off, không phải miss", () => {
+      setDays([]);
+      let d = day(-1); while (!H.gym.days.includes(d.getDay())) d = addDays(d, -1);
+      eq(cellStatus(H.gym, d), "off");
+    });
+  });
+
+  describe("Đếm tuần & chuỗi", () => {
+    test("weekCount habit hằng ngày: unwell không tính vào mẫu", () => {
+      const mon = addDays(mondayOf(today), -7), list = [];
+      for (let i = 0; i < 7; i++) list.push(rec(addDays(mon, i), { h: i === 2 ? {} : { eat: "full" }, unwell: i === 4 }));
+      list[4].h = {};
+      setDays(list);
+      const wc = weekCount(H.eat, mon);
+      eq([wc.done, wc.total, wc.label, wc.star], [5, 6, "5/6", false]);
+    });
+    test("weekCount đủ cả tuần thì có ★", () => {
+      const mon = addDays(mondayOf(today), -7), list = [];
+      for (let i = 0; i < 7; i++) list.push(rec(addDays(mon, i), { h: { eat: i % 2 ? "min" : "full" } }));
+      setDays(list);
+      const wc = weekCount(H.eat, mon);
+      eq([wc.label, wc.star], ["7/7", true]);
+    });
+    test("weekCount Gym: 1 buổi là đạt tối thiểu, 2 buổi là ★", () => {
+      const mon = addDays(mondayOf(today), -7);
+      setDays([rec(addDays(mon, 1), { h: { gym: "full" } })]);
+      let wc = weekCount(H.gym, mon); eq([wc.label, wc.ok, wc.star], ["1/2", true, false]);
+      setDays([rec(addDays(mon, 1), { h: { gym: "full" } }), rec(addDays(mon, 5), { h: { gym: "full" } })]);
+      wc = weekCount(H.gym, mon); eq([wc.label, wc.ok, wc.star], ["2/2", true, true]);
+    });
+    test("chuỗi ngày: hôm nay chưa làm và unwell không làm gãy chuỗi", () => {
+      setDays([rec(day(-1), { h: { eat: "full" } }), rec(day(-2), { h: { eat: "min" } }), rec(day(-3), { unwell: true }), rec(day(-4), { h: { eat: "full" } })]);
+      eq(streak(H.eat), { n: 3, unit: "ngày" });
+    });
+    test("chuỗi Yoga tính theo buổi, bỏ qua ngày không có lịch", () => {
+      const list = []; let n = 0;
+      for (let i = -1; n < 2; i--) { const d = day(i); if (H.yoga.days.includes(d.getDay())) { list.push(rec(d, { h: { yoga: "full" } })); n++; } }
+      setDays(list);
+      eq(streak(H.yoga), { n: 2, unit: "buổi" });
+    });
+    test("chuỗi Gym tính theo tuần: tuần này chưa tập không làm gãy", () => {
+      const m0 = mondayOf(today);
+      setDays([rec(addDays(m0, -7 + 1), { h: { gym: "full" } }), rec(addDays(m0, -14 + 1), { h: { gym: "full" } }), rec(addDays(m0, -14 + 5), { h: { gym: "full" } })]);
+      eq(streak(H.gym), { n: 2, unit: "tuần" });
+    });
+    test("unwellRun đếm số ngày unwell liền nhau tới hôm nay", () => {
+      setDays([rec(today, { unwell: true }), rec(day(-1), { unwell: true }), rec(day(-3), { unwell: true })]);
+      eq(unwellRun(), 2);
+      setDays([]); eq(unwellRun(), 0);
+    });
+  });
+
+  // ------------------------------------------------------------ bộ đọc câu (demo)
+  describe("Bộ đọc câu chế độ demo", () => {
+    test("yoga 20 phút → hoạt động Sức khỏe + habit yoga đạt", () => {
+      const p = demoParse("Vừa tập yoga 20 phút");
+      eq(p.activities.map(a => [a.title, a.category]), [["Yoga", "health"]]);
+      eq(p.habits, [{ id: "yoga", level: "full" }]);
+      const a = p.activities[0], mins = (+atTime(today, a.end) - +atTime(today, a.start)) / 60000;
+      ok(mins === 20 || mins === 20 - 1440, `dài ${mins} phút`);
+    });
+    test("số bước: ≥3000 đạt, ≥2000 tối thiểu, ít hơn là bỏ", () => {
+      eq(demoParse("đi bộ 3.200 bước").habits, [{ id: "walk", level: "full", value: 3200 }]);
+      eq(demoParse("đi được 2,500 bước").habits, [{ id: "walk", level: "min", value: 2500 }]);
+      eq(demoParse("mới 800 bước").habits[0].level, "skip");
+    });
+    test("học vài từ trong ít phút → tiếng Hàn tối thiểu", () => {
+      eq(demoParse("học 5 từ mới 5p").habits, [{ id: "korean", level: "min" }]);
+    });
+    test("mệt / ốm → gợi ý unwell; lướt TikTok → nhóm Lướt", () => {
+      eq(demoParse("hôm nay mệt quá").unwell, true);
+      eq(demoParse("lướt tiktok 40 phút").activities[0].category, "scroll");
+    });
+  });
+
+  // ------------------------------------------------------------ nhật ký
+  describe("Nhật ký markdown", () => {
+    test("journalMd → parseJournal đi vòng, bỏ mục trống", () => {
+      const f = { vui: "Trời đẹp\nĂn ngon", bietOn: "", mai: "Đi bộ", them: "Ghi chú" };
+      const md = journalMd("2026-11-14", f);
+      ok(md.startsWith("# Nhật ký · Thứ Bảy, 14 tháng 11 2026\n"), md.split("\n")[0]);
+      ok(!md.includes("## Biết ơn"), "mục trống không ghi");
+      eq(parseJournal(md), { vui: "Trời đẹp\nĂn ngon", mai: "Đi bộ", them: "Ghi chú" });
+    });
+    test("tiêu đề lạ gộp vào Ghi thêm, chuỗi rỗng không lỗi", () => {
+      eq(parseJournal("# x\n## Khác\nabc\n"), { them: "abc" });
+      eq(parseJournal(""), {}); eq(parseJournal(undefined), {});
+    });
+  });
+
+  // ------------------------------------------------------------ Bây giờ / Tiếp theo
+  describe("Bây giờ / Tiếp theo", () => {
+    const now = Date.now();
+    const p1 = block("Đang", new Date(now - 10 * 60000), new Date(now + 20 * 60000));
+    const p2 = block("Sau", new Date(now + 30 * 60000), new Date(now + 60 * 60000), { ess: true });
+    test("tìm khối hiện tại và khối kế tiếp", () => {
+      S.today = { plan: [p1, p2], actual: [], rec: blankRec(todayStr()) };
+      const c = currentBlocks();
+      eq([c.cur && c.cur.title, c.next && c.next.title, !!c.done], ["Đang", "Sau", false]);
+    });
+    test("đã ghi thực tế / bỏ qua thì khối hiện tại là xong", () => {
+      S.today = { plan: [p1, p2], actual: [{ id: "a", plan: p1.id }], rec: blankRec(todayStr()) };
+      eq(!!currentBlocks().done, true);
+      S.today = { plan: [p1, p2], actual: [], rec: Object.assign(blankRec(todayStr()), { skip: [p1.id] }) };
+      const c = currentBlocks(); eq([!!c.done, !!c.skipped], [true, true]);
+    });
+    test("unwell day ẩn khối không thiết yếu", () => {
+      S.today = { plan: [p1, p2], actual: [], rec: Object.assign(blankRec(todayStr()), { unwell: true }) };
+      const c = currentBlocks(); eq([c.cur, c.next && c.next.title], [undefined, "Sau"]);
+    });
+  });
+
+  // ------------------------------------------------------------ timeline
+  describe("Timeline", () => {
+    const setup = () => {
+      S.today = {
+        plan: [block("Ngắn", at("10:00"), at("10:30")), block("Dài", at("11:00"), at("13:00"))],
+        actual: [{ id: "a1", kind: "act", title: "Code", start: at("10:00"), end: at("10:20"), cat: "build", plan: "" }],
+        rec: blankRec(todayStr()),
+      };
+    };
+    test("vị trí, chiều cao khối theo giờ (56px/giờ, bắt đầu 5:00)", () => {
+      setup(); const b = html(timelineHTML());
+      const s = b.querySelector('[data-pid="t_Ngắn"]'), l = b.querySelector('[data-pid="t_Dài"]');
+      eq([s.style.top, s.style.height], [(10 - TL.H0) * TL.PX + "px", TL.PX / 2 - 2 + "px"]);
+      eq([l.style.top, l.style.height], [(11 - TL.H0) * TL.PX + "px", TL.PX * 2 - 2 + "px"]);
+    });
+    test("khối ngắn: 1 dòng (is-short), không hiện giờ; khối dài hiện giờ", () => {
+      setup(); const b = html(timelineHTML());
+      const s = b.querySelector('[data-pid="t_Ngắn"]'), l = b.querySelector('[data-pid="t_Dài"]');
+      ok(s.classList.contains("is-short") && !s.querySelector("small"), s.outerHTML);
+      ok(!l.classList.contains("is-short") && l.querySelector("small").textContent === "11:00–13:00", l.outerHTML);
+      eq(s.querySelector(".tl__t").textContent, "Ngắn");
+      ok(s.title.includes("10:00–10:30"), "tooltip có tên + giờ");
+    });
+    test("khối kế hoạch và thực tế đều là nút bấm được", () => {
+      setup(); const b = html(timelineHTML());
+      eq(b.querySelectorAll(".tl__col--plan button.tl__ev[data-pid]").length, 2);
+      eq(b.querySelectorAll(".tl__col--act button.tl__ev[data-aid]").length, 1);
+    });
+    test("đủ nhãn giờ 5:00–23:00, có khung cuộn và tiêu đề cột", () => {
+      setup(); const b = html(timelineHTML());
+      eq(b.querySelectorAll(".tl__hour").length, TL.H1 - TL.H0 + 1);
+      eq([...b.querySelectorAll(".tl__head")].map(h => h.textContent), ["Kế hoạch", "Thực tế"]);
+      ok(b.querySelector(".tl__scroll[data-now]"), "có data-now");
+    });
+    test("tên có ký tự HTML được thoát", () => {
+      S.today = { plan: [block("<b>x</b>", at("09:00"), at("10:00"))], actual: [], rec: blankRec(todayStr()) };
+      const b = html(timelineHTML());
+      eq(b.querySelector(".tl__t").textContent, "<b>x</b>");
+      eq(b.querySelectorAll(".tl__t b").length, 0);
+    });
+    test("khối bỏ qua / đang tắt có class riêng", () => {
+      const p = block("A", at("09:00"), at("10:00")), m = block("B", at("10:00"), at("11:00"), { muted: true });
+      S.today = { plan: [p, m], actual: [], rec: Object.assign(blankRec(todayStr()), { skip: [p.id] }) };
+      const b = html(timelineHTML());
+      ok(b.querySelector('[data-pid="t_A"]').classList.contains("is-skip"));
+      ok(b.querySelector('[data-pid="t_B"]').classList.contains("is-muted"));
+    });
+  });
+
+  // ------------------------------------------------------------ Demo API
+  describe("Demo API kế hoạch", () => {
+    test("addPlan → listPlan có khối, đánh dấu added", async () => {
+      const it = await Demo.addPlan({ title: "API thêm", cat: "fun", start: at("16:00"), end: at("16:30") });
+      const list = await Demo.listPlan(today, day(1));
+      const f = list.find(p => p.id === it.id);
+      ok(f, "có trong danh sách");
+      eq([f.title, f.cat, f.added, hm(f.start), hm(f.end)], ["API thêm", "fun", true, "16:00", "16:30"]);
+      await Demo.deletePlan(it.id);
+      ok(!(await Demo.listPlan(today, day(1))).some(p => p.id === it.id), "xoá xong không còn");
+    });
+    test("updatePlan đổi giờ một khối tuần mẫu chỉ cho hôm nay", async () => {
+      const list = await Demo.listPlan(today, day(2));
+      const t0 = list.find(p => p.key === "free" && +startOfDay(p.start) === +today);
+      const t1 = list.find(p => p.key === "free" && +startOfDay(p.start) === +day(1));
+      await Demo.updatePlan(Object.assign({}, t0, { title: "Tự do (dời)", start: at("15:00"), end: at("16:00") }));
+      const after = await Demo.listPlan(today, day(2));
+      const a0 = after.find(p => p.id === t0.id), a1 = after.find(p => p.id === t1.id);
+      eq([a0.title, hm(a0.start), hm(a0.end)], ["Tự do (dời)", "15:00", "16:00"]);
+      eq([a1.title, hm(a1.start)], [TPL.free.title, TPL.free.s], "ngày mai giữ nguyên");
+      await Demo.updatePlan(t0);
+    });
+    test("listPlan không lấy khối thêm của ngày khác", async () => {
+      const it = await Demo.addPlan({ title: "Mai", cat: "life", start: at("09:00", day(1)), end: at("09:30", day(1)) });
+      ok(!(await Demo.listPlan(today, day(1))).some(p => p.id === it.id));
+      ok((await Demo.listPlan(day(1), day(2))).some(p => p.id === it.id));
+      await Demo.deletePlan(it.id);
+    });
+    test("mutePlan bật / tắt", async () => {
+      const [p] = await Demo.listPlan(today, day(1));
+      await Demo.mutePlan([p], true);
+      eq((await Demo.listPlan(today, day(1))).find(x => x.id === p.id).muted, true);
+      await Demo.mutePlan([p], false);
+      eq((await Demo.listPlan(today, day(1))).find(x => x.id === p.id).muted, false);
+    });
+  });
+
+  // ------------------------------------------------------------ luồng giao diện
+  const reset = async () => { closeSheet(); hideToast(); await loadToday(); setView("today"); await frame(); };
+  const sheetOpen = () => !$("#sheet").hidden;
+  const sheetTitle = () => $("#sheetTitle").textContent;
+
+  describe("Thêm kế hoạch", () => {
+    test("giờ kết thúc mặc định: 30 phút, hoặc tới khối kế tiếp", async () => {
+      await reset();
+      S.today.plan = [block("Kế", at("10:15"), at("11:00"))];
+      renderPlanAdd(at("10:00"));
+      eq([sheetTitle(), $("#pStart").value, $("#pEnd").value], ["Thêm kế hoạch", "10:00", "10:15"]);
+      S.today.plan = [block("Sát", at("10:05"), at("11:00"))];
+      renderPlanAdd(at("10:00"));
+      eq($("#pEnd").value, "10:30", "khối kế tiếp sát quá (<15 phút) thì vẫn 30 phút");
+    });
+    test("chưa nhập tên thì không thêm, sheet vẫn mở", async () => {
+      await reset();
+      renderPlanAdd(at("18:30"));
+      $("#pTitle").value = "  ";
+      eq(await savePlanAdd(), false);
+      ok(sheetOpen(), "sheet vẫn mở");
+    });
+    test("thêm được, giờ ngược tự thành 15 phút, có hoàn tác", async () => {
+      await reset();
+      renderPlanAdd(at("10:00"));
+      $("#pTitle").value = "Test thêm"; $("#pStart").value = "10:00"; $("#pEnd").value = "09:00"; $("#pCat").value = "people";
+      eq(await savePlanAdd(), true);
+      const it = S.today.plan.find(p => p.title === "Test thêm");
+      ok(it, "có trong S.today.plan");
+      eq([hm(it.start), hm(it.end), it.cat, it.added], ["10:00", "10:15", "people", true]);
+      ok(!sheetOpen(), "sheet đóng");
+      ok((await Demo.listPlan(today, day(1))).some(p => p.id === it.id), "đã lưu");
+      ok(S.today.plan.every((p, i, a) => !i || a[i - 1].start <= p.start), "vẫn sắp theo giờ");
+      await toast._undo();
+      ok(!S.today.plan.some(p => p.id === it.id) && !(await Demo.listPlan(today, day(1))).some(p => p.id === it.id), "hoàn tác xoá khối");
+    });
+    test("bấm chỗ trống cột Kế hoạch mở sheet, giờ làm tròn xuống 15 phút", async () => {
+      await reset(); renderToday();
+      const col = $(".tl__col--plan"), r = col.getBoundingClientRect();
+      const y = (17 + 20 / 60 - TL.H0) * TL.PX;
+      col.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: r.left + 5, clientY: r.top + y }));
+      await wait(30);
+      eq([sheetOpen(), sheetTitle(), $("#pStart").value], [true, "Thêm kế hoạch", "17:15"]);
+      closeSheet();
+    });
+    test("vạch giờ và vạch hiện tại không chặn cú bấm", async () => {
+      await reset(); renderToday();
+      eq(getComputedStyle($(".tl__grid")).pointerEvents, "none");
+      const nl = $(".tl__nowline"); if (nl) eq(getComputedStyle(nl).pointerEvents, "none");
+    });
+  });
+
+  describe("Chỉnh sửa kế hoạch", () => {
+    test("bấm khối kế hoạch mở sheet; khối tuần mẫu không có nút xoá", async () => {
+      await reset(); renderToday();
+      const p = S.today.plan.find(x => !x.added);
+      $(`.tl__col--plan [data-pid="${p.id}"]`).click(); await wait(30);
+      eq([sheetTitle(), $("#pTitle").value, $("#pStart").value], ["Chỉnh sửa kế hoạch", p.title, hm(p.start)]);
+      ok(!$("#pDel"), "không có nút xoá");
+      closeSheet();
+    });
+    test("sửa tên, giờ chỉ hôm nay, hoàn tác về như cũ", async () => {
+      await reset();
+      const p = S.today.plan.find(x => x.key === "free");
+      renderPlanEdit(p);
+      $("#pTitle").value = "Tự do mới"; $("#pStart").value = "15:00"; $("#pEnd").value = "15:45";
+      await savePlanEdit();
+      const n = S.today.plan.find(x => x.id === p.id);
+      eq([n.title, hm(n.start), hm(n.end)], ["Tự do mới", "15:00", "15:45"]);
+      const saved = (await Demo.listPlan(today, day(1))).find(x => x.id === p.id);
+      eq([saved.title, hm(saved.start)], ["Tự do mới", "15:00"]);
+      await toast._undo();
+      const u = S.today.plan.find(x => x.id === p.id);
+      eq([u.title, hm(u.start), hm(u.end)], [p.title, hm(p.start), hm(p.end)]);
+    });
+    test("không đổi gì thì chỉ đóng sheet, không gọi lưu", async () => {
+      await reset();
+      const p = S.today.plan[0], orig = Demo.updatePlan; let called = 0;
+      Demo.updatePlan = async x => { called++; return orig(x); };
+      try { renderPlanEdit(p); await savePlanEdit(); } finally { Demo.updatePlan = orig; }
+      eq([called, sheetOpen()], [0, false]);
+    });
+    test("khối thêm trong app có nút xoá, xoá được và hoàn tác được", async () => {
+      await reset();
+      const it = await Demo.addPlan({ title: "Xoá thử", cat: "fun", start: at("16:00"), end: at("16:30") });
+      await loadToday();
+      renderPlanEdit(S.today.plan.find(x => x.id === it.id));
+      ok($("#pDel"), "có nút xoá");
+      await deletePlanAdded();
+      ok(!S.today.plan.some(x => x.title === "Xoá thử"), "đã xoá khỏi màn hình");
+      ok(!(await Demo.listPlan(today, day(1))).some(x => x.title === "Xoá thử"), "đã xoá khỏi dữ liệu");
+      await toast._undo();
+      const back = S.today.plan.find(x => x.title === "Xoá thử");
+      ok(back && hm(back.start) === "16:00" && back.cat === "fun", "hoàn tác khôi phục");
+      await Demo.deletePlan(back.id);
+    });
+  });
+
+  describe("Unwell day", () => {
+    test("bật: tắt các khối không thiết yếu còn lại; tắt: bật lại hết", async () => {
+      await reset();
+      const now = new Date(), expect = S.today.plan.filter(p => !p.ess && p.end > now).map(p => p.id);
+      await setUnwell(true);
+      eq(S.today.rec.unwell, true);
+      eq(S.today.rec.muted.slice().sort(), expect.slice().sort());
+      eq(S.today.plan.filter(p => p.muted).map(p => p.id).sort(), expect.slice().sort());
+      await setUnwell(false);
+      eq([S.today.rec.unwell, S.today.rec.muted, S.today.plan.filter(p => p.muted).length], [false, [], 0]);
+    });
+    test("busy(): khoá nút, hiện vòng quay và chữ trạng thái", () => {
+      const b = document.createElement("button"); b.textContent = "X";
+      busy(b, "Đang <chạy>");
+      ok(b.disabled && b.classList.contains("is-busy") && b.querySelector(".spin"), b.outerHTML);
+      eq(b.textContent.trim(), "Đang <chạy>");
+    });
+    test("bấm nút hiện trạng thái ngay, xong thì hiện thẻ Unwell", async () => {
+      await reset(); renderToday();
+      const orig = Demo.mutePlan; let release; const gate = new Promise(r => (release = r));
+      Demo.mutePlan = async (...a) => { await gate; return orig(...a); };
+      try {
+        $("#btnUnwell").click(); await wait(20);
+        const b = $("#btnUnwell");
+        ok(b && b.disabled && b.textContent.includes("Đang chuyển"), b && b.outerHTML);
+        release(); await wait(80);
+        ok($(".unwell-card"), "có thẻ Unwell day");
+        $("#btnUnwellOff").click(); await wait(80);
+        ok($("#btnUnwell"), "quay lại nút không ổn");
+      } finally { Demo.mutePlan = orig; release(); }
+    });
+  });
+
+  describe("Màn hình", () => {
+    test("thanh dưới có 4 ô; Cài đặt mở sheet, không đổi tab", async () => {
+      await reset();
+      eq([...document.querySelectorAll(".tabs .tab")].map(t => t.textContent.trim()), ["Hôm nay", "Thói quen", "Nhật ký", "Cài đặt"]);
+      $("#btnSettings").click(); await wait(30);
+      eq([sheetOpen(), sheetTitle()], [true, "Cài đặt"]);
+      eq([...document.querySelectorAll(".tab.is-on")].map(t => t.dataset.view), ["today"]);
+      closeSheet();
+    });
+    test("đầu trang 1 dòng chữ nhỏ: lời chào · ngày", async () => {
+      await reset();
+      eq($("#dateTitle").textContent, fmtDate(new Date()));
+      ok(["Khuya rồi", "Chào buổi sáng", "Buổi trưa", "Buổi chiều", "Buổi tối"].includes($("#greet").textContent));
+      eq(getComputedStyle($("#dateTitle")).fontSize, getComputedStyle($("#greet")).fontSize);
+      const g = $("#greet").getBoundingClientRect(), t = $("#dateTitle").getBoundingClientRect();
+      ok(Math.abs(g.top - t.top) < g.height / 2 && t.left > g.right, `cùng một dòng: greet ${J(g)}, ngày ${J(t)}`);
+    });
+    test("timeline: không còn nút thu gọn; mở ra cuộn tới giờ hiện tại, render lại giữ chỗ", async () => {
+      await reset();
+      $("#view-today").innerHTML = ""; renderToday(); await frame(); await frame();
+      ok(!$("#btnTlToggle"), "không còn nút thu gọn");
+      const sc = $(".tl__scroll"), want = Math.max(0, Math.min(sc.scrollHeight - sc.clientHeight, +sc.dataset.now - sc.clientHeight * 0.35));
+      ok(Math.abs(sc.scrollTop - want) <= 1, `scrollTop ${sc.scrollTop}, mong ${want}`);
+      sc.scrollTop = 123; renderToday();
+      eq($(".tl__scroll").scrollTop, 123);
+    });
+    test("Thói quen · Tuần: chú thích nằm trên bảng, căn giữa, không còn 'Chạm ô để sửa'", async () => {
+      await reset(); S.habView = "week"; S.habWeek = null; setView("habits");
+      const lg = $("#view-habits .legend");
+      ok(lg && lg.nextElementSibling.classList.contains("week"), "chú thích ngay trên bảng tuần");
+      ok(lg.previousElementSibling.classList.contains("hnav"), "ngay dưới tiêu đề");
+      eq(getComputedStyle(lg).justifyContent, "center");
+      ok(!$("#view-habits").textContent.includes("Chạm ô để sửa"));
+    });
+    test("Thói quen · Tháng: chú thích cùng vị trí, đủ thẻ habit", async () => {
+      S.habView = "month"; S.calMonth = null; renderHabits();
+      const lg = $("#view-habits .legend");
+      ok(lg.previousElementSibling.classList.contains("hnav"), "ngay dưới tiêu đề");
+      eq(document.querySelectorAll("#view-habits .hcard").length, HABITS.length);
+      S.habView = "week"; await reset();
+    });
+    test("Thói quen · lùi tuần rồi tới lại", async () => {
+      await reset(); S.habView = "week"; S.habWeek = null; setView("habits");
+      ok($('[data-week="1"]').disabled, "tuần này không tới được nữa");
+      $('[data-week="-1"]').click(); await wait(50);
+      eq($(".hnav__t b").textContent, "Tuần trước");
+      $('[data-week="1"]').click(); await wait(50);
+      eq($(".hnav__t b").textContent, "Tuần này");
+      await reset();
+    });
+  });
+
+  // ------------------------------------------------------------ chạy
+  const results = [];
+  for (const t of T) {
+    try { await t.fn(); results.push({ group: t.group, name: t.name, ok: true }); }
+    catch (e) { results.push({ group: t.group, name: t.name, ok: false, err: (e && e.stack) || String(e) }); }
+  }
+  window.__testDone(results);
+})().catch(e => window.__testDone([{ group: "runner", name: "tests.js", ok: false, err: String(e && e.stack || e) }]));
