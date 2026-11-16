@@ -5,6 +5,33 @@ Mới nhất ở trên. Số `vNN` là phiên bản cache trong `sw.js`.
 
 ---
 
+## 2026-11-16 · Ô giờ chỉ còn icon đồng hồ, chữ ô ngày cùng màu, chọn biểu tượng gọn hơn, gộp ô Ghi chú cho AI · v37
+**Đổi gì**
+1. Ô chọn giờ (thêm/sửa việc đã làm, kế hoạch) trên điện thoại chỉ hiện icon đồng hồ; bỏ mũi tên ▾ bị chồng lên.
+2. Chữ trong ô ngày (Thêm việc đã làm) cùng màu với các ô khác, không còn xám nhạt.
+3. Sheet Thêm / Sửa thói quen: ô Biểu tượng là một hàng vuốt ngang thay cho lưới 4 hàng; biểu tượng đang chọn đứng đầu.
+4. Sheet Thêm / Sửa thói quen còn 2 ô mức đạt: **Thế nào là đạt** (ô nhiều dòng, Gemini đọc) và **Bản tối thiểu**. Bỏ ô Ghi chú cho AI.
+
+**Vì sao**
+- Trên Chrome Android, ô `type=time` có giao diện mặc định giống select, tự vẽ mũi tên ▾ ở bên phải, đúng chỗ icon đồng hồ app vẽ lại.
+- Ô ngày đã điền mà chữ nhạt trông như placeholder chưa điền.
+- Lưới 28 biểu tượng chiếm gần nửa màn hình, đẩy các ô quan trọng hơn (Lịch, Thế nào là đạt) xuống dưới.
+- "Thế nào là đạt" chỉ để gửi AI, và bị bỏ qua khi đã điền Ghi chú cho AI: hai ô làm cùng một việc nên dễ điền trùng hoặc lệch nhau.
+  Bản tối thiểu giữ riêng vì app dùng nó (nút ½ ở Hôm nay, nhãn, thống kê "x tối thiểu").
+
+**Logic**
+Thêm `appearance: none` cho `input[type=time]:read-only` để tắt giao diện mặc định, chỉ giữ icon đồng hồ vẽ bằng `background-image`.
+Căn chữ giờ sang trái (`::-webkit-date-and-time-value`) vì khi tắt giao diện mặc định, iOS sẽ căn giữa.
+`.act__date` dùng màu nhạt cho nhãn "Hôm nay", và input kế thừa màu đó (`input { color: inherit }`), nên đặt lại `color: var(--ink)` cho input.
+`.iconpick` đổi từ grid sang flex `overflow-x: auto`, ẩn thanh cuộn, mép phải mờ (mask) để thấy còn biểu tượng phía sau. Mỗi nút vẫn 44px để dễ chạm.
+Đưa icon đang chọn lên đầu mảng khi render nên luôn thấy ngay, không cần code cuộn tới nó; đánh đổi là thứ tự không cố định giữa các lần mở.
+`aiRule()` luôn ghép `full: <Thế nào là đạt>. min: <Bản tối thiểu>.`; nếu ô đạt đã tự ghi `full:`/`min:` thì không thêm lần nữa.
+Thói quen cũ có `rule`: `normHabit()` chuyển nguyên văn `rule` (bỏ nhãn `full: ` ở đầu) vào `full` rồi xoá `rule`, nên câu luật gửi Gemini giống hệt trước, không mất chữ nào.
+Đánh đổi: thói quen cũ hiện cả phần `min: …` trong ô đạt; xoá đi thì AI dùng Bản tối thiểu. Thói quen mặc định đổi theo cùng cách.
+Bản app cũ trên máy khác đọc `full` khi thiếu `rule`, nên vẫn chạy đúng.
+
+---
+
 ## 2026-11-16 · Trang Quản lý thói quen, lịch đổi theo ngày, nhóm thói quen · v36
 **Đổi gì**
 1. Tab Thói quen có nút thanh trượt cạnh Tuần/Tháng, mở trang **Quản lý thói quen**: danh sách gom theo nhóm, ↑ ↓ đổi thứ tự trong nhóm,

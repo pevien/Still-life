@@ -181,9 +181,10 @@ sequenceDiagram
 ### 3.8 Danh sách thói quen
 - Biến toàn cục: `ALLH` (mọi thói quen, kể cả `off`, theo thứ tự người dùng) · `HABITS` (đang theo dõi, xếp theo thứ tự nhóm trong `CATS`,
   trong nhóm giữ thứ tự `ALLH`) · `H` (id → thói quen, gồm cả đã ngừng để đọc lịch sử). `useHabits(list)` dựng cả ba qua `normHabit`.
-- Một thói quen: `{ id, name, short, cat, icon, freq, days, perWeekFull, perWeekMin, full, min, rule, since, off, prev }`.
+- Một thói quen: `{ id, name, short, cat, icon, freq, days, perWeekFull, perWeekMin, full, min, since, off, prev }`.
   `since`: ngày bắt đầu riêng (`habStart(hb)` = muộn hơn giữa `since` và ngày bắt đầu app). `off`: đã ngừng.
-  `rule` trống thì `aiRule()` ghép từ `full` / `min` cho prompt Gemini; enum id trong schema chỉ gồm `HABITS` (rỗng thì bỏ enum).
+  `aiRule()` ghép `full: <full>. min: <min>.` cho prompt Gemini; `full` đã tự có `full:`/`min:` thì không thêm lần nữa.
+  Bản cũ có `rule` (Ghi chú cho AI): `normHabit()` chuyển `rule` vào `full` (bỏ nhãn `full: ` ở đầu) rồi xoá `rule`, nên luật gửi AI không đổi; enum id trong schema chỉ gồm `HABITS` (rỗng thì bỏ enum).
 - **Lịch theo thời gian:** lịch = `freq, days, perWeekFull, perWeekMin`. `prev: [{ until, ...lịch }]` là các lịch cũ, mỗi cái áp dụng tới hết
   ngày `until`; lịch ngoài cùng áp dụng sau đó. `sch(hb, d)` trả lịch của ngày `d`; `scheduled`, `cellStatus` dùng lịch theo ngày,
   `weekCount` dùng lịch của thứ Hai cho mục tiêu tuần, `streak` dùng lịch hôm nay để chọn cách đếm.
@@ -227,6 +228,7 @@ Máy khác mở app → `findConfig()` → `adoptCfg()` lấy key nếu máy đ�
   (thêm một listener `pointerdown` ở pha capture làm dự phòng) để Android không mở hộp chọn giờ riêng; `click`/Enter trên ô giờ gọi `TP.open(ô)`.
   Hai cột `.tp__col` cuộn có scroll-snap, mỗi dòng 44px, giá trị = `round(scrollTop / 44)`. Xong → gán `value` rồi phát `input` + `change`
   (bubbles), nên `timeWarn` và code lưu không cần biết bộ chọn này. Escape đóng TP trước, sheet sau.
+  Ô giờ readonly dùng `appearance: none` (tắt mũi tên ▾ mặc định của Chrome Android) và vẽ icon đồng hồ bằng `background-image`.
 - Timeline: `TL = { H0: 5, H1: 23, PX: 56 }`. `top = (giờ - H0) * PX`, khối ≤40px thêm class `is-short` (1 dòng, cắt "…").
   Khối chồng nhau (theo vị trí vẽ, gồm cả chiều cao tối thiểu 22px) được `laneLayout()` chia làn, nằm cạnh nhau trong cột.
   `renderToday()` giữ `scrollTop` cũ khi render lại; lần đầu cuộn tới `data-now` (khi khung đã có chiều cao).

@@ -29,14 +29,14 @@ const CATS = {
 
 // Danh sách mặc định. Danh sách thật sửa được ở trang Quản lý thói quen, lưu trong máy + file cấu hình trên Drive.
 const DEFAULT_HABITS = [
-  { id: "eat",     name: "Ăn đủ 3 bữa", short: "Ăn 3 bữa", cat: "life",        icon: "ph-bowl-food",  freq: "daily", full: "3 bữa", min: "không bỏ bữa", rule: "full: ăn đủ 3 bữa. min: có 3 bữa nhưng có bữa qua loa/lệch giờ." },
-  { id: "wake",    name: "Dậy 5:30", short: "Dậy 5:30", cat: "life",           icon: "ph-sun-horizon", freq: "daily", full: "5:30", min: "trước 6:00", rule: "full: dậy trước hoặc lúc 5:35. min: dậy trước 6:00." },
-  { id: "korean",  name: "Tiếng Hàn 10 phút", short: "Tiếng Hàn", cat: "korean",  icon: "ph-translate",  freq: "daily", full: "10 phút", min: "5 từ mới", rule: "full: học tiếng Hàn từ 10 phút trở lên (đi lớp cũng tính). min: học ít nhất 5 từ mới. value = số phút nếu có." },
-  { id: "walk",    name: "Đi bộ 3000 bước", short: "Đi bộ", cat: "health",    icon: "ph-sneaker-move", freq: "daily", full: "3000 bước", min: "2000 bước", rule: "value = số bước. full: >= 3000. min: >= 2000." },
-  { id: "yoga",    name: "Yoga", short: "Yoga", cat: "health",               icon: "ph-person-simple-tai-chi", freq: "days", days: [1, 3, 5], full: "có tập", rule: "full: có tập yoga." },
-  { id: "gym",     name: "Gym", short: "Gym", cat: "health",                icon: "ph-barbell",    freq: "weekly", days: [2, 6], perWeekMin: 1, perWeekFull: 2, full: "có tập", min: "1 buổi/tuần", rule: "full: có tập gym hôm đó." },
-  { id: "phone",   name: "Cất điện thoại 22:00", short: "Cất máy", cat: "life", icon: "ph-moon-stars", freq: "daily", full: "22:00", min: "trước 22:30", rule: "full: cất điện thoại ra ngoài giường lúc 22:00. min: trước 22:30 hoặc bật chế độ ngủ." },
-  { id: "journal", name: "Nhật ký", short: "Nhật ký", cat: "life",            icon: "ph-notebook",   freq: "daily", full: "3 dòng", min: "1 dòng", rule: "full: viết nhật ký 3 dòng. min: 1 dòng." },
+  { id: "eat",     name: "Ăn đủ 3 bữa", short: "Ăn 3 bữa", cat: "life",        icon: "ph-bowl-food",  freq: "daily", full: "ăn đủ 3 bữa. min: có 3 bữa nhưng có bữa qua loa/lệch giờ.", min: "không bỏ bữa" },
+  { id: "wake",    name: "Dậy 5:30", short: "Dậy 5:30", cat: "life",           icon: "ph-sun-horizon", freq: "daily", full: "dậy trước hoặc lúc 5:35. min: dậy trước 6:00.", min: "trước 6:00" },
+  { id: "korean",  name: "Tiếng Hàn 10 phút", short: "Tiếng Hàn", cat: "korean",  icon: "ph-translate",  freq: "daily", full: "học tiếng Hàn từ 10 phút trở lên (đi lớp cũng tính). min: học ít nhất 5 từ mới. value = số phút nếu có.", min: "5 từ mới" },
+  { id: "walk",    name: "Đi bộ 3000 bước", short: "Đi bộ", cat: "health",    icon: "ph-sneaker-move", freq: "daily", full: "value = số bước. full: >= 3000. min: >= 2000.", min: "2000 bước" },
+  { id: "yoga",    name: "Yoga", short: "Yoga", cat: "health",               icon: "ph-person-simple-tai-chi", freq: "days", days: [1, 3, 5], full: "có tập yoga." },
+  { id: "gym",     name: "Gym", short: "Gym", cat: "health",                icon: "ph-barbell",    freq: "weekly", days: [2, 6], perWeekMin: 1, perWeekFull: 2, full: "có tập gym hôm đó.", min: "1 buổi/tuần" },
+  { id: "phone",   name: "Cất điện thoại 22:00", short: "Cất máy", cat: "life", icon: "ph-moon-stars", freq: "daily", full: "cất điện thoại ra ngoài giường lúc 22:00. min: trước 22:30 hoặc bật chế độ ngủ.", min: "trước 22:30" },
+  { id: "journal", name: "Nhật ký", short: "Nhật ký", cat: "life",            icon: "ph-notebook",   freq: "daily", full: "viết nhật ký 3 dòng. min: 1 dòng.", min: "1 dòng" },
 ];
 
 // Tuần mẫu. days: 0 = CN. ess = vẫn giữ trong unwell day.
@@ -140,6 +140,8 @@ function normHabit(x) {
   const h = normSched(Object.assign({}, x));
   h.name = String(h.name || "").trim() || "Thói quen";
   h.icon = h.icon || "ph-check-circle";
+  // "Ghi chú cho AI" (rule) đã gộp vào "Thế nào là đạt" (full): rule cũ thay full, bỏ nhãn "full: " ở đầu
+  if (h.rule != null) { const r = String(h.rule).trim(); if (r) h.full = r.replace(/^full:\s*/i, ""); delete h.rule; }
   if (!CATS[h.cat]) h.cat = (DEFAULT_HABITS.find(d => d.id === h.id) || {}).cat || "life";
   const prev = (h.prev || []).filter(p => /^\d{4}-\d\d-\d\d$/.test(p.until || "")).map(p => Object.assign({ until: p.until }, pickSched(p)))
     .sort((a, b) => a.until.localeCompare(b.until));
@@ -182,7 +184,11 @@ function useHabits(list) {
 const loadLocalHabits = () => useHabits(LS.get(habKey(), null) || DEFAULT_HABITS);
 loadLocalHabits();
 // Luật cho Gemini: ghi chú riêng nếu có, không thì ghép từ mức đạt / tối thiểu
-const aiRule = h => (h.rule || "").trim() || `full: ${h.full || "có làm"}.${h.min ? ` min: ${h.min}.` : ""}`;
+// Luật gửi Gemini: "full: <Thế nào là đạt>. min: <Bản tối thiểu>." Ô đạt đã tự ghi full:/min: (rule cũ chuyển sang) thì không thêm lần nữa.
+const aiRule = h => {
+  const t = (h.rule || "").trim().replace(/^full:\s*/i, "") || (h.full || "").trim() || "có làm";
+  return (/\bfull:/i.test(t) ? t : `full: ${t}`) + (/[.!?]$/.test(t) ? "" : ".") + (h.min && !/\bmin:/i.test(t) ? ` min: ${h.min}.` : "");
+};
 // Lịch của thói quen, một dòng: "Mỗi ngày" · "T2 · T4 · T6" · "2 lần/tuần"
 const daysLabel = days => [1, 2, 3, 4, 5, 6, 0].filter(k => days.includes(k)).map(k => DOW_SHORT[k]).join(" · ");
 const freqLabel = h => (h.freq === "daily" ? "Mỗi ngày" : h.freq === "days" ? daysLabel(h.days)
@@ -919,10 +925,10 @@ const HICONS = ["ph-check-circle", "ph-bowl-food", "ph-drop", "ph-coffee", "ph-s
 const HFREQ_HINT = { daily: "Mỗi ngày đều tính.", days: "Chỉ những ngày này mới tính. Ngày khác không làm cũng không sao.", weekly: "Đủ số lần trong tuần là đạt, ngày nào cũng được. Chọn ngày thì thói quen chỉ hiện ở Hôm nay vào những ngày đó." };
 // Sheet thêm / sửa một thói quen. id = null là thêm mới.
 function renderHabForm(id) {
-  const h = id ? H[id] : { name: "", cat: "health", icon: "ph-check-circle", freq: "daily", days: [], perWeekFull: 3, perWeekMin: 1, full: "", min: "", rule: "" };
+  const h = id ? H[id] : { name: "", cat: "health", icon: "ph-check-circle", freq: "daily", days: [], perWeekFull: 3, perWeekMin: 1, full: "", min: "" };
   if (!h) return;
   S.habEdit = id;
-  const days = h.days || [], freq = h.freq, icons = HICONS.includes(h.icon) ? HICONS : [h.icon, ...HICONS];
+  const days = h.days || [], freq = h.freq, icons = [h.icon, ...HICONS.filter(x => x !== h.icon)]; // icon đang chọn đứng đầu hàng cuộn ngang
   const t = todayStr(), fromVal = id ? pendingFrom(h) || t : h.since && h.since > t ? h.since : t;
   const fromField = `<input id="hFrom" class="input num" type="date" value="${fromVal}" min="${t}">`;
   const nOpts = (sel, from) => Array.from({ length: 8 - from }, (_, k) => k + from).map(n => `<option value="${n}" ${n === sel ? "selected" : ""}>${n || "Không có"}</option>`).join("");
@@ -946,9 +952,8 @@ function renderHabForm(id) {
       <label class="field"><span>Tối thiểu mỗi tuần</span><select id="hPerMin">${nOpts(h.perWeekMin ?? 1, 0)}</select></label></div>
     <label class="field"><span>${id ? "Lịch này áp dụng từ" : "Bắt đầu theo dõi từ"}</span>${fromField}
       <small>${id ? "Những ngày trước vẫn tính theo lịch cũ, kết quả cũ không đổi." : "Những ngày trước ngày này không tính."}</small></label>
-    <label class="field"><span>Thế nào là đạt</span><input id="hFull" type="text" value="${esc(h.full || "")}" placeholder="vd 2 lít" maxlength="60"></label>
+    <label class="field"><span>Thế nào là đạt</span><textarea id="hFull" rows="2" placeholder="vd 2 lít, tính cả trà, không tính cà phê" maxlength="300">${esc(h.full || "")}</textarea><small>Gemini đọc ô này và Bản tối thiểu để biết câu bạn kể có tính là đạt không.</small></label>
     <label class="field hf-min"><span>Bản tối thiểu</span><input id="hMin" type="text" value="${esc(h.min || "")}" placeholder="vd 1 lít" maxlength="60"><small>Ngày mệt làm bản nhỏ này vẫn giữ chuỗi. Để trống nếu không có.</small></label>
-    <label class="field"><span>Ghi chú cho AI</span><textarea id="hRule" rows="2" placeholder="Để trống thì AI dựa vào các ô ở trên">${esc(h.rule || "")}</textarea><small>Gemini đọc dòng này để biết câu bạn kể có tính là đạt không.</small></label>
     <p class="act__warn" id="hErr" hidden></p>
     </div>
     <div class="sheet-actions"><button class="btn" data-close>Hủy</button><button class="btn btn--primary" id="hSave"><i class="ph ph-check"></i> Lưu</button></div>`);
@@ -973,7 +978,7 @@ function readHabForm() {
   const ic = $("[data-hicon][aria-checked=true]", box);
   const h = Object.assign({}, old || { id: "h" + Date.now().toString(36), since: from }, {
     name, short: $("#hShort").value.trim(), cat: $("#hCat").value, icon: ic ? ic.dataset.hicon : "ph-check-circle", freq: f,
-    full: $("#hFull").value.trim(), min: $("#hMin").value.trim(), rule: $("#hRule").value.trim(),
+    full: $("#hFull").value.trim(), min: $("#hMin").value.trim(),
   });
   if (!h.short) delete h.short;
   if (f === "daily") { delete h.days; delete h.perWeekFull; delete h.perWeekMin; }

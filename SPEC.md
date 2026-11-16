@@ -49,11 +49,11 @@ Luật chuỗi: bản tối thiểu vẫn tính. Unwell day không làm gãy chu
 Thói quen "số lần/tuần" chỉ tính tuần đạt khi có ít nhất 1 lần (kể cả khi đặt tối thiểu 0).
 
 ### Một thói quen gồm
-- **Tên**, **tên ngắn** (cho bảng Tuần), **nhóm** (cùng 7 nhóm thời gian, chỉ để tô màu và xếp), **biểu tượng**.
+- **Tên**, **tên ngắn** (cho bảng Tuần), **nhóm** (cùng 7 nhóm thời gian, chỉ để tô màu và xếp), **biểu tượng** (một hàng vuốt ngang, cái đang chọn đứng đầu).
 - **Lịch**, một trong ba: Mỗi ngày · Ngày cố định (vd T2-4-6, chỉ những ngày đó mới tính) ·
   Số lần/tuần (mục tiêu và tối thiểu mỗi tuần, ngày gợi ý không bắt buộc; có chọn ngày thì chỉ hiện ở Hôm nay vào ngày đó).
-- **Thế nào là đạt** và **bản tối thiểu** (chữ, tuỳ chọn; có tối thiểu thì chip có nút ½). Số lần/tuần thì tối thiểu là "N lần/tuần".
-- **Ghi chú cho AI** (tuỳ chọn): luật để Gemini biết câu kể có tính là đạt không. Trống thì ghép từ hai ô trên.
+- **Thế nào là đạt** (chữ tự do, vài dòng, vd "2 lít, tính cả trà") và **bản tối thiểu** (chữ ngắn, tuỳ chọn; có tối thiểu thì chip có nút ½).
+  Số lần/tuần thì tối thiểu là "N lần/tuần". Gemini đọc hai ô này để biết câu kể có tính là đạt không (không còn ô Ghi chú cho AI riêng).
 - Mức đạt hiện là chữ, app không tự so số (trừ luật riêng của Đi bộ). Loại "mục tiêu bằng số" (nhập số, app tự chấm) chưa làm.
 
 ### Đổi lịch không làm đổi quá khứ

@@ -456,7 +456,7 @@ input[type=time]::-webkit-calendar-picker-indicator { opacity: .6; cursor: point
 .act__warn { grid-column: 1 / -1; margin: -2px 0 0; display: flex; gap: 6px; align-items: flex-start; font-size: 13px; line-height: 1.4; color: var(--miss-ink, #B4554B); }
 .act__warn i { font-size: 16px; flex: none; margin-top: 1px; }
 .act__date { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--ink-soft); }
-.act__date input { flex: 1; min-width: 0; }
+.act__date input { flex: 1; min-width: 0; color: var(--ink); } /* input kế thừa màu nhạt của .act__date → đặt lại như ô khác */
 .act__dayhint { flex: none; font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--ink-soft); }
 .act__date.is-other input { border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
 .act__date.is-other .act__dayhint { background: color-mix(in srgb, var(--accent) 22%, var(--surface)); color: var(--ink); }
@@ -495,11 +495,13 @@ input[type=time]::-webkit-calendar-picker-indicator { opacity: .6; cursor: point
 /* bộ chọn giờ trong app (thay hộp chọn giờ của Android) */
 /* readonly làm Chrome ẩn icon đồng hồ → vẽ lại bằng nền */
 input[type=time]:read-only {
+  -webkit-appearance: none; appearance: none; /* Chrome Android tự vẽ mũi tên ▾ như select → chồng lên icon đồng hồ */
   cursor: pointer; padding-right: 34px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 256 256'%3E%3Cg fill='none' stroke='%238A8A8F' stroke-linecap='round' stroke-linejoin='round' stroke-width='18'%3E%3Ccircle cx='128' cy='128' r='96'/%3E%3Cpath d='M128 72v56h56'/%3E%3C/g%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 10px center; background-size: 16px;
 }
 input[type=time]:read-only::-webkit-calendar-picker-indicator { display: none; }
+input[type=time]::-webkit-date-and-time-value { text-align: left; }
 .tp { position: fixed; inset: 0; z-index: 70; display: grid; align-items: end; }
 .tp[hidden] { display: none; }
 .tp__backdrop { position: absolute; inset: 0; background: rgb(8 14 10 / .35); animation: fade .2s var(--ease); }
@@ -648,7 +650,11 @@ body.is-gated .top, body.is-gated main, body.is-gated .tabs, body.is-gated .fab,
 .madd { margin-top: 10px; }
 .vtoggle--3 { grid-template-columns: repeat(3, 1fr); margin-top: 0; }
 .vtoggle--3 button { font-size: 13px; padding: 0 4px; }
-.iconpick { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 4px; }
+/* một hàng cuộn ngang thay cho lưới 4 hàng; mép phải mờ dần để gợi ý còn nữa */
+.iconpick { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain;
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); }
+.iconpick::-webkit-scrollbar { display: none; }
+.iconpick button { flex: none; width: 44px; }
 .iconpick button, .daypick button { height: 44px; display: grid; place-items: center; border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--canvas); color: var(--ink-soft); }
 .iconpick button { font-size: 22px; }
 .iconpick button[aria-checked="true"], .daypick button[aria-pressed="true"] { border-color: var(--good); background: color-mix(in srgb, var(--good) 18%, var(--surface)); color: var(--good); }

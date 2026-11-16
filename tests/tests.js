@@ -899,6 +899,16 @@
       eq(freqLabel(normHabit({ freq: "weekly", days: [2, 6], perWeekFull: 2 })), "2 lần/tuần · T3 · T7");
       eq(aiRule({ full: "2 lít", min: "1 lít" }), "full: 2 lít. min: 1 lít.");
       eq(aiRule({ full: "", rule: "full: có đọc sách." }), "full: có đọc sách.");
+      eq(aiRule({ full: "ăn đủ 3 bữa. min: có bữa qua loa.", min: "không bỏ bữa" }), "full: ăn đủ 3 bữa. min: có bữa qua loa.");
+      eq(aiRule({ full: "value = số bước. full: >= 3000.", min: "2000 bước" }), "value = số bước. full: >= 3000. min: 2000 bước.");
+      eq(aiRule({ min: "1 dòng" }), "full: có làm. min: 1 dòng.");
+    });
+    test("Ghi chú cho AI cũ (rule) gộp vào Thế nào là đạt, luật AI không đổi", () => {
+      const old = { name: "x", full: "5:30", min: "trước 6:00", rule: "full: dậy trước 5:35. min: dậy trước 6:00." };
+      const h = normHabit(old);
+      eq([h.full, "rule" in h], ["dậy trước 5:35. min: dậy trước 6:00.", false]);
+      eq(aiRule(h), aiRule(old));
+      eq(normHabit({ name: "x", full: "2 lít", rule: "" }).full, "2 lít");
     });
     test("thêm thói quen: hiện ở Hôm nay, ở bảng tuần, có trong luật AI; ngày trước không tính là bỏ", async () => {
       const prev = keep(); await reset(); setView("habits"); S.habManage = true; renderHabits();
