@@ -5,6 +5,473 @@ Mới nhất ở trên. Số `vNN` là phiên bản cache trong `sw.js`.
 
 ---
 
+## 2026-11-16 · Bảng Tuần thoáng hơn · v72
+**Đổi gì**
+- Khoảng cách giữa các hàng thói quen 4px → 10px.
+- Cột tên cách cột T2 thêm (padding phải 2px → 8px); dòng "[icon] số" cách tên 2px.
+
+**Vì sao**
+Sau khi tên lên 2 dòng (tên / [icon] số), mỗi khối tên cao ~ ô ngày; với 4px giữa hàng, các khối tên và các ô màu dính vào nhau, tên dài chạm sát ô T2.
+
+**Logic**
+- Chỉ đổi khoảng trắng, không đổi cỡ ô (34px) hay cỡ chữ. Bảng dài thêm ~6px mỗi hàng (8 thói quen ≈ 48px).
+
+---
+
+## 2026-11-16 · Bảng Tuần: tên ở trên, [icon] số ở dưới · v71
+**Đổi gì**
+- Cột tên của bảng Tuần (tab Thói quen) đổi từ "[icon] Tên / số" sang "Tên" ở dòng trên, "[icon] 1/1" ở dòng dưới.
+
+**Vì sao**
+Cột tên rất hẹp. Icon chiếm riêng một cột 18px cạnh tên nên tên bị cắt ("Đi bộ 300…", "Cất máy 2…"), trong khi dòng số bên dưới để trống phần dưới icon. Dời icon xuống dòng số thì tên được thêm ~22px mà mỗi dòng không cao thêm.
+
+**Logic**
+- `.wname` từ grid 2 cột sang flex cột; icon nằm trong `<small>` cùng số (`<b class="num">`). Icon vẫn tô màu nhóm qua `--cat` (rule đổi từ `.wname > i` thành `.wname i`).
+- Đánh đổi: icon không còn thẳng hàng với tên nên quét màu theo cột kém nổi hơn chút; chọn ưu tiên đọc đủ tên.
+
+---
+
+## 2026-11-16 · Chữ trong sheet Kế hoạch khớp tiêu đề · v70
+**Đổi gì**
+- Trong các sheet tiêu đề "Thêm kế hoạch" / "Sửa kế hoạch" / "Chỉnh sửa kế hoạch", chữ đi kèm trả về "kế hoạch": lỗi "Đặt tên cho kế hoạch nhé.", ghi chú "Kế hoạch thêm riêng cho hôm nay.", toast "Đã đổi kế hoạch hôm nay", aria-label "Tên kế hoạch", "Xoá kế hoạch này".
+
+**Vì sao**
+v69 đổi hết sang "lịch" làm sheet tự mâu thuẫn: tiêu đề "Thêm kế hoạch" mà báo lỗi "Đặt tên cho lịch nhé.". Lỗi và nhãn trong form phải gọi đúng tên mà tiêu đề form dùng. Toast "Đã đổi kế hoạch hôm nay" cũng khớp với "Đã thêm kế hoạch", "Đã xoá kế hoạch" có sẵn.
+
+**Logic**
+- Quy tắc: trong form nào thì dùng đúng từ của tiêu đề form đó. Ngoài form (thẻ Bây giờ, Rest day, nhắc qua lịch ở sheet thói quen) vẫn dùng "lịch" như v69.
+
+---
+
+## 2026-11-16 · Ưu tiên chữ "lịch" thay "kế hoạch" · v69
+**Đổi gì**
+- Các chữ vừa đổi từ "khối" (v67, v68) chuyển tiếp sang "lịch": "Nhắc nhở các lịch khác đã tắt.", "Không có lịch nào lúc này.", "Nhắc qua lịch: …", "Chưa có lịch nào trong Tuần mẫu…", "Lịch thêm riêng cho hôm nay.", toast "Đã đổi lịch hôm nay", "…bỏ qua lịch đang chạy.", "…bấm vào lịch ở trang Hôm nay.", "Đặt tên cho lịch nhé.", aria-label "Tên lịch", "Xoá lịch này".
+- "Đã điền lịch theo kế hoạch vừa lưu" → "Đã điền ngày theo lịch vừa lưu" (tránh "lịch theo lịch").
+
+**Vì sao**
+"Lịch" ngắn, đời thường, khớp với Google Calendar nơi các mục này thật sự nằm. "Kế hoạch" nghe nặng và dài hơn cho một mục 30 phút.
+
+**Logic**
+- Chỉ đổi chữ hiển thị. Tên cột "Kế hoạch" (đối với "Thực tế") trên timeline giữ nguyên vì là cặp so sánh.
+- Test và SPEC sửa theo chữ mới.
+
+---
+
+## 2026-11-16 · Bỏ chữ "khối" khỏi giao diện · v68
+**Đổi gì**
+- Mọi chữ "khối" người dùng thấy hoặc trình đọc màn hình đọc ra đổi sang "kế hoạch" (hoặc "lịch" khi tự nhiên hơn):
+  - Thẻ Bây giờ: "Không có kế hoạch nào lúc này."
+  - Sheet sửa thói quen: "Đang xem lịch nhắc…", "Nhắc qua kế hoạch: …", "Chưa có kế hoạch nào trong Tuần mẫu…"
+  - Sửa kế hoạch hôm nay: "Kế hoạch thêm riêng cho hôm nay.", toast "Đã đổi kế hoạch hôm nay"
+  - Thẻ xác nhận AI: "…bỏ qua kế hoạch đang chạy."
+  - Tuần mẫu: "…bấm vào kế hoạch ở trang Hôm nay.", "Đặt tên cho kế hoạch nhé.", "Đã điền lịch theo kế hoạch vừa lưu…"
+  - aria-label "Tên kế hoạch", "Xoá kế hoạch này"; lỗi demo "Không thấy kế hoạch".
+
+**Vì sao**
+Tiếp theo đổi ở thẻ Rest day (v67): "khối" là từ nội bộ của người làm app, người dùng gọi là kế hoạch / lịch, khớp với cột "Kế hoạch" trên timeline.
+
+**Logic**
+- Chỉ đổi chữ hiển thị. Ghi chú trong code, tên test và tài liệu kỹ thuật vẫn dùng "khối" làm thuật ngữ nội bộ.
+- Test `#hBlocks` và SPEC mục nhắc thói quen sửa theo chữ mới.
+
+---
+
+## 2026-11-16 · Thẻ Rest day: "khối" → "kế hoạch" · v67
+**Đổi gì**
+- Thẻ Rest day: "Nhắc nhở các khối khác đã tắt." → "Nhắc nhở các kế hoạch khác đã tắt."
+
+**Vì sao**
+"Khối" là từ nội bộ (khối thời gian trong lịch), người dùng không gọi vậy. "Kế hoạch" là thứ họ thấy trên timeline và hiểu ngay.
+
+**Logic**
+- Chỉ đổi chữ trong `app.js`, không đổi cách tắt nhắc nhở.
+
+---
+
+## 2026-11-16 · Số giờ đứng ngay sau tên · v66
+**Đổi gì**
+- Danh sách thời gian 2 cột (v65): số giờ không dồn mép phải nữa mà đứng ngay sau tên nhóm.
+
+**Vì sao**
+Số dồn mép phải cách tên quá xa, mắt phải nhảy ngang mới ghép được "Lướt" với "2h20", nên khó đọc.
+
+**Logic**
+- Bỏ `.sum__list b { margin-left: auto; }`. Vẫn giữ lưới 2 cột.
+- Nâng cache lên v66: v65 đã có máy tải về, giữ v65 thì service worker vẫn trả `styles.css` cũ.
+
+---
+
+## 2026-11-16 · Tổng thời gian chia 2 cột · v65
+**Đổi gì**
+- Danh sách thời gian theo nhóm dưới thanh màu (Thời gian hôm nay) xếp thành 2 cột đều nhau. Số giờ đứng ngay sau tên.
+
+**Vì sao**
+Trước đó các mục xếp nối đuôi rồi tự xuống dòng, mỗi dòng dài ngắn khác nhau nên nhìn lộn xộn, khó so số. 2 cột thì mỗi mục bắt đầu ở cùng một mép, nhìn gọn. Số không cần thẳng hàng, để ngay sau tên cho dễ đọc liền.
+
+**Logic**
+- `.sum__list`: flex-wrap → grid `repeat(2, minmax(0, 1fr))`, gap 6px 24px. `li` thành flex, số nằm ngay sau tên (không dồn mép phải).
+- Thứ tự giữ nguyên (nhiều → ít), chạy theo hàng: trái → phải rồi xuống.
+
+---
+
+## 2026-11-16 · Bỏ ngôi sao ở bảng Tuần · v64
+**Đổi gì**
+- Dòng đếm dưới tên thói quen ở bảng Tuần chỉ còn "1/1", bỏ ★ khi đủ cả tuần.
+
+**Vì sao**
+"1/1" đã nói là đủ, ★ lặp lại ý đó và chiếm chỗ trong cột tên vốn hẹp. Bảng cũng gọn, đều hơn khi hàng nào cũng chỉ một con số.
+
+**Logic**
+- Chỉ bỏ phần hiển thị trong `renderHabits()`. `weekCount()` vẫn trả `star` (test đang dùng, để dành nếu cần lại).
+
+---
+
+## 2026-11-16 · Khoảng cột bớt đi dồn cho tên · v63
+**Đổi gì**
+- Bảng Tuần: cột tên thói quen rộng tối thiểu 92px → 106px. Ô ngày giữ bề rộng như trước khi giảm gap (v61).
+
+**Vì sao**
+Giảm gap giữa cột (v61) là để tên có thêm chỗ, nhưng thực tế phần bớt đi lại chia hết cho 7 ô ngày làm ô rộng ra. Trên điện thoại cột tên luôn kẹt ở mức tối thiểu, nên phải nâng mức tối thiểu thì tên mới được thêm chỗ.
+
+**Logic**
+- Trên màn điện thoại (≤ ~430px) cột tên = mức tối thiểu, 7 ô ngày chia phần còn lại. Gap 4 → 2px bớt khoảng 14px, cộng đúng vào mức tối thiểu 92 + 14 = 106px, nên ô ngày gần như không đổi (360px: ~26px cả trước lẫn sau).
+- Màn rộng: tỉ lệ `1.4fr` vẫn quyết định, không đổi.
+- Thêm khoảng 1-2 ký tự cho tên trước khi bị cắt "…" (v62).
+
+---
+
+## 2026-11-16 · Tên ở bảng Tuần chỉ 1 dòng · v62
+**Đổi gì**
+- Tên thói quen ở bảng Tuần (trang Thói quen) chỉ hiện 1 dòng, dài quá thì cắt "…". Trước đó cho xuống tối đa 2 dòng.
+
+**Vì sao**
+Tên 2 dòng ("Tiếng Hàn / 10p", "Cất máy / 22:00") làm hàng cao không đều, bảng lổn nhổn và dài ra. 1 dòng thì mọi hàng cao bằng nhau, nhìn thẳng hơn. Tên đầy đủ vẫn xem được ở Hôm nay và trang Quản lý thói quen.
+
+**Logic**
+- `.wname span`: bỏ `-webkit-line-clamp: 2` và `overflow-wrap: anywhere`, thay bằng `white-space: nowrap; text-overflow: ellipsis`.
+- Đánh đổi: cột tên rộng tối thiểu 92px nên tên dài hơn khoảng 9-10 ký tự sẽ bị cắt.
+
+---
+
+## 2026-11-16 · Bảng Tuần sát cột hơn · v61
+**Đổi gì**
+- Bảng Tuần (trang Thói quen): khoảng giữa các cột 4px → 2px. Khoảng giữa các hàng giữ nguyên 4px.
+
+**Vì sao**
+Ô ngày nằm rời nhau theo chiều ngang, hàng 7 ngày trông lỏng, khó đọc liền một tuần.
+
+**Logic**
+- Chỉ đổi `gap` của `.wgrid` (áp cho cả hàng tiêu đề T2…CN và hàng thói quen, nên cột vẫn thẳng). Ô ngày tự giãn ra lấp phần gap bớt đi, vì cột là `1fr`.
+- Lịch tháng (`.mcal__row`, gap 3px) không đổi.
+- Lúc đầu nhầm sang khoảng giữa các hàng, đã trả lại như cũ.
+
+---
+
+## 2026-11-16 · Bỏ chú thích màu ở tab Tháng · v60
+**Đổi gì**
+- Tab Tháng (trang Thói quen) không còn dòng chú thích "Đạt · Tối thiểu · Rest · Bỏ" dưới tên tháng. Tab Tuần vẫn giữ.
+
+**Vì sao**
+Ở Tháng, dòng này chiếm chỗ mà không thêm thông tin: mỗi thẻ thói quen đã có dòng đếm kèm chấm màu ("3 đạt · 1 tối thiểu · 2 bỏ"), tự làm chú thích luôn. Bỏ đi để thẻ đầu tiên lên cao hơn.
+
+**Logic**
+- Chỉ xoá `html += legend` ở nhánh tháng của `renderHabits()`. Biến `legend` và CSS `.legend` giữ cho Tuần.
+- Test "Thói quen · Tháng" đổi: kiểm tra không có `.legend` và thẻ đầu nằm ngay dưới tiêu đề tháng.
+
+---
+
+## 2026-11-16 · Nút bút tròn, nhỏ hơn · v59
+**Đổi gì**
+- Nút bút nổi (`.fab`, mở ô viết nhanh) đổi từ ô vuông bo góc 56px sang hình tròn 48px. Icon bút 26px → 22px.
+
+**Vì sao**
+Ô vuông 56px to và nặng, che mất một phần timeline và hàng thói quen bên dưới. Hình tròn nhỏ hơn đọc ra là nút nổi phụ, không giành chú ý với nội dung.
+
+**Logic**
+- `border-radius: 50%`. Lớp ánh sáng chạy (`::after`) đã có `overflow: hidden` nên tự cắt theo hình tròn.
+- 48px vẫn đủ vùng chạm tối thiểu (44px). Vị trí giữ nguyên: cách mép phải 16px, trên tab bar 14px.
+
+---
+
+## 2026-11-16 · Đổi màu Sinh hoạt ↔ Người thân · v58
+**Đổi gì**
+- Sinh hoạt: vàng (Banana) → hồng san hô (Flamingo, #D9685E).
+- Người thân & bạn bè: hồng (Flamingo) → vàng (Banana, #E3AE1B).
+
+**Vì sao**
+Muốn Sinh hoạt mang màu hồng/cam thay cho vàng. Đổi chỗ với Người thân thay vì chọn màu mới vì Google Calendar chỉ có 11 màu và hai màu ấm hồng/cam đã dùng hết.
+
+**Logic**
+- Đổi `color` (colorId Google) và `hex` của `CATS.life` / `CATS.people`; cờ `lightInk` (chữ tối trên khối vàng) chuyển sang `people`.
+- Biến `--life-ic` đổi tên thành `--yellow-ic`, `icVars` áp nó cho `people`.
+- App đọc nhóm từ `extendedProperties.cat`, không đọc `colorId`, nên sự kiện cũ hiện đúng màu mới trong app. Trên Google Calendar, sự kiện cũ giữ màu cũ tới khi được sửa hoặc tạo lại từ app.
+
+---
+
+## 2026-11-16 · Mọi tiêu đề đậm 600 · v57
+**Đổi gì**
+- Mọi chữ dùng `--f-display` (Bricolage Grotesque) đổi từ đậm 700 xuống 600: tiêu đề mục `.h2`, tiêu đề sheet, trang con, thẻ Rest day, trang trống, tên tuần/tháng, số chuỗi, bộ chọn giờ, mục Nhật ký, logo cổng vào.
+- Link Google Fonts chỉ tải Bricolage 600, bỏ 700.
+
+**Vì sao**
+Sau khi thử 600 cho tiêu đề lớn nhất (v55), các tiêu đề còn lại ở 700 trông nặng và lệch với tiêu đề lớn. Đưa hết về 600 cho đồng bộ, nhẹ mắt hơn, và chỉ còn một độ đậm cho font tiêu đề.
+
+**Logic**
+- Thay `font: 700 … var(--f-display)` → `600` ở 11 chỗ trong `styles.css`.
+- `.streak2.is-on` bỏ `font-weight: 600` riêng vì giờ đã là mặc định.
+- Bricolage chỉ còn 1 file font thay vì 2.
+- Chữ đậm 700 của font chữ thường (Be Vietnam Pro, ví dụ `.dock__title`) không đổi.
+
+---
+
+## 2026-11-16 · Chip đã đạt / tối thiểu: icon giữ màu nhóm · v56
+**Đổi gì**
+- Chip Hôm nay khi Đạt hoặc Tối thiểu: icon không chuyển xanh nữa, giữ màu nhóm như lúc chưa làm.
+
+**Vì sao**
+Icon xanh lẫn vào nền chip xanh, mất màu nhóm vừa thêm ở v54. Trạng thái đã đủ rõ qua nền, viền và icon đặc.
+
+**Logic**
+- Bỏ 2 rule `.chip[data-st="full"|"min"] .chip__ic { color: var(--good) }`; icon đọc `var(--cat)` như mọi trạng thái.
+
+---
+
+## 2026-11-16 · Tiêu đề lớn nhất đậm 600 · v55
+**Đổi gì**
+- Tiêu đề cỡ `--fd-xl` (thẻ Bây giờ như "Ngày đã khép lại.", tiêu đề cổng vào) giảm từ đậm 700 xuống 600.
+- Link Google Fonts tải thêm Bricolage Grotesque 600.
+
+**Vì sao**
+Ở 34px, Bricolage 700 trông nặng và dày, lấn các phần khác của thẻ. Chữ càng to càng thấy đậm, nên hạ một bậc ở cỡ lớn nhất cho nhẹ mắt mà vẫn là chữ nổi nhất màn hình.
+
+**Logic**
+- Chỉ đổi `.now__title` và `.gate__title`. Tiêu đề 22px và 16px giữ 700, vì ở cỡ nhỏ hơn 600 dễ mất độ nổi.
+- `.now__title` cũng dùng cho "Ba dòng cho hôm nay." trong Nhật ký (cỡ `--fd-l` gắn inline), nên chữ đó cũng thành 600.
+- Tải thêm một file font (600), vừa bỏ 500 ở v53 nên tổng số file không đổi.
+
+---
+
+## 2026-11-16 · Icon thói quen tô màu theo nhóm ở mọi chỗ · v54
+**Đổi gì**
+- Biểu tượng thói quen mang màu nhóm ở: chip Hôm nay (cả lúc chưa làm lẫn đã đạt / tối thiểu), thẻ thói quen bên Tiến độ, danh sách Quản lý, hàng sửa ngày, danh sách Rest day, nút chọn thói quen khi AI đọc Nhật ký, badge trong sheet sửa kế hoạch. Bảng Tuần vốn đã tô màu.
+- Giữ nguyên: bộ chọn biểu tượng (màu trung tính); thói quen đã ngừng vẫn mờ.
+
+**Vì sao**
+Trước chỉ bảng Tuần có màu, chỗ khác xám, nên cùng một thói quen trông như hai thứ khác nhau. Màu nhóm giúp nhận ra thói quen nhanh hơn chữ.
+Bộ chọn biểu tượng là chỗ chọn hình, không phải chỗ nhận diện. Chip đã đạt / tối thiểu ban đầu để icon xanh theo trạng thái, nhưng thử thấy icon xanh lẫn vào nền xanh và mất màu nhóm; trạng thái đã đủ rõ qua nền chip, viền và icon đặc, nên icon giữ màu nhóm.
+
+**Logic**
+- Bỏ 2 rule `.chip[data-st="full"|"min"] .chip__ic { color: var(--good) }`.
+- Hàm `icVars(cat)` gắn `--cat` lên `<i>`; CSS dùng `var(--cat, var(--ink-soft))` để thiếu nhóm thì về xám như cũ. Thêm class `.hic` cho 3 chỗ chưa có rule màu icon.
+- Vàng Sinh hoạt #E3AE1B chỉ ~2:1 trên nền sáng: thêm `--life-ic` (#A87D0B ở theme sáng, giữ #E3AE1B ở theme tối).
+- Đánh đổi: Giải trí (cam) và Người thân (đỏ hồng) hơi gần màu lửa 🔥 và màu cảnh báo; chấp nhận vì icon luôn đi kèm tên.
+
+---
+
+## 2026-11-16 · Gộp cỡ chữ 11px vào 12px, dọn hệ chữ · v53
+**Đổi gì**
+- Bỏ bậc `--fs-xs` (11px). Nhãn tab bar, hàng thứ lịch tháng, chữ nhỏ dưới số chuỗi và dưới tên bảng Tuần lên 12px (`--fs-s`).
+- Chữ thường giờ còn 3 bậc: 15 / 13 / 12px.
+- Số trong bộ chọn giờ (`.tp__it`, `.tp__colon`) dùng token `--fd-l` thay cho 22px viết cứng. Cỡ không đổi.
+- Link Google Fonts chỉ tải Bricolage Grotesque độ đậm 700, bỏ 500.
+
+**Vì sao**
+11px và 12px gần như không phân biệt được bằng mắt, nên không tạo thứ bậc mà chỉ thêm một token phải nhớ. Ở 11px, dấu tiếng Việt chồng (ệ, ở, ữ) dễ dính nhau, nhất là với chữ màu nhạt, mà phần lớn chữ 11px lại đang dùng màu nhạt. Gộp lên 12px thay vì xuống 11px để không làm khó đọc giờ timeline, số ngày, badge.
+
+**Logic**
+- Thay `var(--fs-xs)` → `var(--fs-s)` ở 4 chỗ: `.wname small`, `.streak small`, `.mcal__row--head span`, `.tab`. Xoá biến khỏi `:root`.
+- Bộ chọn giờ: vẫn font chữ thường (`--f-text`, số tabular), chỉ mượn cỡ của `--fd-l` để đổi cỡ tiêu đề thì số giờ đổi theo. Ngoài icon, còn đúng một cỡ viết cứng là logo 40px.
+- Bricolage 500: không chỗ nào dùng, mọi `--f-display` đều 700. Bỏ đi thì tải ít hơn một file font.
+- Đánh đổi: các chỗ hẹp rộng thêm khoảng 1px mỗi chữ. Nhãn tab và "T2…CN" ngắn nên vẫn vừa ở 360px.
+
+---
+
+## 2026-11-16 · Ngọn lửa chuỗi màu đỏ · v52
+**Đổi gì**
+- Icon lửa cạnh số chuỗi (thẻ thói quen và chuỗi lớn) đổi từ vàng `--accent` sang đỏ cam `--fire`.
+
+**Vì sao**
+Lửa vàng nhạt trông như icon giọt nước/đồng xu, không ra "lửa". Đỏ cam đọc ra ngay là chuỗi đang cháy, và tách khỏi vàng accent dùng cho nút/nhấn khác.
+
+**Logic**
+- Thêm biến `--fire` ở `:root` (#E0452B) và theme tối (#FF5A3C, sáng hơn để nổi trên nền đen). Chỉ dùng cho icon lửa, kể cả quầng sáng nhấp nháy `glint` (trước sáng vàng).
+- Chuỗi = 0 vẫn icon viền, màu vẫn đỏ; số giữ màu `--ink-faint` như cũ.
+
+---
+
+## 2026-11-16 · Thời lượng ghi "2h20" thay vì "2g20"
+**Đổi gì**
+- Tổng thời gian theo nhóm (dưới timeline Hôm nay): "2g20" → "2h20", "1g" → "1h". Dưới 1 giờ vẫn "45p".
+
+**Vì sao**
+"g" cho giờ không phải cách viết quen; "h" đọc ra ngay. Giữ dạng gọn (không viết "phút") cho hàng tổng ngắn, dễ quét.
+
+**Logic**
+- `fmtDur(m)`: < 60 → `Np`; tròn giờ → `Nh`; còn lại → `NhMM` (phút 2 chữ số).
+
+---
+
+## 2026-11-16 · Cỡ tiêu đề: gom 10 cỡ về 3 · v51
+**Đổi gì**
+- Tiêu đề chỉ còn 34 / 22 / 16px (trước có 34, 28, 26, 24, 22, 20, 18, 16). Logo "Still life" ở cổng vào giữ 40px.
+  - 34px: thẻ Bây giờ, tiêu đề cổng vào (trước 28).
+  - 22px: "Ba dòng cho hôm nay." (trước 28; 34 thì xuống 2 dòng to, lấn form), tiêu đề sheet, trang con, thẻ Rest day (trước 24), trang trống (trước 26), số chuỗi 🔥 (trước 26).
+  - 22px cả tiêu đề mục `.h2` như "Thói quen hôm nay", "Thời gian hôm nay" (trước 20; 16 thì chìm, không còn tách được các mục của trang).
+  - 16px: tên tuần/tháng (trước 20), bộ chọn giờ (trước 20), chuỗi phụ (trước 18), mục khi đọc Nhật ký.
+- 3 dòng ghi chú trong HTML đang viết cứng `font-size:13px` chuyển sang `var(--fs-m)`.
+
+**Vì sao**
+Nối tiếp v50: các cỡ cách nhau 2px (18/20, 22/24/26) mắt không phân biệt được là hai bậc, chỉ thấy lệch. Ba bậc cách xa nhau thì mỗi bậc có vai trò rõ:
+chữ chính của màn, tiêu đề khung, tiêu đề mục.
+
+**Logic**
+- Biến `--fd-xl`, `--fd-l`, `--fd-m` trong `:root`, thay mọi `font: … Npx … var(--f-display)` trong `styles.css`.
+- Tiêu đề mục 16px vẫn nổi hơn chữ chính 15px nhờ font tiêu đề, đậm 700 và khoảng cách trên 36px.
+
+---
+
+## 2026-11-16 · Nhật ký: bỏ dòng ngày trên tiêu đề
+**Đổi gì**
+- Form Nhật ký bỏ dòng "🌙 Thứ Hai, 16/11/2026 · trước khi ngủ" phía trên "Ba dòng cho hôm nay.".
+- Bỏ dòng "Lưu vào Google Drive (Still life › Nhật ký), mỗi ngày một trang." dưới nút Lưu. Dòng báo "Hôm nay đã có trang…" (khi lưu sẽ nối vào trang cũ) vẫn giữ, vì nó nói điều người dùng cần biết trước khi bấm.
+
+**Vì sao**
+Đầu trang đã ghi "Buổi tối · Thứ Hai, 16/11/2026", nên ngày bị lặp hai lần sát nhau. Tiêu đề "Ba dòng cho hôm nay." đã đủ nói đây là trang của hôm nay.
+
+**Logic**
+- `drawJournal()` bỏ `<p class="now__label">`; tiêu đề đặt `margin-top: 0` để không hở khoảng trên.
+
+---
+
+## 2026-11-16 · Cỡ chữ: gom về 4 bậc, ô nhập và dropdown nhỏ lại · v50
+**Đổi gì**
+- Chữ trong ô nhập, dropdown, ô soạn câu và chữ chính của app: 16px → 15px.
+- Mọi chữ thường trong app chỉ còn 4 cỡ: 15 / 13 / 12 / 11px (trước có 10, 11, 12, 12.5, 13, 14, 15, 16).
+  14px (chữ phụ, toast, dòng "Tiếp theo", danh sách Nhật ký…) → 13px. 12.5 → 12. 10 → 11.
+- Tiêu đề lớn và cỡ icon giữ nguyên.
+
+**Vì sao**
+Trong một sheet có tới 5 cỡ chữ đứng cạnh nhau (tiêu đề ô 13, giá trị trong ô 16, chú thích 12, nút 15, ghi chú 14), nhìn lộn xộn
+và chữ trong ô nhập to hơn hẳn mọi thứ xung quanh. Ít bậc hơn thì mắt đọc ra thứ bậc ngay: tiêu đề ô / giá trị / chú thích.
+
+**Logic**
+- Biến `--fs-b`, `--fs-m`, `--fs-s`, `--fs-xs` trong `:root`. Thay hết `font-size` / `font:` px của chữ thường bằng biến theo bảng trên;
+  bỏ qua selector của icon (`… i`, nút `.seg`) và tiêu đề `--f-display`.
+- Ô nhập 15px vẫn cao ≥ 44px nhờ padding. Đánh đổi: Safari trên iPhone tự phóng to khi chạm vào ô có chữ < 16px.
+  App đang dùng chủ yếu trên Android nên chấp nhận; nếu sau này dùng iPhone thì cân nhắc `maximum-scale=1` (đánh đổi: chặn phóng to bằng hai ngón).
+
+---
+
+## 2026-11-16 · Sheet kế hoạch: "Vẫn nhắc khi rest day" thành công tắc · v49
+**Đổi gì**
+- Checkbox "Vẫn giữ khi rest day" + mô tả đổi thành một dòng: "Vẫn nhắc khi rest day", công tắc sát lề phải, nằm ngay dưới ô Nhắc, chữ cùng cỡ và màu với tiêu đề ô (13px, `--ink-soft`). Bỏ mô tả và emoji 💤. Nhắc là "Không nhắc" thì ẩn dòng này (không có nhắc thì không có gì để giữ); giá trị đã chọn vẫn được giữ, chọn lại có nhắc là hiện lại đúng như cũ.
+- Bỏ dòng "Google Calendar trên điện thoại sẽ báo theo giờ này." dưới ô Nhắc.
+- Ô "Gắn thói quen" + dòng "Bấm Đã làm ở khối này thì thói quen được đánh dấu đạt." gộp thành một tiêu đề: "Làm xong thì đạt thói quen".
+- Nút full-width (`.btn--block`) cho chữ xuống dòng; nút "Lưu & đổi lịch thói quen" rút gọn nhãn.
+
+**Vì sao**
+Checkbox to, chữ đậm, mô tả hai dòng và emoji nằm lệch khỏi nhịp của form, trông như chèn tạm vào. Với người dùng, tác dụng thấy được
+là "rest day vẫn được nhắc", nên tên ô nói thẳng điều đó và không cần mô tả. Công tắc bên phải là kiểu quen thuộc cho bật/tắt trên điện thoại.
+
+**Logic**
+- `.switchrow` (label bọc chữ + `input.switch`), một dòng cao 44px, cả hàng bấm được. `.switchrow .switch` vẽ công tắc bằng `appearance: none` + `::after`,
+  selector 2 class để thắng `.field input` (vốn cho input rộng 100%, có viền, padding).
+- Xoá `.check` vì không còn chỗ nào dùng. `#tEss` vẫn là checkbox nên đọc `checked` như cũ.
+
+---
+
+## 2026-11-16 · Timeline: thêm khoảng trống dưới cùng · v47
+**Đổi gì**
+- Timeline Hôm nay và Tuần mẫu có thêm 24px trống dưới vạch 23:00.
+
+**Vì sao**
+Nhãn 23:00 và khối cuối ngày nằm sát mép dưới thẻ, trông như bị cắt, và khó bấm chỗ trống cuối ngày.
+
+**Logic**
+- `tlFrame()` trả thêm `bodyPad` (`PAD` trên, `PAD + 24` dưới), hai timeline dùng chung. Toạ độ giờ vẫn tính từ mép trên nên bấm chỗ trống ra đúng giờ.
+
+---
+
+## 2026-11-16 · Trang Tuần mẫu: sửa lịch lặp hằng tuần ngay trong app · v46
+**Đổi gì**
+- Tiêu đề "Thời gian hôm nay" có thêm icon bút (bên trái icon lịch), mở trang con **Tuần mẫu**: chip T2…CN (chọn sẵn thứ của ngày mai) và timeline của thứ đó.
+- Bấm khối để sửa, bấm chỗ trống để thêm khối lặp (không ghi chú thích dưới timeline: thao tác này đã quen từ timeline Hôm nay). Sheet tên "Sửa kế hoạch" / "Thêm kế hoạch", không dùng chữ "khối lặp" (từ kỹ thuật, người dùng gọi là kế hoạch). Ô: Tên, Nhóm, Giờ, Lặp vào các thứ, Gắn thói quen, Vẫn giữ khi rest day, Nhắc. Xoá khối = ngừng lặp. Lưu và xoá đều có hoàn tác.
+- Mọi thay đổi **áp dụng từ ngày mai**. Hôm nay và quá khứ giữ nguyên.
+- Ngày lặp lệch lịch thói quen đã gắn thì báo một dòng, kèm nút "Lưu & đổi lịch thói quen" (mở Sửa thói quen điền sẵn, không tự lưu). Nút full-width (`.btn--block`) cho chữ xuống dòng, không tràn.
+- Sheet Sửa thói quen có dòng "Nhắc qua khối: …" hoặc "Chưa có khối nào…, nên sẽ không có nhắc".
+- Nhắc của mỗi khối được ghi vào sự kiện (`rem`), để rest day bật / tắt nhắc đúng cho cả khối tự thêm.
+
+**Vì sao**
+Muốn đổi nhịp sinh hoạt lâu dài (giờ lớp, ngày tập) thì trước đây phải mở Google Calendar, còn trong app chỉ sửa được cho hôm nay.
+Chốt qua buổi grill:
+- Chỉ sửa tuần mẫu. Sửa riêng một ngày khác thì để sau.
+- Không có ô chọn ngày, luôn tính từ mai, cho đơn giản. Đổi từ hôm nay thì có thể làm mất liên kết Đã làm / Bỏ qua / 💤 của khối hôm nay.
+- Khối và thói quen giữ độc lập, chỉ nhắc khi lệch. Đồng bộ tự động sẽ làm hỏng các trường hợp như Gym 2 lần/tuần nhưng khối cố định T3, T7, và đổi lịch thói quen kéo theo chuỗi.
+- Nhắc nằm ở khối vì app không có máy chủ: thông báo do Google Calendar gửi theo giờ của khối, còn thói quen thì không có giờ.
+
+**Logic**
+- `tplApply(old, N)`: chuỗi đã có lần lặp tới hôm nay thì đặt `UNTIL` = hôm nay rồi tạo chuỗi mới từ mai. Chuỗi bắt đầu từ mai trở đi (vừa tạo hôm nay) thì sửa / xoá thẳng, nên sửa nhiều lần trong một ngày vẫn chỉ ra một bản. Tạo chuỗi mới lỗi thì nối lại chuỗi cũ.
+- `evToSeries` đọc sự kiện gốc (`singleEvents=false`), chỉ nhận WEEKLY / DAILY không COUNT. `withUntil` thay UNTIL và giữ EXDATE.
+- `evToItem`: thuộc tính có ghi trong sự kiện thắng `TPL` (trước đây `ess`, `habit` rỗng bị `TPL` ghi đè, nên không bỏ được).
+- `mutePlan(false)` khôi phục nhắc theo `it.rem` thay vì `TPL[key].rem`.
+- Timeline tách `tlFrame` / `laneStyle` dùng chung. Demo chuyển từ `TEMPLATE` cố định sang `db.tpl` sửa được.
+- Test: chuyển đổi chuỗi, UNTIL, luật cắt / sửa thẳng / xoá / hoàn tác, câu báo lệch lịch, luồng màn hình (152 test).
+
+---
+
+## 2026-11-16 · Bỏ "Tên ngắn", tên thói quen tối đa 15 ký tự · v45
+**Đổi gì**
+- Form thói quen bỏ ô **Tên ngắn** và dòng giải thích dưới ô Nhóm ("Để tô màu và xếp thói quen theo nhóm."). Ô **Tên** giới hạn 15 ký tự, dùng cho mọi chỗ (Hôm nay, sheet một ngày, bảng Tuần, Quản lý).
+- Bảng Tuần: tên xuống tối đa 2 dòng rồi mới cắt "…", thay vì 1 dòng.
+- Gemini (Nhờ AI điền) không trả `short` nữa; tên AI đưa được cắt còn 15 ký tự.
+- Bộ mẫu: "Tiếng Hàn 10 phút" → "Tiếng Hàn 10p", "Cất điện thoại 22:00" → "Cất máy 22:00" cho vừa giới hạn.
+
+**Vì sao**
+Hai ô tên cho một thói quen là thêm việc phải nghĩ mà ít người cần: phần lớn tên đã ngắn, và người dùng thấy hai tên khác nhau ở hai màn hình.
+Giới hạn tên ngay từ đầu thì một tên vừa mọi chỗ. 15 ký tự giữ tên gọn như một nhãn, vừa 2 dòng ở cột tên bảng Tuần; chi tiết (giờ, số phút) đã có ở "Thế nào là đạt".
+
+**Logic**
+- `NAME_MAX = 15`: `maxlength` của `#hName`, mô tả trong schema Gemini, `fillHabForm` cắt theo nó.
+- `normHabit` xoá `short` của dữ liệu cũ; bảng Tuần hiện `name`. Tên cũ dài hơn 15 không bị cắt trong dữ liệu (không tự đổi dữ liệu của người dùng); lần sửa tới ô Tên sẽ giữ giới hạn.
+- `.wname span`: `-webkit-line-clamp: 2` thay cho `nowrap` + ellipsis.
+- Test: bộ mẫu không có `short`, tên ≤ 15; form không còn `#hShort`; ô Tên có `maxlength`.
+
+---
+
+## 2026-11-16 · Sheet một ngày: đổi liền, có trạng thái đang lưu, hiện bản tối thiểu · v44
+**Đổi gì**
+- Bấm Chưa / Tối thiểu / Đạt trong sheet một ngày: nút đổi ngay, icon thói quen bên trái quay vòng tới khi lưu xong lên Lịch.
+- Dưới tên thói quen hiện "Tối thiểu: …" nếu thói quen có bản tối thiểu.
+- 3 nút trạng thái nhỏ lại (44 → 34px, khoảng cách 3px), tên thói quen có thêm ~30px, ít bị xuống dòng.
+
+**Vì sao**
+Trước đây bấm xong phải đợi Google Calendar trả lời (có khi cả giây) mới thấy đổi, không có dấu hiệu gì nên tưởng bấm không ăn.
+Bấm thêm lần nữa trong lúc đó còn có thể tạo hai sự kiện cho cùng một ngày (lần thứ hai chưa biết `id` của lần đầu).
+Bản tối thiểu cần thấy ngay lúc chọn nút ½, không phải nhớ.
+
+**Logic**
+- `queueHabit()` xếp mọi lần ghi thói quen (sheet một ngày và chip Hôm nay) vào một hàng đợi `habQ`, chạy lần lượt; lần cuối thắng.
+- Sheet: đổi `aria-pressed` của cả hàng ngay khi bấm, `data-saving` đếm số lần đang lưu, về 0 mới trả icon. Không vẽ lại sheet khi lưu thành công
+  (tránh nhảy cuộn); lỗi thì vẽ lại theo dữ liệu thật để không hiển thị sai.
+- Nút 34px nhỏ hơn mức 44px khuyến nghị, đổi lấy chỗ cho tên; 3 nút cách nhau 3px, vẫn bấm được bằng ngón tay trên màn nhỏ.
+- Test: đổi liền, đang lưu, bấm hai lần liên tiếp, hiện / không hiện bản tối thiểu.
+
+---
+
+## 2026-11-16 · Chip thói quen không đổi chỗ khi đã đạt · v43
+**Đổi gì**
+- Hôm nay: chip thói quen giữ nguyên vị trí khi đánh dấu đạt, tối thiểu hay rest. Thứ tự luôn là thứ tự nhóm, giống bảng Tuần và trang Quản lý.
+
+**Vì sao**
+Trước đây chip chưa làm được đẩy lên đầu, chip đã đạt tụt xuống cuối. Chạm xong thì chip nhảy đi chỗ khác, dễ chạm nhầm chip vừa trượt vào chỗ cũ
+và mất cảm giác "danh sách của mình". Màu và icon đầy đã đủ cho biết cái nào xong, số "còn N" ở tiêu đề cho biết còn bao nhiêu.
+
+**Logic**
+- `renderToday()` bỏ `ORDER` và `.sort` theo trạng thái, giữ thứ tự `HABITS` (nhóm trong `CATS`, trong nhóm theo `ALLH`).
+- Test: đánh dấu đạt / tối thiểu, thứ tự chip không đổi.
+
+---
+
 ## 2026-11-16 · Rest day chỉ giữ thói quen có tối thiểu · bộ thói quen mẫu chỉ cho xem thử · v42
 **Đổi gì**
 - Rest day: chỉ hiện thói quen có **Tối thiểu** (chip ghi luôn bản tối thiểu). Thói quen không có tối thiểu hoặc loại số lần/tuần thì ẩn hôm đó, trừ khi đã đánh dấu. Tiêu đề ghi "rest day" thay vì "xong".

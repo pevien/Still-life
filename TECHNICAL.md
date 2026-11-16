@@ -37,7 +37,7 @@ const api = () => (S.settings.demo ? Demo : Google);
 ### 2.1 Google Calendar · lịch "Still life · Kế hoạch"
 | Loại sự kiện | Cách nhận ra | Tạo bởi |
 |---|---|---|
-| Khối tuần mẫu | sự kiện **lặp** (`RRULE:FREQ=WEEKLY;BYDAY=…`), `private.sl=plan`, `private.key=<key TEMPLATE>` | `Google.setup()` lúc dựng lần đầu, từ `TEMPLATE` qua `planBody()` |
+| Khối tuần mẫu | sự kiện **lặp** (`RRULE:FREQ=WEEKLY;BYDAY=…[;UNTIL=…]`), `private.sl=plan`, `private.key=<key TEMPLATE>` (khối thêm ở trang Tuần mẫu: key rỗng), `private.rem` | `Google.setup()` lúc dựng lần đầu, từ `TEMPLATE` qua `planBody()`; sau đó trang Tuần mẫu (`createSeries` / `updateSeries` / `endSeries`) |
 | Khối thêm trong app | sự kiện **đơn**, `private.sl=plan`, `private.added=1`, `private.cat` | `Google.addPlan()` |
 | Khối đã sửa cho hôm nay | là **1 lần lặp** của khối tuần mẫu bị ghi đè (Calendar tự tách ra exception) | `Google.updatePlan()` |
 | Khối đang tắt (unwell) | tên bắt đầu bằng `💤 `, không có nhắc | `Google.mutePlan(items, true)` |
@@ -50,7 +50,16 @@ các ngày khác của chuỗi lặp giữ nguyên. Đây là lý do "sửa kế
 { id, kind: "plan", key, title /* đã bỏ 💤 */, start: Date, end: Date,
   cat, habit, ess /* thiết yếu, giữ trong unwell */, muted /* có 💤 */, added /* thêm trong app */ }
 ```
-`cat`, `habit`, `ess` lấy từ `extendedProperties.private`; thiếu thì tra theo `key` trong `TPL` (bản đồ của `TEMPLATE`).
+`cat`, `habit`, `ess`, `rem` lấy từ `extendedProperties.private`; **thiếu hẳn** thì tra theo `key` trong `TPL` (bản đồ của `TEMPLATE`).
+Có ghi (kể cả rỗng, vd `habit=""`, `ess="0"`) thì giá trị trong sự kiện thắng, để bỏ gắn thói quen / bỏ giữ rest day ở trang Tuần mẫu có tác dụng.
+`rem` = phút nhắc trước, nối bằng dấu phẩy (`"30,0"`, `""` = không nhắc); sự kiện cũ chưa có thì lấy `TPL[key].rem` hoặc `[0]`.
+
+**Tuần mẫu** đọc sự kiện gốc của chuỗi (`singleEvents=false`) qua `evToSeries(ev)`:
+```js
+{ id, key, title, cat, days: [0..6], s: "HH:MM", e: "HH:MM", habit, ess, rem, from: "YYYY-MM-DD" /* lần lặp đầu */, until /* lần lặp cuối hoặc null */, recurrence }
+```
+Chỉ nhận `FREQ=WEEKLY` / `DAILY`, không `COUNT`, không `INTERVAL` khác 1 (chuỗi lạ tạo trong Google Calendar bị bỏ qua, không sửa được trong app).
+`listSeries()` chỉ trả chuỗi còn chạy từ ngày mai (`until` trống hoặc ≥ mai). `UNTIL` ghi theo UTC của 23:59:59 giờ máy (`untilUTC`).
 
 ### 2.2 Google Calendar · lịch "Still life · Thực tế"
 | Loại | Cách nhận ra | Nội dung |
@@ -97,6 +106,7 @@ S = {
   habView, habWeek, calMonth,         // đang xem tuần/tháng nào ở tab Thói quen
   habManage, habEdit, habLooked,      // đang ở trang Quản lý thói quen · id đang sửa · đã đọc danh sách từ Drive trong phiên này
   editPlan, editAct, dayDate,         // id đang mở trong sheet sửa
+  tplOpen, tplDay, tplList, tplEdit, tplErr,   // trang Tuần mẫu: đang mở · thứ đang xem · các chuỗi (null = đang tải) · id đang sửa · tải lỗi
   jfiles, jprev, jopen,               // nhật ký: danh sách file {id,date,mod}, câu đầu mỗi trang, trang đang mở trong sheet
   jdirty,                             // đang gõ dở trong form (quay lại tab không vẽ lại để khỏi mất chữ)
 }
@@ -174,15 +184,19 @@ sequenceDiagram
 
 ### 3.4 Habit
 - Ghi: `setHabit(date, id, level)` → đọc bản ghi ngày hiện có, đổi `h[id]`, `saveRec()` → `api().saveDay()` (tạo mới hoặc PUT đè).
+  Chip Hôm nay và sheet một ngày gọi qua `queueHabit()`: các lần ghi chạy lần lượt trên một hàng đợi (`habQ`), lần sau đọc bản đã lưu (đã có `id`),
+  nên bấm nhanh không tạo hai sự kiện cho một ngày và lần bấm cuối thắng. Sheet một ngày đổi `aria-pressed` ngay, đánh dấu dòng `aria-busy`
+  + icon `ph-circle-notch spin` (đếm `data-saving` cho nhiều lần bấm), lưu xong trả icon; lỗi thì vẽ lại sheet theo dữ liệu thật.
 - Trạng thái một ô: `cellStatus(hb, d)` trả `full | min | rest | miss | pending | off | none | future`.
   Thứ tự kiểm: tương lai → đã ghi → trước ngày bắt đầu → không có lịch → unwell → Gym theo tuần → hôm nay → bỏ.
-- `weekCount()` đếm theo tuần (unwell không tính vào mẫu số). Gym tính theo số buổi/tuần (1 là đạt, 2 là ★).
+- `weekCount()` đếm theo tuần (unwell không tính vào mẫu số). Gym tính theo số buổi/tuần (1 là đạt, 2 là đủ). Cờ `star` (đủ cả tuần) vẫn tính nhưng bảng Tuần không còn hiện ★, chỉ hiện "đã/tổng".
 - `streak()`: đi lùi từ hôm nay; `pending`, `rest`, `off` bỏ qua không làm gãy chuỗi; Gym đếm theo tuần.
 
 ### 3.8 Danh sách thói quen
 - Biến toàn cục: `ALLH` (mọi thói quen, kể cả `off`, theo thứ tự người dùng) · `HABITS` (đang theo dõi, xếp theo thứ tự nhóm trong `CATS`,
-  trong nhóm giữ thứ tự `ALLH`) · `H` (id → thói quen, gồm cả đã ngừng để đọc lịch sử). `useHabits(list)` dựng cả ba qua `normHabit`.
-- Một thói quen: `{ id, name, short, cat, icon, freq, days, perWeekFull, perWeekMin, full, min, since, off, prev }`.
+  trong nhóm giữ thứ tự `ALLH`; chip Hôm nay dùng đúng thứ tự này, không xếp lại theo trạng thái) · `H` (id → thói quen, gồm cả đã ngừng để đọc lịch sử). `useHabits(list)` dựng cả ba qua `normHabit`.
+- Một thói quen: `{ id, name, cat, icon, freq, days, perWeekFull, perWeekMin, full, min, since, off, prev }`.
+  `name` tối đa `NAME_MAX` (15) ký tự: ô Tên có `maxlength`, `fillHabForm` cắt tên AI trả về. Không còn `short`; `normHabit` xoá trường này ở dữ liệu cũ (tên cũ dài hơn 15 vẫn giữ, bảng Tuần cắt ở dòng 2).
   `since`: ngày bắt đầu riêng (`habStart(hb)` = muộn hơn giữa `since` và ngày bắt đầu app). `off`: đã ngừng.
   `aiRule()` ghép `full: <full>. min: <min>.` cho prompt Gemini; `full` đã tự có `full:`/`min:` thì không thêm lần nữa.
   Bản cũ có `rule` (Ghi chú cho AI): `normHabit()` chuyển `rule` vào `full` (bỏ nhãn `full: ` ở đầu) rồi xoá `rule`, nên luật gửi AI không đổi; enum id trong schema chỉ gồm `HABITS` (rỗng thì bỏ enum).
@@ -224,9 +238,25 @@ Chạm chỗ trống: `y` trong cột → phút = `TL.H0*60 + y / TL.PX * 60`, l
 Kết thúc mặc định +30 phút, hoặc tới khối kế tiếp nếu khối đó cách ≥15 phút.
 Vạch giờ, vạch hiện tại có `pointer-events: none` để không chặn cú chạm.
 
+### 3.5b Tuần mẫu (`openTpl` / `renderTpl` / `renderTplForm`)
+Trang con của tab Hôm nay (`S.tplOpen`; `setView` luôn tắt nó). Mở là tải lại `listSeries()` (người dùng có thể đã sửa trong Google Calendar).
+`tplApply(old, N)` là chỗ duy nhất đổi tuần mẫu, `N = null` là xoá, trả về hàm hoàn tác. Luật **áp dụng từ ngày mai** `T`:
+| Trường hợp | Làm gì | Hoàn tác |
+|---|---|---|
+| Thêm (`old = null`) | `createSeries(N, T)`: lần đầu = ngày đầu tiên từ `T` rơi vào thứ đã chọn (`firstOn`) | `deleteSeries` |
+| `old.from >= T` (chưa có lần lặp nào tới hôm nay, vd vừa tạo hôm nay) | sửa thẳng (`updateSeries`) / xoá thẳng | ghi lại `old` / tạo lại |
+| còn lại | `endSeries(old, hôm nay)` (đặt `UNTIL`) rồi `createSeries(N, T)` | xoá chuỗi mới, `endSeries(old, old.until)` |
+Nhờ hàng 2, sửa nhiều lần trong một ngày chỉ có một chuỗi mới. Tạo chuỗi mới lỗi thì nối lại chuỗi cũ rồi báo lỗi, không để mất khối.
+Hôm nay không bị đụng nên `S.today` không cần tải lại; trạng thái Đã làm / Bỏ qua / 💤 của hôm nay (gắn với id lần lặp) giữ nguyên.
+Không đổi gì thì đóng sheet, không gọi API. Không đổi ô Nhắc thì giữ nguyên mảng `rem` cũ (kể cả kiểu lạ như `[15]`).
+`habDaysMismatch(hb, days)` so ngày lặp với lịch thói quen áp dụng từ mai (`sch(hb, T)`); `openHabSync` mở `renderHabForm` rồi điền `freq`, ngày, `hFrom = T`.
+`renderHabForm` gọi `fillHabBlocks(id)` (tải `listSeries`) để hiện dòng `#hBlocks`.
+Timeline dùng chung `tlFrame(t0)` (y, vị trí khối, vạch giờ) và `laneStyle` với timeline Hôm nay; chạm chỗ trống trong `.tl--tpl` mở `renderTplForm(null, giờ)`.
+Demo: `db.tpl` (chuỗi `{ id, …khối, from, until }`, chuỗi gốc có `id = key` nên id lần lặp vẫn là `key_ngày`), `listPlan` đọc từ đó.
+
 ### 3.6 Rest day (trong code vẫn là `unwell`)
 `setUnwell(true)`: lấy các khối không thiết yếu còn lại trong ngày → `mutePlan(items, true)` (song song, đổi tên thành `💤 …`, bỏ nhắc)
-→ lưu `rec.unwell = true`, `rec.muted = [ids]`. `setUnwell(false)` bật lại đúng các id trong `rec.muted`, khôi phục nhắc theo `TEMPLATE`.
+→ lưu `rec.unwell = true`, `rec.muted = [ids]`. `setUnwell(false)` bật lại đúng các id trong `rec.muted`, khôi phục nhắc theo `rem` của từng khối (đọc từ sự kiện, nên khối tự thêm cũng đúng).
 Nếu gọi Calendar lỗi, bản ghi ngày vẫn được lưu (unwell là trạng thái quan trọng hơn việc tắt nhắc).
 
 ### 3.7 Gemini key giữa các máy
@@ -236,6 +266,13 @@ Máy khác mở app → `findConfig()` → `adoptCfg()` lấy key nếu máy đ�
 ## 4. Giao diện đọc state thế nào
 - `render()` gọi `header()` + view đang mở: `renderToday()`, `renderHabits()`, `renderJournal()`. Mỗi hàm dựng lại HTML của view từ `S`.
 - Mọi nút đi qua **một** `click` listener ở `document`, phân theo `id` hoặc `data-*` (`data-pid`, `data-aid`, `data-day`, `data-week`, `data-hview`…).
+- Cỡ chữ: 3 bậc trong `:root` cho mọi chữ thường: `--fs-b` 15px (chữ chính, ô nhập, dropdown, tên trong danh sách) · `--fs-m` 13px
+  (tiêu đề ô, chữ phụ) · `--fs-s` 12px (chú thích, giờ, cả chỗ rất hẹp: tab bar, lịch tháng, bảng Tuần). Không có bậc dưới 12px.
+  Tiêu đề (`--f-display`) có 3 bậc: `--fd-xl` 34px (chữ lớn nhất của một màn: thẻ Bây giờ, tiêu đề cổng vào) ·
+  `--fd-l` 22px (tiêu đề mục `.h2` như "Thói quen hôm nay", "Ba dòng cho hôm nay.", tiêu đề sheet, trang con, thẻ Rest day, trang trống, số chuỗi 🔥) · `--fd-m` 16px (tên tuần/tháng, bộ chọn giờ,
+  chuỗi phụ, mục khi đọc Nhật ký). Chỉ logo cổng vào (40px) và cỡ icon dùng số px riêng. Số trong bộ chọn giờ (`.tp__it`) dùng cỡ `--fd-l` nhưng font `--f-text`. Font: Be Vietnam Pro tải 400/500/600/700, Bricolage Grotesque chỉ tải 600: mọi chữ `--f-display` (tiêu đề, số chuỗi, logo) đều đậm 600. Thêm chữ mới thì chọn một trong các biến, không thêm cỡ mới.
+- Màu icon thói quen: `icVars(cat)` trả `--cat:<hex nhóm>` gắn thẳng lên thẻ `<i>`; CSS đọc `var(--cat, var(--ink-soft))` (`.chip__ic`, `.hcard__head i.big`, `.mrow__ic`, `.dayrow > i`, `.wname > i`, `.hic`). Người thân (vàng) dùng `var(--yellow-ic)` (sáng #A87D0B, tối #E3AE1B) vì vàng gốc chỉ ~2:1 trên nền sáng. Bộ chọn biểu tượng không gắn `--cat`.
+- Màu: icon lửa của chuỗi 🔥 (`.streak b i`, `.streak2 i`) dùng `--fire` (đỏ cam, sáng: #E0452B, tối: #FF5A3C), tách khỏi `--accent` vàng.
 - Sheet (`openSheet` / `closeSheet`) dùng chung cho Cài đặt, sửa, thêm, xác nhận.
   `.sheet-actions` trong sheet là `position: sticky` ở đáy panel (bù đúng padding-bottom), nên Hủy/Lưu luôn thấy khi panel phải cuộn.
 - Bộ chọn giờ `TP` (một `.tp` gắn vào `body`, z-index trên sheet): `openSheet` đặt mọi `input[type=time]` thành `readOnly`
@@ -270,4 +307,4 @@ Mỗi lần đổi giao diện tăng `V` trong `sw.js` để cache cũ bị xoá
 ## 7. Kiểm thử
 `tests/index.html` mở app ở chế độ demo trong iframe, chèn `tests/tests.js` vào cùng phạm vi toàn cục (để thấy `S`, `TL`, `Demo`…),
 chạy test rồi trả localStorage `sl.*` về như cũ. `tests/run.py` chạy trang đó bằng Chrome headless. Test không gọi Google hay Gemini,
-nên phần `Google.*` chỉ được kiểm qua các hàm chuyển đổi (`evToItem`, `recToProps`, `recFromEv`, `planBody`).
+nên phần `Google.*` chỉ được kiểm qua các hàm chuyển đổi (`evToItem`, `recToProps`, `recFromEv`, `planBody`, `evToSeries`, `withUntil`). Luật cắt chuỗi `tplApply` được kiểm trên `Demo`.

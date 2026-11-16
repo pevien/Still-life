@@ -12,7 +12,7 @@ Chốt qua buổi grill ngày 14/11/2026, cập nhật theo app hiện tại.
 ## Dữ liệu (tất cả trong Google của người dùng)
 | Nơi | Chứa gì |
 |---|---|
-| Google Calendar · lịch **Still life · Kế hoạch** | Tuần mẫu, sự kiện lặp lại hằng tuần, có nhắc nhở. Sửa trong app chỉ đổi đúng lần lặp của hôm nay. Khối thêm trong app là sự kiện đơn (không lặp), đánh dấu `added=1` |
+| Google Calendar · lịch **Still life · Kế hoạch** | Tuần mẫu, sự kiện lặp lại hằng tuần, có nhắc nhở. Sửa ở tab Hôm nay chỉ đổi đúng lần lặp của hôm nay; sửa ở trang **Tuần mẫu** đổi chuỗi lặp từ ngày mai. Khối thêm trong app là sự kiện đơn (không lặp), đánh dấu `added=1` |
 | Google Calendar · lịch **Still life · Thực tế** | Việc đã làm (AI tạo từ câu nhập), tô màu theo nhóm. Mỗi ngày 1 sự kiện cả ngày "Thói quen" lưu trạng thái habit + unwell |
 | Google Drive · `Still life/Nhật ký/YYYY-MM-DD.md` | Nhật ký 3 dòng + tự do |
 | Google Drive · `Still life/still-life-config.json` | ID 2 lịch, thư mục, ngày bắt đầu, Gemini key, danh sách thói quen. Máy mới đăng nhập sẽ tự tìm file này để nối vào, không tạo trùng |
@@ -20,8 +20,8 @@ Chốt qua buổi grill ngày 14/11/2026, cập nhật theo app hiện tại.
 Scope OAuth: `calendar.app.created` (chỉ các lịch app tự tạo) + `drive.file` (chỉ file app tự tạo).
 
 ## Nhóm thời gian (màu Google Calendar)
-Sức khỏe (Basil) · Tiếng Hàn (Grape) · Build & Learn (Blueberry) · Sinh hoạt (Banana) ·
-Người thân & bạn bè (Flamingo) · Giải trí có chủ đích (Tangerine) · Lướt vô thức (Graphite)
+Sức khỏe (Basil) · Tiếng Hàn (Grape) · Build & Learn (Blueberry) · Sinh hoạt (Flamingo) ·
+Người thân & bạn bè (Banana) · Giải trí có chủ đích (Tangerine) · Lướt vô thức (Graphite)
 
 ## Tuần mẫu
 - Mỗi ngày: 5:30 dậy · 6:00–7:00 vận động · 7:00 ăn sáng · 11:30 ăn trưa · 21:00 nhật ký & tổng kết · 22:00 cất điện thoại
@@ -38,11 +38,11 @@ Ngoại lệ: tài khoản đã dựng lịch từ trước khi có danh sách r
 |---|---|---|
 | Ăn đủ 3 bữa | hằng ngày | không bỏ bữa |
 | Dậy 5:30 | hằng ngày | trước 6:00 |
-| Tiếng Hàn 10 phút | hằng ngày | 5 từ mới |
+| Tiếng Hàn 10p | hằng ngày | 5 từ mới |
 | Đi bộ 3000 bước | hằng ngày | 2000 bước (nhập tay) |
 | Yoga | T2-4-6 | — |
 | Gym | T3, T7 | 1 buổi/tuần (đủ 2 là 🌟) |
-| Cất điện thoại 22:00 | hằng ngày | bật chế độ ngủ trước 22:30 |
+| Cất máy 22:00 | hằng ngày | bật chế độ ngủ trước 22:30 |
 | Nhật ký | hằng ngày | 1 dòng |
 
 Để sau: Thiền.
@@ -51,7 +51,7 @@ Luật chuỗi: bản tối thiểu vẫn tính. Rest day không làm gãy chu�
 Thói quen "số lần/tuần" chỉ tính tuần đạt khi có ít nhất 1 lần (kể cả khi đặt tối thiểu 0).
 
 ### Một thói quen gồm
-- **Tên**, **tên ngắn** (cho bảng Tuần), **nhóm** (cùng 7 nhóm thời gian, chỉ để tô màu và xếp), **biểu tượng** (một hàng vuốt ngang, cái đang chọn đứng đầu).
+- **Tên** (tối đa 15 ký tự, dùng chung cho Hôm nay và bảng Tuần; bảng Tuần chỉ 1 dòng, dài quá thì cắt "…"; dưới tên là [biểu tượng] số đã/tổng), **nhóm** (cùng 7 nhóm thời gian, chỉ để tô màu biểu tượng và xếp), **biểu tượng** (một hàng vuốt ngang, cái đang chọn đứng đầu).
 - **Lịch**, một trong ba: Mỗi ngày · Ngày cố định (vd T2-4-6, chỉ những ngày đó mới tính) ·
   Số lần/tuần (mục tiêu và tối thiểu mỗi tuần, ngày gợi ý không bắt buộc; có chọn ngày thì chỉ hiện ở Hôm nay vào ngày đó).
 - **Thế nào là đạt** (chữ tự do, vài dòng, vd "2 lít, tính cả trà") và **tối thiểu** (chữ ngắn, tuỳ chọn; có tối thiểu thì chip có nút ½).
@@ -89,6 +89,16 @@ Thanh dưới có 4 ô: Hôm nay · Thói quen · Nhật ký · Cài đặt (Cà
      mở ra tự cuộn tới giờ hiện tại, render lại giữ nguyên chỗ đang xem. Khối ngắn hiện 1 dòng, cắt bằng "…".
    - Bấm khối Kế hoạch → "Chỉnh sửa kế hoạch": đổi tên, giờ cho riêng hôm nay, có hoàn tác.
      Khối thêm trong app có thêm nút xoá.
+   - **Tuần mẫu** (icon bút bên trái icon lịch ở tiêu đề "Thời gian hôm nay"): trang con có nút ←, bấm ← hoặc tab Hôm nay để về.
+     Hàng chip T2…CN (chọn sẵn thứ của ngày mai) + timeline 5:00–23:00 của thứ đó, chỉ một cột kế hoạch.
+     Bấm khối → "Sửa kế hoạch", bấm chỗ trống → "Thêm kế hoạch" (giờ theo chỗ bấm, dài 30 phút hoặc tới khối kế tiếp, lặp vào thứ đang chọn).
+     Ô: Tên, Nhóm, Giờ, **Lặp vào các thứ**, rồi "Làm xong thì đạt thói quen" (chọn thói quen gắn với kế hoạch, không có dòng giải thích), Nhắc (Đúng giờ / Trước 10 phút / Trước 30 phút / Không nhắc), "Vẫn nhắc khi rest day" (công tắc bên phải, chữ cùng kiểu tiêu đề ô; ẩn khi Nhắc là "Không nhắc").
+     - Thay đổi **luôn áp dụng từ ngày mai**, không có ô chọn ngày. Hôm nay và các ngày trước giữ nguyên (đổi riêng hôm nay thì vẫn bấm khối ở Hôm nay).
+       Sửa một khối nhiều lần trong ngày vẫn chỉ ra một bản. Xoá = ngừng lặp từ ngày mai. Lưu, xoá đều có hoàn tác.
+     - Khối và thói quen độc lập: gắn thói quen chỉ để bấm Đã làm thì thói quen thành đạt. Ngày lặp lệch lịch thói quen (loại Mỗi ngày / Ngày cố định)
+       thì sheet báo một dòng kèm nút "Lưu & đổi lịch thói quen": lưu khối rồi mở Sửa thói quen điền sẵn lịch (từ ngày mai), người dùng tự bấm Lưu.
+       Thói quen số lần/tuần không báo (ngày nào cũng được).
+     - Nhắc nằm ở khối, không ở thói quen: app không có máy chủ nên không tự gửi thông báo, Google Calendar báo theo giờ của khối.
    - Bấm chỗ trống cột Kế hoạch → "Thêm kế hoạch": giờ bắt đầu theo chỗ bấm (làm tròn xuống 15 phút),
      dài 30 phút hoặc tới khối kế tiếp. Thứ tự ô: Tên, Nhóm, Giờ. Chỉ cho hôm nay.
    - Bấm khối Thực tế → "Sửa việc đã làm" (Tên, Nhóm, Giờ): sửa, xoá việc đã ghi.
@@ -105,17 +115,18 @@ Thanh dưới có 4 ô: Hôm nay · Thói quen · Nhật ký · Cài đặt (Cà
      Không dùng hộp chọn giờ của Android (trên Vivo X200 Pro mini bị cắt mất nút Set).
    - Nút Hủy / Lưu của sheet luôn dính đáy sheet, kể cả khi bàn phím bật hoặc có nhiều thẻ việc.
 3. **Thói quen**: chuyển Tuần / Tháng, lùi tới từng tuần, tháng (không quá ngày bắt đầu, không quá hiện tại).
-   Chú thích trạng thái nằm dưới tiêu đề, căn giữa. Chạm ô một ngày để sửa habit ngày đó. Chuỗi 🔥.
-   Thói quen xếp theo nhóm; bảng Tuần tô màu biểu tượng theo nhóm. Hôm nay cũng xếp theo nhóm, không có chấm màu.
+   Chú thích trạng thái nằm dưới tiêu đề, căn giữa. Chạm ô một ngày để sửa habit ngày đó: mỗi dòng có tên, bản tối thiểu (nếu có) và 3 nút nhỏ Chưa / Tối thiểu / Đạt; bấm là đổi liền, icon thói quen quay vòng tới khi lưu xong. Chuỗi 🔥.
+   Thói quen xếp theo nhóm. Biểu tượng thói quen tô màu theo nhóm ở mọi chỗ (Hôm nay, Tiến độ, bảng Tuần, Quản lý, sửa ngày, Rest day, Nhật ký); kể cả chip đã đạt / tối thiểu (trạng thái thể hiện qua nền chip và icon đặc); riêng bộ chọn biểu tượng giữ màu trung tính. Hôm nay cũng xếp theo nhóm, không có chấm màu; đánh dấu đạt / tối thiểu không làm chip đổi chỗ.
    Sheet sửa một ngày hiện cả thói quen số lần/tuần vào ngày ngoài ngày gợi ý (đi gym ngày khác vẫn ghi được).
    - **Quản lý thói quen**: nút thanh trượt cạnh Tuần/Tháng mở trang con (nút ← hoặc bấm tab Thói quen để về).
      Danh sách gom theo nhóm, mỗi dòng: biểu tượng, tên, lịch. Nút ↑ ↓ đổi thứ tự trong nhóm. Chạm dòng mở sheet Sửa thói quen.
      "Thêm thói quen" ở cuối. Mục "Đã ngừng": thói quen ngừng theo dõi (không hiện ở Hôm nay, không tính chuỗi, không vào luật AI, dữ liệu cũ giữ).
+   - Sheet Sửa có dòng chỉ đọc "Nhắc qua lịch: Yoga · 6:00 · T2 · T4 · T6", hoặc "Chưa có lịch nào…, nên sẽ không có nhắc".
    - Sheet Thêm / Sửa: nút Ngừng theo dõi (hoặc Theo dõi lại · Xoá hẳn nếu đã ngừng) ở đầu form, rồi nút **Nhờ AI điền / Nhờ AI sửa**, rồi các ô ở mục "Một thói quen gồm",
      ô ngày áp dụng lịch. Thiếu tên, ngày cố định chưa chọn ngày, ngày đã qua: báo dưới form, không đóng sheet.
      Nút Nhờ AI chỉ hiện khi đã có Gemini key. Bấm vào mở popup nhập từ dưới lên (giống popup ghi việc ở Hôm nay, có micro), nằm trên form. Kể bằng lời
      (vd "uống 2 lít nước mỗi ngày, mệt thì 1 lít"; khi sửa: "đổi thành 3 buổi mỗi tuần") rồi gửi. Popup đóng lại,
-     Gemini điền tên, tên ngắn, nhóm, biểu tượng, lịch, Thế nào là đạt, Tối thiểu; ô nào đổi thì nháy nhẹ, dưới nút hiện 1 câu AI đã làm gì.
+     Gemini điền tên (≤ 15 ký tự), nhóm, biểu tượng, lịch, Thế nào là đạt, Tối thiểu; ô nào đổi thì nháy nhẹ, dưới nút hiện 1 câu AI đã làm gì.
      Lỗi thì popup giữ nguyên chữ để thử lại. Đóng popup (Esc, chạm nền) không đóng form.
      AI **không tự lưu** và không đụng ô ngày áp dụng: người dùng xem lại, chỉnh rồi bấm Lưu. Khi sửa (hoặc form đã có chữ), AI chỉ đổi phần được nhờ.
      Lưu, ngừng, xoá đều có hoàn tác. Theo dõi lại thì tính từ hôm nay, khoảng đã ngừng không thành Bỏ.

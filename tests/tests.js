@@ -54,7 +54,7 @@
       eq(dmy(new Date(2027, 0, 5)), "05/01/2027");
     });
     test("fmtDur: phút và giờ", () => {
-      eq([0, 45, 60, 65, 130, 59.6].map(fmtDur), ["0p", "45p", "1g", "1g05", "2g10", "1g"]);
+      eq([0, 45, 60, 65, 130, 59.6].map(fmtDur), ["0p", "45p", "1h", "1h05", "2h10", "1h"]);
     });
   });
 
@@ -107,7 +107,10 @@
         if (hb.freq === "weekly") ok(hb.perWeekMin >= 1 && hb.perWeekMin <= hb.perWeekFull, hb.id);
       }
     });
-    test("mỗi habit mặc định đều có tên ngắn cho bảng tuần", () => { for (const hb of SAMPLE_HABITS) ok(hb.short, hb.id); });
+    test("tên thói quen tối đa NAME_MAX ký tự; không còn tên ngắn", () => {
+      for (const hb of SAMPLE_HABITS) { ok(hb.name.length <= NAME_MAX, hb.name); ok(!("short" in hb), hb.id); }
+      ok(!("short" in normHabit({ id: "x", name: "X", short: "cũ" })), "trường cũ bị bỏ");
+    });
   });
 
   // ------------------------------------------------------------ Calendar mapping
@@ -662,7 +665,7 @@
     test("chế độ Làm việc khác: trống vẫn lưu được (để đánh dấu bỏ qua)", async () => {
       await reset();
       S.otherFor = S.today.plan[0].id;
-      try { renderConfirm(P({})); ok(!$("#cSave").disabled); ok($("#sheetBody").textContent.includes("bỏ qua khối đang chạy")); }
+      try { renderConfirm(P({})); ok(!$("#cSave").disabled); ok($("#sheetBody").textContent.includes("bỏ qua lịch đang chạy")); }
       finally { closeSheet(); resetOther(); }
     });
     test("bỏ hết việc: ẩn lời đáp cũ, khoá Lưu, giữ chỗ đã sửa", async () => {
@@ -853,10 +856,10 @@
       eq(getComputedStyle(lg).justifyContent, "center");
       ok(!$("#view-habits").textContent.includes("Chạm ô để sửa"));
     });
-    test("Thói quen · Tháng: chú thích cùng vị trí, đủ thẻ habit", async () => {
+    test("Thói quen · Tháng: không có chú thích màu, đủ thẻ habit", async () => {
       S.habView = "month"; S.calMonth = null; renderHabits();
-      const lg = $("#view-habits .legend");
-      ok(lg.previousElementSibling.classList.contains("hnav"), "ngay dưới tiêu đề");
+      ok(!$("#view-habits .legend"), "không còn dòng chú thích");
+      ok($("#view-habits .hnav").nextElementSibling.classList.contains("hcard"), "thẻ đầu ngay dưới tiêu đề");
       eq(document.querySelectorAll("#view-habits .hcard").length, HABITS.length);
       S.habView = "week"; await reset();
     });
@@ -918,12 +921,13 @@
       eq(sheetTitle(), "Thêm thói quen");
       $("#hSave").click(); await wait(20);
       ok(!$("#hErr").hidden && sheetOpen(), "thiếu tên thì báo, không đóng sheet");
-      $("#hName").value = "Uống 2 lít nước"; $("#hShort").value = "Nước"; $("#hFull").value = "2 lít"; $("#hMin").value = "1 lít";
+      $("#hName").value = "Uống 2 lít nước"; $("#hFull").value = "2 lít"; $("#hMin").value = "1 lít";
       $('[data-hicon="ph-drop"]').click();
       $("#hSave").click(); await wait(30);
       ok(!sheetOpen(), "lưu xong đóng sheet");
       const h = ALLH[ALLH.length - 1];   // ALLH giữ thứ tự thêm, HABITS xếp theo nhóm
-      eq([h.name, h.short, h.icon, h.freq, h.since], ["Uống 2 lít nước", "Nước", "ph-drop", "daily", todayStr()]);
+      eq([h.name, h.icon, h.freq, h.since], ["Uống 2 lít nước", "ph-drop", "daily", todayStr()]);
+      ok(!$("#hShort") && !("short" in h), "không còn tên ngắn");
       eq(cellStatus(h, day(-1)), "none", "hôm qua chưa theo dõi");
       ok(geminiPrompt("x").includes(`${h.id} (Uống 2 lít nước): full: 2 lít. min: 1 lít.`), "có trong prompt");
       ok(geminiSchema().properties.habits.items.properties.id.enum.includes(h.id), "có trong schema");
@@ -1025,6 +1029,41 @@
         ok(!$(".unwell-card ul") && $(".unwell-card").textContent.includes("nghỉ ngơi là đủ"), $(".unwell-card").textContent);
       } finally { await saveRec(keepRec); await back(prev); await reset(); }
     });
+    test("Hôm nay: đánh dấu đạt / tối thiểu không đổi chỗ chip", async () => {
+      const prev = keep(); await reset();
+      const d = todayStr(), keepRec = Object.assign({}, S.days[d] || blankRec(d));
+      const base = { cat: "life", icon: "ph-drop", freq: "daily", full: "x", min: "y" };
+      try {
+        await saveHabits(["oA", "oB", "oC"].map(id => Object.assign({}, base, { id, name: id })));
+        const ids = () => $$("#view-today [data-habit]").map(b => b.dataset.habit);
+        await saveRec(Object.assign(blankRec(d), { id: keepRec.id })); renderToday();
+        eq(ids(), ["oA", "oB", "oC"]);
+        await saveRec(Object.assign(blankRec(d), { id: keepRec.id, h: { oA: "full", oB: "min" } })); renderToday();
+        eq(ids(), ["oA", "oB", "oC"], "đã đạt vẫn ở chỗ cũ");
+      } finally { await saveRec(keepRec); await back(prev); await reset(); }
+    });
+    test("sheet một ngày: bấm là đổi liền, icon quay khi đang lưu; hiện bản tối thiểu", async () => {
+      const prev = keep(); await reset();
+      const d = todayStr(), keepRec = Object.assign({}, S.days[d] || blankRec(d));
+      const base = { cat: "life", icon: "ph-drop", freq: "daily", full: "x" };
+      try {
+        await saveHabits([Object.assign({}, base, { id: "sA", name: "Uống nước", min: "1 ly" }), Object.assign({}, base, { id: "sB", name: "Chạy bộ" })]);
+        await saveRec(Object.assign(blankRec(d), { id: keepRec.id }));
+        renderDaySheet(d);
+        const row = id => $(`#sheetBody [data-row="${id}"]`);
+        ok(row("sA").textContent.includes("Tối thiểu: 1 ly"), "có bản tối thiểu");
+        ok(!row("sB").querySelector(".dayrow__min"), "không có tối thiểu thì không hiện");
+        const btn = row("sA").querySelector('[data-lv="full"]');
+        btn.click();
+        eq(btn.getAttribute("aria-pressed"), "true", "đổi ngay, không đợi lưu");
+        eq(row("sA").querySelector('[data-lv=""]').getAttribute("aria-pressed"), "false");
+        ok(row("sA").getAttribute("aria-busy") === "true" && row("sA").querySelector(".ph-circle-notch"), "đang lưu");
+        row("sA").querySelector('[data-lv="min"]').click();   // bấm tiếp khi lần trước chưa xong
+        await habQ; await new Promise(r => setTimeout(r));
+        eq(S.days[d].h.sA, "min", "lần bấm sau cùng thắng");
+        ok(!row("sA").hasAttribute("aria-busy") && row("sA").querySelector(".ph-drop"), "xong thì trả icon");
+      } finally { closeSheet(); await saveRec(keepRec); await back(prev); await reset(); }
+    });
     test("bộ thói quen mẫu chỉ dành cho xem thử: người mới bắt đầu trống, cấu hình cũ giữ bộ cũ", async () => {
       const keepS = Object.assign({}, S.settings), keepCfg = S.cfg, keepLS = localStorage.getItem("sl.habits");
       try {
@@ -1059,8 +1098,9 @@
     test("fillHabForm điền mọi ô, chưa lưu gì cho tới khi bấm Lưu", async () => {
       const prev = keep(), n = ALLH.length; await reset();
       renderHabForm(null); const from = $("#hFrom").value;
-      fillHabForm({ name: "Đọc sách", short: "Đọc sách dài quá mười bốn", cat: "build", icon: "ph-book-open", freq: "days", days: [5, 1, 3, 9], full: "đọc 10 trang", min: "1 trang" });
-      eq([$("#hName").value, $("#hShort").value, $("#hCat").value, $("#hForm").dataset.freq], ["Đọc sách", "Đọc sách dài q", "build", "days"]);
+      fillHabForm({ name: "Đọc sách", cat: "build", icon: "ph-book-open", freq: "days", days: [5, 1, 3, 9], full: "đọc 10 trang", min: "1 trang" });
+      eq([$("#hName").value, $("#hCat").value, $("#hForm").dataset.freq], ["Đọc sách", "build", "days"]);
+      eq($("#hName").maxLength, NAME_MAX, "ô Tên giới hạn ký tự");
       eq($$("[data-hday][aria-pressed=true]").map(b => +b.dataset.hday).sort(), [1, 3, 5]);
       eq($(".iconpick button").dataset.hicon, "ph-book-open", "biểu tượng AI chọn đứng đầu, đang chọn");
       eq($(".iconpick button").getAttribute("aria-checked"), "true");
@@ -1254,6 +1294,171 @@
       $("#hCat").value = "build"; $("#hSave").click(); await wait(30);
       eq(H.journal.cat, "build");
       await back(prev); await reset();
+    });
+  });
+
+  // ------------------------------------------------------------ Tuần mẫu
+  describe("Tuần mẫu: đọc / ghi chuỗi lặp", () => {
+    const sev = (rec, extra) => Object.assign({ id: "S1", summary: "Yoga", start: { dateTime: rfc(at("06:00", parseYmd("2026-11-02"))) }, end: { dateTime: rfc(at("07:00", parseYmd("2026-11-02"))) },
+      recurrence: rec, extendedProperties: { private: { sl: "plan", key: "yoga", cat: "health", habit: "yoga", ess: "0", rem: "0" } } }, extra);
+    test("evToSeries: thứ, giờ, ngày đầu, UNTIL (UTC) về ngày theo giờ máy", () => {
+      const x = evToSeries(sev([rrule([1, 3, 5], "2026-11-20")]));
+      eq([x.days, x.s, x.e, x.from, x.until, x.habit, x.rem], [[1, 3, 5], "06:00", "07:00", "2026-11-02", "2026-11-20", "yoga", [0]]);
+      eq(evToSeries(sev(["RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR"])).until, null);
+      eq(evToSeries(sev(["RRULE:FREQ=DAILY"])).days, ALL, "mỗi ngày");
+      eq(evToSeries(sev(["RRULE:FREQ=WEEKLY;BYDAY=MO;UNTIL=20261120"])).until, "2026-11-20", "UNTIL chỉ có ngày");
+    });
+    test("evToSeries bỏ qua chuỗi không hiểu được và sự kiện không lặp", () => {
+      eq(evToSeries(sev(["RRULE:FREQ=WEEKLY;BYDAY=MO;COUNT=5"])), null);
+      eq(evToSeries(sev(["RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO"])), null);
+      eq(evToSeries(sev(["RRULE:FREQ=MONTHLY"])), null);
+      eq(evToSeries(sev(undefined)), null);
+      eq(evToSeries(sev(["RRULE:FREQ=WEEKLY"], { start: { date: "2026-11-02" } })), null, "cả ngày");
+    });
+    test("withUntil thêm / thay / bỏ UNTIL, giữ EXDATE", () => {
+      const r = ["RRULE:FREQ=WEEKLY;BYDAY=MO", "EXDATE:20261109T060000Z"];
+      const a = withUntil(r, "2026-11-16");
+      ok(a[0].includes(";UNTIL=" + untilUTC("2026-11-16")), a[0]); eq(a[1], r[1]);
+      const b = withUntil(a, "2026-11-20");
+      eq((b[0].match(/UNTIL/g) || []).length, 1, "chỉ một UNTIL");
+      eq(withUntil(b, null)[0], r[0]);
+    });
+    test("planBody ghi nhắc vào sự kiện, có UNTIL khi cần", () => {
+      const b = planBody(Object.assign({}, TPL.phone, { until: null }), day(1));
+      eq(b.extendedProperties.private.rem, "30,0");
+      eq(planBody(Object.assign({}, TPL.yoga, { rem: [] }), day(1)).reminders.overrides, []);
+      ok(planBody(TPL.yoga, day(1), "2026-12-01").recurrence[0].includes("UNTIL="));
+    });
+    test("evToItem: thuộc tính đã ghi trong sự kiện thắng tuần mẫu trong code", () => {
+      const ev = p => ({ id: "x", summary: "Ăn trưa", start: { dateTime: rfc(at("11:30")) }, end: { dateTime: rfc(at("12:30")) }, extendedProperties: { private: p } });
+      eq(evToItem(ev({ key: "lunch", ess: "0" }), "plan").ess, false, "bỏ giữ rest day");
+      eq(evToItem(ev({ key: "class", habit: "" }), "plan").habit, "", "bỏ gắn thói quen");
+      eq(evToItem(ev({ key: "phone" }), "plan").rem, [30, 0], "sự kiện cũ: nhắc theo code");
+      eq(evToItem(ev({ key: "phone", rem: "" }), "plan").rem, [], "không nhắc");
+      eq(evToItem(ev({ sl: "plan", added: "1" }), "plan").rem, [0]);
+    });
+    test("remKeyOf / remFromKey", () => {
+      eq([[0], [10, 0], [30, 0], [], [15]].map(remKeyOf), ["0", "10", "30", "none", "10"]);
+      eq(["0", "10", "30", "none"].map(remFromKey), [[0], [10, 0], [30, 0], []]);
+    });
+  });
+
+  describe("Tuần mẫu: áp dụng từ ngày mai", () => {
+    const find = async key => (await Demo.listSeries()).find(x => x.key === key);
+    const onDay = async (d, key) => (await Demo.listPlan(d, addDays(d, 1))).find(p => p.key === key);
+    test("sửa khối: hôm nay giữ, từ mai đổi; sửa lần nữa trong ngày không tạo thêm bản", async () => {
+      const old = await find("free"), n0 = (await Demo.listSeries()).length;
+      const undo = await tplApply(old, Object.assign({}, old, { s: "15:00", e: "17:30", title: "Tự do mới" }));
+      eq(hm((await onDay(today, "free")).start), old.s, "hôm nay giữ nguyên");
+      const tm = await onDay(day(1), "free"); eq([tm.title, hm(tm.start)], ["Tự do mới", "15:00"]);
+      eq(hm((await onDay(day(8), "free")).start), "15:00", "tuần sau cũng đổi");
+      const list = await Demo.listSeries(); eq(list.length, n0, "chuỗi cũ đã cắt không hiện");
+      const cur = list.find(x => x.key === "free"); eq(cur.from, tomorrowStr());
+      const undo2 = await tplApply(cur, Object.assign({}, cur, { s: "16:00" }));
+      eq((await Demo.listSeries()).filter(x => x.key === "free").length, 1, "vẫn một bản");
+      eq(hm((await onDay(day(1), "free")).start), "16:00");
+      await undo2(); await undo();
+      const back = await find("free"); eq([back.id, back.until, back.s], [old.id, null, old.s], "hoàn tác về như cũ");
+      eq(hm((await onDay(day(1), "free")).start), old.s);
+    });
+    test("xoá khối: ngừng lặp từ mai, hôm nay còn; hoàn tác thì chạy tiếp", async () => {
+      const old = await find("fun");
+      const d = [0, 1, 2, 3, 4, 5, 6].map(day).find(x => x > today && old.days.includes(x.getDay()));
+      const undo = await tplApply(old, null);
+      ok(!(await find("fun")), "không còn trong tuần mẫu");
+      ok(!(await onDay(d, "fun")), "ngày tới không còn");
+      if (old.days.includes(today.getDay())) ok(await onDay(today, "fun"), "hôm nay còn");
+      await undo();
+      ok(await onDay(d, "fun"), "hoàn tác");
+    });
+    test("thêm khối mới rồi xoá trong ngày: xoá hẳn", async () => {
+      const n0 = (await Demo.listSeries()).length;
+      await tplApply(null, { title: "Đọc sách", cat: "fun", days: [2, 4], s: "20:00", e: "20:30", habit: "", ess: false, rem: [10, 0] });
+      const x = (await Demo.listSeries()).find(y => y.title === "Đọc sách");
+      ok(x && x.from >= tomorrowStr(), "bắt đầu từ mai");
+      ok([2, 4].includes(parseYmd(x.from).getDay()), "ngày đầu đúng thứ");
+      await tplApply(x, null);
+      eq((await Demo.listSeries()).length, n0);
+    });
+    test("lệch lịch thói quen: chỉ báo khi ngày cố định / mỗi ngày khác ngày lặp", () => {
+      ok(habDaysMismatch(H.yoga, [2, 4]).includes("Yoga"), "Yoga T2-4-6 vs T3-5");
+      eq(habDaysMismatch(H.yoga, [1, 3, 5]), null);
+      eq(habDaysMismatch(H.eat, ALL), null, "mỗi ngày");
+      ok(habDaysMismatch(H.eat, [1]), "mỗi ngày vs T2");
+      eq(habDaysMismatch(H.gym, [2]), null, "số lần/tuần: ngày nào cũng được");
+    });
+  });
+
+  describe("Tuần mẫu: màn hình", () => {
+    test("icon bút cạnh icon lịch, mở trang Tuần mẫu chọn sẵn thứ của ngày mai", async () => {
+      await reset();
+      const acts = [...document.querySelectorAll("#view-today .h2__acts .icon-btn")].map(b => b.id);
+      eq(acts, ["btnTpl", "btnOpenCal"]);
+      await openTpl();
+      ok($("#view-today .tl--tpl"), "có timeline");
+      eq($("#view-today [data-tday][aria-selected=true]").dataset.tday, String(day(1).getDay()));
+      ok($("#btnCompose").hidden, "ẩn nút bút nhập");
+      const n = (await Demo.listSeries()).filter(x => x.days.includes(day(1).getDay())).length;
+      eq(document.querySelectorAll("#view-today .tl--tpl [data-sid]").length, n);
+      $("#view-today [data-tday='0']").click(); await frame();
+      eq($("#view-today .tl__head").textContent, "Chủ nhật");
+      $("#tplBack").click(); await frame();
+      ok(!$("#view-today .tl--tpl") && $("#view-today .tl"), "về Hôm nay");
+      await openTpl(); setView("today"); ok(!S.tplOpen, "bấm tab Hôm nay cũng về");
+      await reset();
+    });
+    test("sheet sửa khối: đủ ô, lưu có hoàn tác, khối mặc định khi bấm chỗ trống", async () => {
+      await reset(); await openTpl();
+      S.tplDay = 1; renderTpl();
+      $("#view-today [data-sid='yoga']").click();
+      eq(sheetTitle(), "Sửa kế hoạch");
+      ok($("#tTitle") && $("#tCat") && $("#tStart") && $("#tHabit") && $("#tEss") && $("#tRem") && $("#tDel"), "đủ ô");
+      eq([$("#tHabit").value, $("#tRem").value, $("#tEss").checked], ["yoga", "0", false]);
+      ok(!$("#tEssRow").hidden, "có nhắc thì hiện Vẫn nhắc khi rest day");
+      $("#tRem").value = "none"; $("#tRem").dispatchEvent(new Event("change", { bubbles: true }));
+      ok($("#tEssRow").hidden, "Không nhắc thì ẩn");
+      $("#tRem").value = "0"; $("#tRem").dispatchEvent(new Event("change", { bubbles: true }));
+      ok(!$("#tEssRow").hidden, "chọn lại có nhắc thì hiện lại");
+      ok($("#tHint").hidden, "khớp lịch thói quen thì không nhắc");
+      $("#tForm [data-hday='1']").click();
+      ok(!$("#tHint").hidden && $("#tHabSync"), "lệch lịch thì hiện nhắc");
+      $("#tForm [data-hday='1']").click();
+      $("#tStart").value = "06:30"; $("#tEnd").value = "07:15";
+      $("#tSave").click(); await wait(40);
+      ok(!sheetOpen(), "đóng sheet");
+      eq((await Demo.listSeries()).find(x => x.key === "yoga").s, "06:30");
+      ok(toast._undo, "có hoàn tác"); await toast._undo(); await tplLoad();
+      eq((await Demo.listSeries()).find(x => x.key === "yoga").s, "06:00");
+      renderTplForm(null, "08:00");
+      eq([sheetTitle(), $("#tStart").value, $("#tEnd").value], ["Thêm kế hoạch", "08:00", "08:30"]);
+      eq($$("#tForm [data-hday][aria-pressed=true]").map(b => b.dataset.hday), ["1"], "lặp vào thứ đang chọn");
+      renderTplForm(null, "08:45");
+      eq($("#tEnd").value, "09:00", "tới khối kế tiếp");
+      $("#tSave").click(); await wait(20);
+      ok(sheetOpen() && !$("#tErr").hidden, "thiếu tên thì báo, không đóng");
+      await reset();
+    });
+    test("Lưu khối & đổi lịch thói quen: mở Sửa thói quen điền sẵn, chưa tự lưu", async () => {
+      await reset(); await openTpl(); S.tplDay = 1; renderTpl();
+      $("#view-today [data-sid='yoga']").click();
+      $("#tForm [data-hday='5']").click();   // bỏ T6 → T2, T4
+      $("#tHabSync").click(); await wait(60);
+      eq(sheetTitle(), "Sửa thói quen");
+      eq($("#hForm").dataset.freq, "days");
+      eq($$("#hForm [data-hday][aria-pressed=true]").map(b => b.dataset.hday), ["1", "3"]);
+      eq($("#hFrom").value, tomorrowStr());
+      eq(H.yoga.days, [1, 3, 5], "thói quen chưa đổi");
+      ok(toast._undo, "khối đã lưu, có hoàn tác"); await toast._undo(); closeSheet(); await reset();
+    });
+    test("Sửa thói quen có dòng nhắc qua khối", async () => {
+      await reset();
+      renderHabForm("yoga"); await wait(30);
+      ok($("#hBlocks").textContent.includes("Nhắc qua lịch: Yoga · 6:00 · T2 · T4 · T6"), $("#hBlocks").textContent);
+      renderHabForm("eat"); await wait(30);
+      ok($("#hBlocks").textContent.includes("Chưa có lịch nào"), "không có khối");
+      renderHabForm(null);
+      ok(!$("#hBlocks"), "thêm mới thì không có");
+      closeSheet();
     });
   });
 

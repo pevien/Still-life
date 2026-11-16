@@ -21,8 +21,8 @@ const CATS = {
   health: { name: "Sức khỏe", short: "Sức khỏe", color: "10", hex: "#0B8043", icon: "ph-heartbeat" },
   korean: { name: "Tiếng Hàn", short: "Tiếng Hàn", color: "3", hex: "#8E24AA", icon: "ph-translate" },
   build:  { name: "Build & Learn", short: "Build", color: "9", hex: "#3F51B5", icon: "ph-code" },
-  life:   { name: "Sinh hoạt", short: "Sinh hoạt", color: "5", hex: "#E3AE1B", icon: "ph-house-line", lightInk: true },
-  people: { name: "Người thân & bạn bè", short: "Người thân", color: "4", hex: "#D9685E", icon: "ph-users-three" },
+  life:   { name: "Sinh hoạt", short: "Sinh hoạt", color: "4", hex: "#D9685E", icon: "ph-house-line" },
+  people: { name: "Người thân & bạn bè", short: "Người thân", color: "5", hex: "#E3AE1B", icon: "ph-users-three", lightInk: true },
   fun:    { name: "Giải trí có chủ đích", short: "Giải trí", color: "6", hex: "#E8592A", icon: "ph-film-strip" },
   scroll: { name: "Lướt vô thức", short: "Lướt", color: "8", hex: "#616161", icon: "ph-device-mobile" },
 };
@@ -31,14 +31,14 @@ const CATS = {
 // (lưu trong máy + file cấu hình trên Drive). Ngoại lệ: cấu hình dựng trước khi có danh sách riêng (chưa có trường habits)
 // thì dùng bộ này một lần rồi ghi lên Drive, để lịch sử cũ vẫn khớp id (xem legacyHabits trong refresh()).
 const SAMPLE_HABITS = [
-  { id: "eat",     name: "Ăn đủ 3 bữa", short: "Ăn 3 bữa", cat: "life",        icon: "ph-bowl-food",  freq: "daily", full: "ăn đủ 3 bữa. min: có 3 bữa nhưng có bữa qua loa/lệch giờ.", min: "không bỏ bữa" },
-  { id: "wake",    name: "Dậy 5:30", short: "Dậy 5:30", cat: "life",           icon: "ph-sun-horizon", freq: "daily", full: "dậy trước hoặc lúc 5:35. min: dậy trước 6:00.", min: "trước 6:00" },
-  { id: "korean",  name: "Tiếng Hàn 10 phút", short: "Tiếng Hàn", cat: "korean",  icon: "ph-translate",  freq: "daily", full: "học tiếng Hàn từ 10 phút trở lên (đi lớp cũng tính). min: học ít nhất 5 từ mới. value = số phút nếu có.", min: "5 từ mới" },
-  { id: "walk",    name: "Đi bộ 3000 bước", short: "Đi bộ", cat: "health",    icon: "ph-sneaker-move", freq: "daily", full: "value = số bước. full: >= 3000. min: >= 2000.", min: "2000 bước" },
-  { id: "yoga",    name: "Yoga", short: "Yoga", cat: "health",               icon: "ph-person-simple-tai-chi", freq: "days", days: [1, 3, 5], full: "có tập yoga." },
-  { id: "gym",     name: "Gym", short: "Gym", cat: "health",                icon: "ph-barbell",    freq: "weekly", days: [2, 6], perWeekMin: 1, perWeekFull: 2, full: "có tập gym hôm đó.", min: "1 buổi/tuần" },
-  { id: "phone",   name: "Cất điện thoại 22:00", short: "Cất máy", cat: "life", icon: "ph-moon-stars", freq: "daily", full: "cất điện thoại ra ngoài giường lúc 22:00. min: trước 22:30 hoặc bật chế độ ngủ.", min: "trước 22:30" },
-  { id: "journal", name: "Nhật ký", short: "Nhật ký", cat: "life",            icon: "ph-notebook",   freq: "daily", full: "viết nhật ký 3 dòng. min: 1 dòng.", min: "1 dòng" },
+  { id: "eat",     name: "Ăn đủ 3 bữa", cat: "life",        icon: "ph-bowl-food",  freq: "daily", full: "ăn đủ 3 bữa. min: có 3 bữa nhưng có bữa qua loa/lệch giờ.", min: "không bỏ bữa" },
+  { id: "wake",    name: "Dậy 5:30", cat: "life",           icon: "ph-sun-horizon", freq: "daily", full: "dậy trước hoặc lúc 5:35. min: dậy trước 6:00.", min: "trước 6:00" },
+  { id: "korean",  name: "Tiếng Hàn 10p", cat: "korean",  icon: "ph-translate",  freq: "daily", full: "học tiếng Hàn từ 10 phút trở lên (đi lớp cũng tính). min: học ít nhất 5 từ mới. value = số phút nếu có.", min: "5 từ mới" },
+  { id: "walk",    name: "Đi bộ 3000 bước", cat: "health",    icon: "ph-sneaker-move", freq: "daily", full: "value = số bước. full: >= 3000. min: >= 2000.", min: "2000 bước" },
+  { id: "yoga",    name: "Yoga", cat: "health",               icon: "ph-person-simple-tai-chi", freq: "days", days: [1, 3, 5], full: "có tập yoga." },
+  { id: "gym",     name: "Gym", cat: "health",                icon: "ph-barbell",    freq: "weekly", days: [2, 6], perWeekMin: 1, perWeekFull: 2, full: "có tập gym hôm đó.", min: "1 buổi/tuần" },
+  { id: "phone",   name: "Cất máy 22:00", cat: "life", icon: "ph-moon-stars", freq: "daily", full: "cất điện thoại ra ngoài giường lúc 22:00. min: trước 22:30 hoặc bật chế độ ngủ.", min: "trước 22:30" },
+  { id: "journal", name: "Nhật ký", cat: "life",            icon: "ph-notebook",   freq: "daily", full: "viết nhật ký 3 dòng. min: 1 dòng.", min: "1 dòng" },
 ];
 
 // Tuần mẫu. days: 0 = CN. ess = vẫn giữ trong unwell day.
@@ -79,6 +79,7 @@ function rfc(d) {
 }
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const todayStr = () => ymd(new Date());
+const tomorrowStr = () => ymd(addDays(startOfDay(new Date()), 1));
 // Mọi ngày hiện ra đều theo DD/MM/YYYY (vd 14/11/2026)
 const dmy = d => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 const fmtDate = d => `${DOW[d.getDay()]}, ${dmy(d)}`;
@@ -138,9 +139,12 @@ function normSched(o) {
 }
 const pickSched = x => { const o = {}; for (const k of SKEYS) if (x[k] != null) o[k] = x[k]; return normSched(o); };
 const sameSched = (a, b) => JSON.stringify(pickSched(a)) === JSON.stringify(pickSched(b));
+// Tên hiện cả ở bảng Tuần (cột hẹp, tối đa 2 dòng), nên giới hạn ngắn; không còn "tên ngắn" riêng
+const NAME_MAX = 15;
 function normHabit(x) {
   const h = normSched(Object.assign({}, x));
   h.name = String(h.name || "").trim() || "Thói quen";
+  delete h.short;   // trường cũ, đã bỏ
   h.icon = h.icon || "ph-check-circle";
   // "Ghi chú cho AI" (rule) đã gộp vào "Thế nào là đạt" (full): rule cũ thay full, bỏ nhãn "full: " ở đầu
   if (h.rule != null) { const r = String(h.rule).trim(); if (r) h.full = r.replace(/^full:\s*/i, ""); delete h.rule; }
@@ -248,10 +252,11 @@ function evToItem(ev, kind) {
   return {
     id: ev.id, kind, key, title: (ev.summary || "").replace(/^💤 /, ""), start, end,
     cat: p.cat || (key && TPL[key] && TPL[key].cat) || "life",
-    habit: p.habit || (key && TPL[key] && TPL[key].habit) || "",
+    habit: p.habit != null ? p.habit : (key && TPL[key] && TPL[key].habit) || "",
     plan: p.plan || "",
     hprev: p.hprev || "",
-    ess: p.ess === "1" || !!(key && TPL[key] && TPL[key].ess),
+    ess: p.ess != null ? p.ess === "1" : !!(key && TPL[key] && TPL[key].ess),
+    rem: remParse(p.rem, key),
     muted: (ev.summary || "").startsWith("💤 "),
     added: p.added === "1",
   };
@@ -264,18 +269,49 @@ function recFromEv(ev) {
 function recToProps(r) {
   return { sl: "day", date: r.date, h: JSON.stringify(r.h || {}), v: JSON.stringify(r.v || {}), unwell: r.unwell ? "1" : "0", reason: (r.reason || "").slice(0, 500), skip: JSON.stringify(r.skip || []), muted: JSON.stringify(r.muted || []) };
 }
-function planBody(t, firstDay) {
+// Nhắc của một khối: mảng số phút trước giờ bắt đầu ([] = không nhắc). Lưu trong sự kiện (rem = "30,0"),
+// để khối tự thêm cũng bật / tắt nhắc đúng khi rest day. Sự kiện cũ chưa có rem thì lấy theo tuần mẫu trong code.
+function remParse(s, key) {
+  if (s == null) return (key && TPL[key] && TPL[key].rem) || [0];
+  return String(s).split(",").filter(x => x !== "").map(Number).filter(n => n >= 0);
+}
+// UNTIL của RRULE: hết ngày ds theo giờ máy, đổi sang UTC (vd 20261116T165959Z)
+const untilUTC = ds => { const d = parseYmd(ds); d.setHours(23, 59, 59, 0); return d.toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z"); };
+const rrule = (days, until) => `RRULE:FREQ=WEEKLY;BYDAY=${[...days].sort().map(d => BYDAY[d]).join(",")}` + (until ? `;UNTIL=${untilUTC(until)}` : "");
+// Ngày đầu tiên từ ds trở đi rơi vào một trong các thứ days
+function firstOn(days, ds) { let d = parseYmd(ds); for (let i = 0; i < 7 && !days.includes(d.getDay()); i++) d = addDays(d, 1); return d; }
+function planBody(t, firstDay, until) {
+  const e = t.e > t.s ? t.e : hm(new Date(+atTime(firstDay, t.s) + 15 * 60000));
   return {
     summary: t.title,
     start: { dateTime: rfc(atTime(firstDay, t.s)), timeZone: TZ },
-    end: { dateTime: rfc(atTime(firstDay, t.e)), timeZone: TZ },
-    recurrence: [`RRULE:FREQ=WEEKLY;BYDAY=${t.days.map(d => BYDAY[d]).join(",")}`],
-    colorId: CATS[t.cat].color,
+    end: { dateTime: rfc(atTime(firstDay, e)), timeZone: TZ },
+    recurrence: [rrule(t.days, until)],
+    colorId: (CATS[t.cat] || CATS.life).color,
     reminders: { useDefault: false, overrides: (t.rem || [0]).map(m => ({ method: "popup", minutes: m })) },
-    extendedProperties: { private: { sl: "plan", key: t.key, cat: t.cat, habit: t.habit || "", ess: t.ess ? "1" : "0" } },
+    extendedProperties: { private: { sl: "plan", key: t.key || "", cat: t.cat, habit: t.habit || "", ess: t.ess ? "1" : "0", rem: (t.rem || [0]).join(",") } },
     transparency: "transparent",
   };
 }
+// Sự kiện gốc của một chuỗi lặp (singleEvents=false) → khối tuần mẫu.
+// from = ngày lần lặp đầu, until = ngày lần lặp cuối (null = mãi mãi). Chuỗi kiểu khác (COUNT, cách tuần...) thì bỏ qua.
+function evToSeries(ev) {
+  if (!ev.start || !ev.start.dateTime) return null;
+  const rr = (ev.recurrence || []).find(r => r.startsWith("RRULE:")); if (!rr) return null;
+  const P = Object.fromEntries(rr.slice(6).split(";").map(x => x.split("=")));
+  if (!["WEEKLY", "DAILY"].includes(P.FREQ) || (P.INTERVAL && P.INTERVAL !== "1") || P.COUNT) return null;
+  const it = evToItem(ev, "plan");
+  const days = P.FREQ === "DAILY" ? [...ALL] : P.BYDAY ? [...new Set(P.BYDAY.split(",").map(x => BYDAY.indexOf(x.slice(-2))).filter(n => n >= 0))].sort() : [it.start.getDay()];
+  let until = null;
+  if (P.UNTIL) {
+    const m = P.UNTIL.match(/^(\d{4})(\d\d)(\d\d)(?:T(\d\d)(\d\d)(\d\d)(Z?))?/);
+    if (m) until = ymd(m[4] ? (m[7] ? new Date(Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6])) : new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5])) : new Date(+m[1], m[2] - 1, +m[3]));
+  }
+  const s = hm(it.start), e = startOfDay(it.end) > startOfDay(it.start) ? "23:59" : hm(it.end);
+  return { id: ev.id, key: it.key || "", title: it.title, cat: CATS[it.cat] ? it.cat : "life", days, s, e, habit: it.habit, ess: it.ess, rem: it.rem, from: ymd(it.start), until, recurrence: ev.recurrence };
+}
+// Thay / thêm UNTIL trong RRULE, giữ các dòng khác (EXDATE...). until = null thì bỏ UNTIL.
+const withUntil = (rec, until) => rec.map(r => (r.startsWith("RRULE:") ? r.replace(/;UNTIL=[^;]*/, "") + (until ? `;UNTIL=${untilUTC(until)}` : "") : r));
 
 const Google = {
   async findConfig() {
@@ -384,10 +420,9 @@ const Google = {
   async mutePlan(items, mute) {
     const base = `${CAL}/calendars/${encodeURIComponent(S.cfg.planCal)}/events`;
     await Promise.all(items.map(it => {   // song song: tắt cả chục khối mất ~1 lượt mạng thay vì chục lượt
-      const t = TPL[it.key] || {};
       const body = mute
         ? { summary: "💤 " + it.title, reminders: { useDefault: false, overrides: [] } }
-        : { summary: it.title, reminders: { useDefault: false, overrides: (t.rem || [0]).map(m => ({ method: "popup", minutes: m })) } };
+        : { summary: it.title, reminders: { useDefault: false, overrides: (it.rem || [0]).map(m => ({ method: "popup", minutes: m })) } };
       return g(`${base}/${encodeURIComponent(it.id)}`, { method: "PATCH", body: JSON.stringify(body) });
     }));
   },
@@ -409,6 +444,29 @@ const Google = {
     const ev = await g(`${CAL}/calendars/${encodeURIComponent(S.cfg.planCal)}/events/${encodeURIComponent(it.id)}`, { method: "PATCH", body: JSON.stringify(body) });
     return evToItem(ev, "plan");
   },
+  // ---- tuần mẫu: làm việc với sự kiện gốc của chuỗi lặp, không phải từng lần lặp
+  // Các chuỗi còn chạy từ ngày mai (chuỗi đã cắt ở hôm nay hoặc trước đó là quá khứ, không hiện)
+  async listSeries() {
+    const out = [], T = tomorrowStr(); let pageToken = "";
+    do {
+      const r = await g(`${CAL}/calendars/${encodeURIComponent(S.cfg.planCal)}/events?${q(Object.assign({ singleEvents: false, maxResults: 250 }, pageToken ? { pageToken } : {}))}`);
+      for (const e of r.items) { if (e.status === "cancelled") continue; const s = evToSeries(e); if (s && (!s.until || s.until >= T)) out.push(s); }
+      pageToken = r.nextPageToken || "";
+    } while (pageToken);
+    return out;
+  },
+  async createSeries(t, from) {
+    const ev = await g(`${CAL}/calendars/${encodeURIComponent(S.cfg.planCal)}/events`, { method: "POST", body: JSON.stringify(planBody(t, firstOn(t.days, from), t.until)) });
+    return evToSeries(ev);
+  },
+  async updateSeries(id, t, from) {   // sửa thẳng chuỗi (chỉ dùng khi chuỗi chưa có lần lặp nào tới hôm nay)
+    const ev = await g(`${CAL}/calendars/${encodeURIComponent(S.cfg.planCal)}/events/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(planBody(t, firstOn(t.days, from), t.until)) });
+    return evToSeries(ev);
+  },
+  async endSeries(s, until) {   // cho chuỗi dừng sau ngày until (null = chạy tiếp mãi, dùng khi hoàn tác)
+    await g(`${CAL}/calendars/${encodeURIComponent(S.cfg.planCal)}/events/${encodeURIComponent(s.id)}`, { method: "PATCH", body: JSON.stringify({ recurrence: withUntil(s.recurrence || [rrule(s.days)], until) }) });
+  },
+  async deleteSeries(id) { await this.deletePlan(id); },
   async listJournal() {
     const r = await g(`${DRIVE}/files?${q({ q: `'${S.cfg.journalFolderId}' in parents and trashed=false`, fields: "files(id,name,modifiedTime)", orderBy: "name desc", pageSize: 120 })}`);
     return r.files.map(f => ({ id: f.id, date: f.name.replace(/\.md$/, ""), mod: f.modifiedTime }));
@@ -450,16 +508,22 @@ const Demo = (() => {
     return { days, actual, journal, muted: [] };
   }
   db.planEdit = db.planEdit || {}; db.planExtra = db.planExtra || [];
-  const persist = () => LS.set("demo", { days: db.days, actual: db.actual.map(a => Object.assign({}, a, { start: +a.start, end: +a.end })), journal: db.journal, jmod: db.jmod, muted: db.muted, planEdit: db.planEdit, planExtra: db.planExtra });
+  // Tuần mẫu của demo: mỗi chuỗi { id, ...khối, from, until }. Chuỗi gốc lấy id = key để id lần lặp giữ dạng key_ngày như trước
+  db.tpl = db.tpl || TEMPLATE.map(t => ({ id: t.key, key: t.key, title: t.title, cat: t.cat, days: [...t.days], s: t.s, e: t.e, habit: t.habit || "", ess: !!t.ess, rem: t.rem || [0], from: "2000-01-01", until: null }));
+  const persist = () => LS.set("demo", { days: db.days, actual: db.actual.map(a => Object.assign({}, a, { start: +a.start, end: +a.end })), journal: db.journal, jmod: db.jmod, muted: db.muted, planEdit: db.planEdit, planExtra: db.planExtra, tpl: db.tpl });
+  const SF = ["key", "title", "cat", "days", "s", "e", "habit", "ess", "rem"];
+  const pickS = t => { const o = {}; for (const k of SF) o[k] = Array.isArray(t[k]) ? [...t[k]] : t[k]; o.key = o.key || ""; o.habit = o.habit || ""; o.ess = !!o.ess; o.rem = o.rem || [0]; return o; };
   db.actual = db.actual.map(a => Object.assign(a, { start: new Date(a.start), end: new Date(a.end) }));
   return {
     async setup() { return { planCal: "demo", actualCal: "demo", start: ymd(addDays(new Date(), -60)) }; },
     async listPlan(from, to) {
       const out = [];
-      for (let d = startOfDay(from); d < to; d = addDays(d, 1)) for (const t of TEMPLATE) if (t.days.includes(d.getDay())) {
-        const id = `${t.key}_${ymd(d)}`;
+      for (let d = startOfDay(from); d < to; d = addDays(d, 1)) for (const t of db.tpl) {
+        const ds = ymd(d);
+        if (!t.days.includes(d.getDay()) || ds < t.from || (t.until && ds > t.until)) continue;
+        const id = `${t.id}_${ds}`;
         const ed = db.planEdit[id] || {};
-        out.push({ id, kind: "plan", key: t.key, title: ed.title || t.title, start: ed.start ? new Date(ed.start) : atTime(d, t.s), end: ed.end ? new Date(ed.end) : atTime(d, t.e), cat: t.cat, habit: t.habit || "", ess: !!t.ess, muted: db.muted.includes(id) });
+        out.push({ id, kind: "plan", key: t.key, title: ed.title || t.title, start: ed.start ? new Date(ed.start) : atTime(d, t.s), end: ed.end ? new Date(ed.end) : atTime(d, t.e), cat: t.cat, habit: t.habit || "", ess: !!t.ess, rem: t.rem, muted: db.muted.includes(id) });
       }
       for (const x of db.planExtra) {
         const ed = db.planEdit[x.id] || {}, st = new Date(ed.start || x.start), en = new Date(ed.end || x.end);
@@ -476,6 +540,11 @@ const Demo = (() => {
     async addPlan(it) { const x = { id: "p" + Date.now(), title: it.title, cat: it.cat, start: +it.start, end: +it.end }; db.planExtra.push(x); persist(); return Object.assign({ kind: "plan", habit: "", ess: false, added: true, muted: false }, it, { id: x.id }); },
     async deletePlan(id) { db.planExtra = db.planExtra.filter(x => x.id !== id); delete db.planEdit[id]; persist(); },
     async updatePlan(it) { db.planEdit[it.id] = { title: it.title, start: +it.start, end: +it.end }; persist(); return Object.assign({}, it); },
+    async listSeries() { const T = tomorrowStr(); return db.tpl.filter(t => !t.until || t.until >= T).map(t => Object.assign({}, t, pickS(t))); },
+    async createSeries(t, from) { const x = Object.assign(pickS(t), { id: "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), from: ymd(firstOn(t.days, from)), until: t.until || null }); db.tpl.push(x); persist(); return Object.assign({}, x); },
+    async updateSeries(id, t, from) { const x = db.tpl.find(y => y.id === id); if (!x) throw new Error("Không thấy lịch"); Object.assign(x, pickS(t), { from: ymd(firstOn(t.days, from)), until: t.until || null }); persist(); return Object.assign({}, x); },
+    async endSeries(s, until) { const x = db.tpl.find(y => y.id === s.id); if (x) { x.until = until || null; persist(); } },
+    async deleteSeries(id) { db.tpl = db.tpl.filter(y => y.id !== id); persist(); },
     async mutePlan(items, mute) { for (const it of items) { db.muted = db.muted.filter(x => x !== it.id); if (mute) db.muted.push(it.id); } persist(); },
     async listJournal() { return Object.keys(db.journal).sort().reverse().map(date => ({ id: date, date, mod: (db.jmod || {})[date] })); },
     async readJournal(f) { return db.journal[f.date] || ""; },
@@ -570,6 +639,13 @@ async function saveRec(rec) {
   if (saved.date === todayStr()) S.today.rec = saved;
   return saved;
 }
+// Ghi lần lượt: bấm nhanh nhiều nút thì lần sau đợi lần trước xong, đọc bản đã lưu (có id), không tạo hai sự kiện cho một ngày
+let habQ = Promise.resolve();
+function queueHabit(date, id, level, value) {
+  const run = habQ.then(() => setHabit(date, id, level, value));
+  habQ = run.catch(() => {});
+  return run;
+}
 async function setHabit(date, id, level, value) {
   const rec = Object.assign(blankRec(date), S.days[date] || {});
   rec.h = Object.assign({}, rec.h); rec.v = Object.assign({}, rec.v);
@@ -580,6 +656,8 @@ async function setHabit(date, id, level, value) {
 
 // ============================================================ render: today
 function catVars(cat) { const c = CATS[cat] || CATS.life; return `--cat:${c.hex}`; }
+// Màu icon thói quen theo nhóm. Vàng (Người thân) quá nhạt trên nền sáng nên đi qua biến --yellow-ic (đậm hơn ở theme sáng).
+function icVars(cat) { const k = CATS[cat] ? cat : "life"; return `--cat:${k === "people" ? "var(--yellow-ic)" : CATS[k].hex}`; }
 function currentBlocks() {
   const now = new Date(), rec = S.today.rec || {};
   const plan = S.today.plan.filter(p => !(rec.unwell && !p.ess));
@@ -592,6 +670,7 @@ function currentBlocks() {
 function renderToday() {
   const v = $("#view-today");
   if (!ready()) return;   // cổng vào đang che app
+  if (S.tplOpen) return renderTpl();
   const rec = S.today.rec || blankRec(todayStr()), now = new Date();
   const { cur, next, done, skipped } = currentBlocks();
   let html = "";
@@ -602,10 +681,10 @@ function renderToday() {
     html += `<div class="unwell-card fade-in">
       <p class="now__label"><i class="ph-fill ph-hand-heart"></i> Rest day</p>
       <h3>Hôm nay chỉ cần nhẹ nhàng thôi.</h3>
-      <p class="muted" style="margin:0">Chuỗi ngày không bị gãy. Nhắc nhở các khối khác đã tắt.</p>
+      <p class="muted" style="margin:0">Chuỗi ngày không bị gãy. Nhắc nhở các lịch khác đã tắt.</p>
       ${(() => { const t0 = startOfDay(new Date()), rs = restHabits(t0).filter(hb => cellStatus(hb, t0) === "rest");   // đã làm rồi thì không nhắc
         return rs.length ? `<p class="muted" style="margin:10px 0 0">Nếu còn sức, chỉ cần bản tối thiểu:</p>
-      <ul>${rs.map(hb => `<li><i class="ph ${hb.icon}"></i> <span><b>${esc(hb.name)}</b> · ${esc(hb.min)}</span></li>`).join("")}</ul>`
+      <ul>${rs.map(hb => `<li><i class="ph ${hb.icon} hic" style="${icVars(hb.cat)}"></i> <span><b>${esc(hb.name)}</b> · ${esc(hb.min)}</span></li>`).join("")}</ul>`
         : `<p class="muted" style="margin:10px 0 14px">Hôm nay nghỉ ngơi là đủ.</p>`; })()}
       <button class="btn" id="btnUnwellOff"><i class="ph ph-arrow-counter-clockwise"></i> Mình ổn hơn rồi</button>
     </div>`;
@@ -627,7 +706,7 @@ function renderToday() {
       ${next ? `<p class="now__next"><i class="ph ph-arrow-right"></i> <b>${esc(next.title)}</b> <span class="num">${hm(next.start)}</span></p>` : ""}
     </article>`;
   } else {
-    const msg = next ? `Tiếp theo <b>${esc(next.title)}</b> lúc <span class="num">${hm(next.start)}</span>.` : now.getHours() >= 22 || now.getHours() < 5 ? "Hết lịch hôm nay. Ngủ ngon nhé." : "Không có khối nào lúc này.";
+    const msg = next ? `Tiếp theo <b>${esc(next.title)}</b> lúc <span class="num">${hm(next.start)}</span>.` : now.getHours() >= 22 || now.getHours() < 5 ? "Hết lịch hôm nay. Ngủ ngon nhé." : "Không có lịch nào lúc này.";
     html += `<article class="now fade-in" style="${next ? catVars(next.cat) : ""}">
       <h2 class="now__title">${next ? "Thở một chút." : "Ngày đã khép lại."}</h2>
       <p class="now__time">${msg}</p>
@@ -636,16 +715,14 @@ function renderToday() {
 
   if (!rec.unwell) html += `<button class="unwell-toggle" id="btnUnwell"><i class="ph-fill ph-hand-heart"></i> Hôm nay mình không ổn</button>`;
 
-  // habits today: chưa làm lên đầu. Chạm thẻ = đạt, nút ½ = tối thiểu.
+  // habits today: giữ thứ tự của HABITS (theo nhóm), không đổi chỗ khi đánh dấu. Chạm thẻ = đạt, nút ½ = tối thiểu.
   const t = startOfDay(new Date());
-  const ORDER = { pending: 0, miss: 0, rest: 1, off: 1, min: 2, full: 3 };
   // Rest day: thói quen chưa làm thành "rest" (không tính, không gãy chuỗi). Chỉ hiện những thói quen có bản tối thiểu
   // cho riêng ngày đó (restHabits); thói quen không có tối thiểu hoặc số lần/tuần thì ẩn, trừ khi đã đánh dấu.
   const restIds = new Set(restHabits(t).map(h => h.id));
   const list = HABITS.map(hb => ({ hb, st: cellStatus(hb, t) }))
     .filter(x => (t >= habStart(x.hb) && scheduled(x.hb, t)) || x.st === "full" || x.st === "min")
-    .filter(x => x.st !== "rest" || restIds.has(x.hb.id))
-    .sort((a, b) => (ORDER[a.st] ?? 0) - (ORDER[b.st] ?? 0));
+    .filter(x => x.st !== "rest" || restIds.has(x.hb.id));
   const left = list.filter(x => x.st === "pending" || x.st === "miss").length;
   const rested = list.some(x => x.st === "rest");
   const badge = left ? `còn ${left}` : rested ? '<i class="ph-fill ph-hand-heart"></i> rest day' : '<i class="ph-fill ph-check-circle ok-c"></i> xong';
@@ -657,7 +734,7 @@ function renderToday() {
     const label = st === "full" ? "đạt" : st === "min" ? "đạt tối thiểu" : st === "rest" ? `rest day, tối thiểu ${hb.min}` : "chưa";
     html += `<div class="chip" data-st="${st}">
       <button class="chip__main" data-habit="${hb.id}" aria-pressed="${st === "full"}" aria-label="${esc(hb.name)}: ${label}">
-        <i class="ph${st === "full" || st === "min" ? "-fill" : ""} ${hb.icon} chip__ic"></i>
+        <i class="ph${st === "full" || st === "min" ? "-fill" : ""} ${hb.icon} chip__ic" style="${icVars(hb.cat)}"></i>
         <span class="chip__t">${esc(hb.name)}</span>${sub ? `<span class="chip__s">${esc(sub)}</span>` : ""}
       </button>
       ${hb.min ? `<button class="chip__half" data-habit-min="${hb.id}" aria-pressed="${st === "min"}" aria-label="Tối thiểu: ${esc(hb.min)}" title="Tối thiểu: ${esc(hb.min)}"><i class="ph${st === "min" ? "-fill" : ""} ph-circle-half"></i></button>` : `<span class="chip__half" aria-hidden="true"></span>`}
@@ -667,6 +744,7 @@ function renderToday() {
 
   // thời gian theo nhóm + timeline
   html += `<h2 class="h2">Thời gian hôm nay <span class="h2__acts">
+      <button class="icon-btn" id="btnTpl" aria-label="Sửa tuần mẫu" title="Sửa tuần mẫu"><i class="ph ph-pencil-simple"></i></button>
       <button class="icon-btn" id="btnOpenCal" aria-label="Mở Google Calendar" title="Mở Google Calendar"><i class="ph ph-calendar-blank"></i></button>
     </span></h2>
     ${summaryHTML()}${timelineHTML()}`;
@@ -680,7 +758,8 @@ function renderToday() {
   });
 }
 
-const fmtDur = m => { m = Math.round(m); return m < 60 ? `${m}p` : `${Math.floor(m / 60)}g${m % 60 ? pad(m % 60) : ""}`; };
+// Thời lượng: "45p", "2h", "2h20"
+const fmtDur = m => { m = Math.round(m); return m < 60 ? `${m}p` : `${Math.floor(m / 60)}h${m % 60 ? pad(m % 60) : ""}`; };
 function summaryHTML() {
   const now = new Date(), mins = {};
   for (const a of S.today.actual) { const m = (Math.min(+a.end, +now) - a.start) / 60000; if (m > 0) mins[a.cat] = (mins[a.cat] || 0) + m; }
@@ -706,21 +785,29 @@ function laneLayout(items, geo) {
   }
   flush(); return out;
 }
-function timelineHTML() {
-  const rec = S.today.rec || {}, t0 = startOfDay(new Date()), now = new Date();
-  const { H0, H1, PX } = TL, PAD = 10;
+// Khung chung của timeline (Hôm nay và Tuần mẫu): y(giờ) → px, vị trí một khối, cột giờ và vạch kẻ
+function tlFrame(t0) {
+  const { H0, H1, PX } = TL, PAD = 10, height = (H1 - H0) * PX;
+  // dưới thêm khoảng trống: nhãn 23:00 và khối cuối ngày không dính sát mép thẻ
+  const bodyPad = `padding:${PAD}px 0 ${PAD + 24}px`;
   const y = d => ((d - t0) / 3600000 - H0) * PX;
-  const height = (H1 - H0) * PX;
   const geo = it => {
     if (y(it.end) <= 0 || y(it.start) >= height) return null;
     const top = Math.max(0, y(it.start)), h = Math.max(22, Math.min(height, y(it.end)) - top - 2);
     return { top, h, bot: top + h + 2 };
   };
+  let hours = "", grid = "";
+  for (let h = H0; h <= H1; h++) { hours += `<div class="tl__hour num" style="top:${(h - H0) * PX}px">${pad(h)}:00</div>`; grid += `<div class="tl__grid" style="top:${(h - H0) * PX + PAD}px"></div>`; }
+  return { PAD, bodyPad, height, y, geo, hours, grid };
+}
+const laneStyle = L => (L && L.n > 1 ? `left:${(L.lane * 100 / L.n).toFixed(3)}%;right:auto;width:calc(${(100 / L.n).toFixed(3)}% - 3px);` : "");
+function timelineHTML() {
+  const rec = S.today.rec || {}, t0 = startOfDay(new Date()), now = new Date();
+  const { PAD, bodyPad, height, y, geo, hours, grid } = tlFrame(t0);
   const lanes = new Map([...laneLayout(S.today.plan, geo), ...laneLayout(S.today.actual, geo)]);
   const evHTML = it => {
     const g = geo(it); if (!g) return "";
-    const { top, h } = g, c = CATS[it.cat] || CATS.life, L = lanes.get(it.id);
-    const lane = L && L.n > 1 ? `left:${(L.lane * 100 / L.n).toFixed(3)}%;right:auto;width:calc(${(100 / L.n).toFixed(3)}% - 3px);` : "";
+    const { top, h } = g, c = CATS[it.cat] || CATS.life, lane = laneStyle(lanes.get(it.id));
     const time = h > 40 ? `<small class="num">${hm(it.start)}–${hm(it.end)}</small>` : "";
     const short = h <= 40 ? " is-short" : "", tt = `<span class="tl__t">${esc(it.title)}</span>`;
     if (it.kind === "plan") {
@@ -729,14 +816,12 @@ function timelineHTML() {
     }
     return `<button class="tl__ev${c.lightInk ? " light-ink" : ""}${short}" title="${esc(it.title)} ${hm(it.start)}–${hm(it.end)}" data-aid="${esc(it.id)}" style="top:${top}px;height:${h}px;${lane}--cat:${c.hex}" aria-label="Sửa: ${esc(it.title)} ${hm(it.start)}–${hm(it.end)}">${tt}${time}</button>`;
   };
-  let hours = "", grid = "";
-  for (let h = H0; h <= H1; h++) { hours += `<div class="tl__hour num" style="top:${(h - H0) * PX}px">${pad(h)}:00</div>`; grid += `<div class="tl__grid" style="top:${(h - H0) * PX + PAD}px"></div>`; }
   const nowY = y(now);
   const nowLine = nowY > 0 && nowY < height ? `<div class="tl__nowline" style="top:${nowY + PAD}px"></div>` : "";
   return `<div class="tl">
     <div class="tl__heads"><span></span><div class="tl__head">Kế hoạch</div><div class="tl__head">Thực tế</div></div>
     <div class="tl__scroll" data-now="${Math.max(0, Math.min(height, nowY)) + PAD}">
-      <div class="tl__body" style="padding:${PAD}px 0">
+      <div class="tl__body" style="${bodyPad}">
         <div class="tl__hours" style="height:${height}px">${hours}</div>
         <div class="tl__col tl__col--plan" style="height:${height}px">${S.today.plan.map(evHTML).join("")}</div>
         <div class="tl__col tl__col--act" style="height:${height}px">${S.today.actual.map(evHTML).join("")}</div>
@@ -854,7 +939,7 @@ function renderHabits() {
     html += `</div>`;
     for (const hb of HABITS) {
       const wc = weekCount(hb, mon);
-      html += `<div class="wgrid"><div class="wname" style="${catVars(hb.cat)}"><i class="ph ${hb.icon}"></i><span>${esc(hb.short || hb.name)}</span><small class="num">${wc.label}${wc.star ? " ★" : ""}</small></div>`;
+      html += `<div class="wgrid"><div class="wname" style="${icVars(hb.cat)}"><span>${esc(hb.name)}</span><small><i class="ph ${hb.icon}"></i><b class="num">${wc.label}</b></small></div>`;
       for (let i = 0; i < 7; i++) html += habitDay(hb, addDays(mon, i));
       html += `</div>`;
     }
@@ -866,8 +951,7 @@ function renderHabits() {
   const cm = S.calMonth || (S.calMonth = { y: t.getFullYear(), m: t.getMonth() });
   const mStart = new Date(cm.y, cm.m, 1), mEnd = new Date(cm.y, cm.m + 1, 0);
   const first = mondayOf(mStart), W = Math.ceil((addDays(mEnd, 1) - first) / (7 * 864e5));
-  html += nav("month", mStart > trackStart(), mEnd < t, `Tháng ${cm.m + 1}`, cm.y);
-  html += legend;
+  html += nav("month", mStart > trackStart(), mEnd < t, `Tháng ${cm.m + 1}`, cm.y);   // không chú thích màu: ô ngày đã đủ rõ, chú thích chỉ ở Tuần
   for (const hb of HABITS) {
     const s = streak(hb);
     const n = { full: 0, min: 0, miss: 0 };
@@ -885,7 +969,7 @@ function renderHabits() {
     }
     const streakTxt = `<i class="ph${s.n > 0 ? "-fill" : ""} ph-fire"></i> ${s.n}`;
     html += `<article class="hcard fade-in">
-      <div class="hcard__head"><i class="ph ${hb.icon} big"></i>
+      <div class="hcard__head"><i class="ph ${hb.icon} big" style="${icVars(hb.cat)}"></i>
         <div class="hcard__name">${esc(hb.name)}</div>
         <div class="streak2 ${s.n > 0 ? "is-on" : ""}" aria-label="${s.n} ${s.unit} liên tiếp">${streakTxt}</div>
       </div>
@@ -909,7 +993,7 @@ function renderHabManage() {
   const v = $("#view-habits"), off = ALLH.filter(h => h.off);
   const row = (h, i, n) => `<li class="mrow${h.off ? " is-off" : ""}">
       <button class="mrow__main" data-hedit="${esc(h.id)}" aria-label="Sửa ${esc(h.name)}">
-        <i class="ph ${esc(h.icon)} mrow__ic"></i>
+        <i class="ph ${esc(h.icon)} mrow__ic" style="${icVars(h.cat)}"></i>
         <span class="mrow__txt"><b>${esc(h.name)}</b><small>${esc(schedNote(h))}</small></span>
       </button>
       ${h.off ? "" : `<button class="icon-btn mrow__mv" data-hmove="${esc(h.id)}" data-dir="-1" aria-label="Lên trên" ${i === 0 ? "disabled" : ""}><i class="ph ph-arrow-up"></i></button>
@@ -951,9 +1035,8 @@ function renderHabForm(id) {
       : `<div class="mdanger"><button class="btn btn--ghost btn--block" id="hStop" type="button"><i class="ph ph-pause"></i> Ngừng theo dõi</button></div>`) : ""}
     ${cleanKey(S.settings.geminiKey) ? `<div class="hai"><button class="btn btn--block hai__go" id="hAiGo" type="button"><i class="ph ph-sparkle"></i> Nhờ AI ${id ? "sửa" : "điền"}</button>
       <p class="hai__note" id="hAiNote" role="status" hidden></p></div>` : ""}
-    <label class="field"><span>Tên</span><input id="hName" type="text" value="${esc(h.name)}" placeholder="vd Uống 2 lít nước" maxlength="60"></label>
-    <label class="field"><span>Tên ngắn</span><input id="hShort" type="text" value="${esc(h.short || "")}" placeholder="${esc(h.name || "vd Uống nước")}" maxlength="14"><small>Hiện ở bảng Tuần (chỗ hẹp). Để trống thì dùng tên.</small></label>
-    <label class="field"><span>Nhóm</span><select id="hCat">${Object.entries(CATS).map(([k, c]) => `<option value="${k}" ${k === h.cat ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select><small>Để tô màu và xếp thói quen theo nhóm.</small></label>
+    <label class="field"><span>Tên</span><input id="hName" type="text" value="${esc(h.name)}" placeholder="vd Uống 2 lít nước" maxlength="${NAME_MAX}"></label>
+    <label class="field"><span>Nhóm</span><select id="hCat">${Object.entries(CATS).map(([k, c]) => `<option value="${k}" ${k === h.cat ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label>
     <div class="field"><span>Biểu tượng</span><div class="iconpick" role="radiogroup" aria-label="Biểu tượng">
       ${icons.map(ic => `<button type="button" role="radio" data-hicon="${esc(ic)}" aria-checked="${ic === h.icon}" aria-label="${esc(ic.replace(/^ph-/, ""))}"><i class="ph ${esc(ic)}"></i></button>`).join("")}
     </div></div>
@@ -967,12 +1050,14 @@ function renderHabForm(id) {
       <label class="field"><span>Tối thiểu mỗi tuần</span><select id="hPerMin">${nOpts(h.perWeekMin ?? 1, 0)}</select></label></div>
     <label class="field"><span>${id ? "Lịch này áp dụng từ" : "Bắt đầu theo dõi từ"}</span>${fromField}
       <small>${id ? "Những ngày trước vẫn tính theo lịch cũ, kết quả cũ không đổi." : "Những ngày trước ngày này không tính."}</small></label>
+    ${id ? `<p class="hblocks" id="hBlocks"><i class="ph ph-bell"></i><span>${S.tplList ? esc(habBlocksText(id)) : "Đang xem lịch nhắc…"}</span></p>` : ""}
     <label class="field"><span>Thế nào là đạt</span><textarea id="hFull" rows="2" placeholder="vd 2 lít, tính cả trà, không tính cà phê" maxlength="300">${esc(h.full || "")}</textarea><small>Gemini đọc ô này và ô Tối thiểu để biết câu bạn kể có tính là đạt không.</small></label>
     <label class="field hf-min"><span>Tối thiểu</span><input id="hMin" type="text" value="${esc(h.min || "")}" placeholder="vd 1 lít" maxlength="60"><small>Ngày mệt làm bản nhỏ này vẫn giữ chuỗi. Để trống nếu không có.</small></label>
     <p class="act__warn" id="hErr" hidden></p>
     </div>
     <div class="sheet-actions"><button class="btn" data-close>Hủy</button><button class="btn btn--primary" id="hSave"><i class="ph ph-check"></i> Lưu</button></div>`);
   if (!id) setTimeout(() => $("#hName") && $("#hName").focus(), 50);
+  else fillHabBlocks(id);
 }
 function setHabFreq(f) {
   const box = $("#hForm"); if (!box) return;
@@ -985,7 +1070,7 @@ function setHabFreq(f) {
 // Các ô đang có trên form (chưa kiểm tra), để AI sửa tiếp từ đó
 function habFormRaw() {
   const box = $("#hForm"), f = box.dataset.freq, ic = $("[data-hicon][aria-checked=true]", box);
-  const o = { name: $("#hName").value.trim(), short: $("#hShort").value.trim(), cat: $("#hCat").value, icon: ic ? ic.dataset.hicon : "ph-check-circle", freq: f,
+  const o = { name: $("#hName").value.trim(), cat: $("#hCat").value, icon: ic ? ic.dataset.hicon : "ph-check-circle", freq: f,
     days: $$("[data-hday]", box).filter(b => b.getAttribute("aria-pressed") === "true").map(b => +b.dataset.hday), full: $("#hFull").value.trim(), min: $("#hMin").value.trim() };
   if (f === "weekly") { o.perWeekFull = +$("#hPerFull").value; o.perWeekMin = +$("#hPerMin").value; delete o.min; }
   return o;
@@ -995,8 +1080,7 @@ function habAiSchema() {
   return {
     type: "OBJECT",
     properties: {
-      name: { type: "STRING", description: "tên ngắn gọn, tối đa 60 ký tự, viết hoa chữ đầu" },
-      short: { type: "STRING", description: "tên rất ngắn cho bảng Tuần, tối đa 14 ký tự" },
+      name: { type: "STRING", description: `tên ngắn gọn, tối đa ${NAME_MAX} ký tự, viết hoa chữ đầu` },
       cat: { type: "STRING", enum: HAI_CATS() },
       icon: { type: "STRING", enum: HICONS },
       freq: { type: "STRING", enum: ["daily", "days", "weekly"] },
@@ -1031,8 +1115,7 @@ function fillHabForm(a) {
   const cur = habFormRaw(), mark = el => { const f = el && el.closest(".field"); if (f) { f.classList.remove("is-ai"); void f.offsetWidth; f.classList.add("is-ai"); } };
   const set = (sel, v) => { const el = $(sel); if (el && v != null && String(v) !== el.value) { el.value = String(v); mark(el); } };
   const txt = (v, n) => (v == null ? null : String(v).trim().slice(0, n));
-  set("#hName", txt(a.name, 60) || null);
-  set("#hShort", txt(a.short, 14));
+  set("#hName", txt(a.name, NAME_MAX) || null);
   if (HAI_CATS().includes(a.cat)) set("#hCat", a.cat);
   if (HICONS.includes(a.icon) && a.icon !== cur.icon) {
     const pick = $(".iconpick", box);
@@ -1099,10 +1182,9 @@ function readHabForm() {
   if (from < todayStr()) return { err: "Chỉ chọn từ hôm nay trở đi.", el: "#hFrom" };
   const ic = $("[data-hicon][aria-checked=true]", box);
   const h = Object.assign({}, old || { id: "h" + Date.now().toString(36), since: from }, {
-    name, short: $("#hShort").value.trim(), cat: $("#hCat").value, icon: ic ? ic.dataset.hicon : "ph-check-circle", freq: f,
+    name, cat: $("#hCat").value, icon: ic ? ic.dataset.hicon : "ph-check-circle", freq: f,
     full: $("#hFull").value.trim(), min: $("#hMin").value.trim(),
   });
-  if (!h.short) delete h.short;
   if (f === "daily") { delete h.days; delete h.perWeekFull; delete h.perWeekMin; }
   if (f === "days") { h.days = days; delete h.perWeekFull; delete h.perWeekMin; }
   if (f === "weekly") {
@@ -1153,7 +1235,7 @@ function renderDaySheet(date) {
   const rows = HABITS.filter(hb => d >= habStart(hb) && (scheduled(hb, d) || sch(hb, d).freq === "weekly" || rec.h[hb.id])).map(hb => {
     const cur = rec.h[hb.id] === "full" || rec.h[hb.id] === "min" ? rec.h[hb.id] : "";
     const opts = [["", "ph-x", "Chưa"], ["min", "ph-circle-half", "Tối thiểu"], ["full", "ph-check", "Đạt"]];
-    return `<div class="dayrow"><i class="ph ${hb.icon}"></i><span>${esc(hb.name)}</span><div class="seg" role="group" aria-label="${esc(hb.name)}">
+    return `<div class="dayrow" data-row="${hb.id}"><i class="ph ${hb.icon}" data-ic="${hb.icon}" style="${icVars(hb.cat)}"></i><span>${esc(hb.name)}${hb.min ? `<small class="dayrow__min">Tối thiểu: ${esc(hb.min)}</small>` : ""}</span><div class="seg" role="group" aria-label="${esc(hb.name)}">
       ${opts.map(([lv, ic, lab]) => lv === "min" && !hb.min ? `<span class="seg__gap"></span>` : `<button data-dh="${hb.id}" data-lv="${lv}" aria-pressed="${cur === lv}" aria-label="${lab}" title="${lab}"><i class="ph ${ic}"></i></button>`).join("")}
     </div></div>`;
   }).join("");
@@ -1195,11 +1277,10 @@ function drawJournal(flash) {
   const v = $("#view-journal"), today = todayStr(), files = S.jfiles || [];
   const hasToday = files.some(f => f.date === today);
   let html = `<form class="jcard fade-in" id="jform">
-    <p class="now__label"><i class="ph ph-moon"></i> ${fmtDate(new Date())} · trước khi ngủ</p>
-    <h2 class="now__title" style="font-size:28px;margin-bottom:16px">${hasToday ? "Viết thêm cho hôm nay." : "Ba dòng cho hôm nay."}</h2>
+    <h2 class="now__title" style="font-size:var(--fd-l);margin:0 0 16px">${hasToday ? "Viết thêm cho hôm nay." : "Ba dòng cho hôm nay."}</h2>
     ${journalFormFields({})}
     <button class="btn btn--primary btn--block" type="submit"><i class="ph ph-floppy-disk"></i> Lưu nhật ký</button>
-    <p class="jnote">${hasToday ? "Hôm nay đã có trang. Lưu nữa thì viết nối vào trang đó, không mất phần cũ." : "Lưu vào Google Drive (Still life › Nhật ký), mỗi ngày một trang."}</p>
+    ${hasToday ? `<p class="jnote">Hôm nay đã có trang. Lưu nữa thì viết nối vào trang đó, không mất phần cũ.</p>` : ""}
   </form>`;
   html += `<h2 class="h2">Đã viết <small>${files.length}</small></h2>`;
   html += files.length ? `<ul class="jlist">${files.map(f => { const d = parseYmd(f.date), isT = f.date === today; return `<li${f.date === flash ? ' class="is-new"' : ""}><button data-jdate="${esc(f.date)}"><b>${isT ? "Hôm nay" : `${DOW_SHORT[d.getDay()]} ${dmy(d)}`}</b><span class="jprev" data-prev="${esc(f.date)}">${esc((S.jprev || {})[f.date] || "")}</span><i class="ph ph-caret-right"></i></button></li>`; }).join("")}</ul>` : `<p class="muted">Chưa có trang nào. Trang đầu tiên sẽ là hôm nay.</p>`;
@@ -1257,7 +1338,7 @@ function renderSettings() {
         ${s.demo ? '<button class="btn" id="sDemoOff">Thoát xem thử</button><button class="btn btn--ghost" id="sDemoReset">Làm mới dữ liệu mẫu</button>'
           : signedIn() ? '<button class="btn" id="sOut">Đăng xuất</button>' : '<button class="btn btn--primary" id="sIn">Đăng nhập Google</button>'}
       </div>
-      ${S.cfg && !s.demo ? `<p class="faint" style="font-size:13px;margin:10px 0 0">Đang theo dõi từ ${esc(S.cfg.start)}. <a class="link" href="https://drive.google.com/drive/folders/${esc(S.cfg.folderId)}" target="_blank" rel="noopener">Mở thư mục Drive</a></p>` : ""}
+      ${S.cfg && !s.demo ? `<p class="faint" style="font-size:var(--fs-m);margin:10px 0 0">Đang theo dõi từ ${esc(S.cfg.start)}. <a class="link" href="https://drive.google.com/drive/folders/${esc(S.cfg.folderId)}" target="_blank" rel="noopener">Mở thư mục Drive</a></p>` : ""}
     </div>
     <div class="set-group">
       <label class="field"><span>Gemini API key</span><input id="sKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(s.geminiKey)}" placeholder="AIza…"><span class="keystate" id="sKeyState" role="status"></span><small>Đồng bộ theo tài khoản Google. Lấy miễn phí ở <a class="link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a></small></label>
@@ -1315,12 +1396,12 @@ function renderConfirm(p) {
   html += `<button type="button" class="btn btn--ghost btn--block act-add" id="cAddAct"><i class="ph ph-plus"></i> Thêm việc</button>`;
   if (p.habits.length) {
     html += `<p class="group-t">Thói quen</p><div class="hpick">`;
-    p.habits.forEach((h, i) => { const hb = H[h.id]; if (!hb) return; const tag = dayShort(h.date); html += `<button type="button" data-hi="${i}" data-lv="${h.level}"><i class="ph ${hb.icon}"></i>${esc(hb.name)} · ${h.level === "full" ? "Đạt" : h.level === "min" ? "Tối thiểu" : "Bỏ"}${h.value ? ` (${h.value})` : ""}${tag ? `<span class="hpick__day">${esc(tag)}</span>` : ""}</button>`; });
+    p.habits.forEach((h, i) => { const hb = H[h.id]; if (!hb) return; const tag = dayShort(h.date); html += `<button type="button" data-hi="${i}" data-lv="${h.level}"><i class="ph ${hb.icon} hic" style="${icVars(hb.cat)}"></i>${esc(hb.name)} · ${h.level === "full" ? "Đạt" : h.level === "min" ? "Tối thiểu" : "Bỏ"}${h.value ? ` (${h.value})` : ""}${tag ? `<span class="hpick__day">${esc(tag)}</span>` : ""}</button>`; });
     html += `</div>`;
   }
   if (p.journal) html += `<p class="group-t">Thêm vào nhật ký</p><label class="field"><textarea id="cJournal" rows="3">${esc(p.journal)}</textarea></label>`;
   if (p.unwell) html += `<p class="care"><b>Bật rest day cho hôm nay?</b>Lịch sẽ nhẹ lại và chuỗi ngày không gãy.</p>`;
-  if (empty) html += `<p class="muted">${p.edited ? "Đã bỏ hết, không còn gì để ghi." : "Mình chưa thấy việc nào để ghi. Thử kể cụ thể hơn, ví dụ “vừa đi bộ 20 phút”."}${S.otherFor ? " Lưu sẽ chỉ đánh dấu bỏ qua khối đang chạy." : ""}</p>`;
+  if (empty) html += `<p class="muted">${p.edited ? "Đã bỏ hết, không còn gì để ghi." : "Mình chưa thấy việc nào để ghi. Thử kể cụ thể hơn, ví dụ “vừa đi bộ 20 phút”."}${S.otherFor ? " Lưu sẽ chỉ đánh dấu bỏ qua lịch đang chạy." : ""}</p>`;
   html += `<div class="sheet-actions"><button class="btn" data-close>Hủy</button><button class="btn btn--primary" id="cSave"${canSave ? "" : " disabled"}><i class="ph ph-check"></i> Lưu</button></div>`;
   openSheet(p.manual ? "Thêm việc đã làm" : "Mình hiểu là…", html);
 }
@@ -1642,13 +1723,13 @@ function renderPlanEdit(p) {
     : skip ? `<span class="badge"><i class="ph ph-skip-forward"></i> Đã bỏ qua</span>`
     : p.muted || (rec.unwell && !p.ess) ? `<span class="badge"><i class="ph ph-moon"></i> Đang tắt</span>` : "";
   const hb = p.habit && HABITS.find(h => h.id === p.habit);   // thói quen đã ngừng thì không hiện nhãn
-  openSheet("Chỉnh sửa kế hoạch", `<p class="plan-meta"><span class="badge" style="${catVars(p.cat)}"><span class="dot"></span>${esc(c.name)}</span>${hb ? `<span class="badge"><i class="ph ${hb.icon}"></i> ${esc(hb.name)}</span>` : ""}${st}</p>
+  openSheet("Chỉnh sửa kế hoạch", `<p class="plan-meta"><span class="badge" style="${catVars(p.cat)}"><span class="dot"></span>${esc(c.name)}</span>${hb ? `<span class="badge"><i class="ph ${hb.icon} hic" style="${icVars(hb.cat)}"></i> ${esc(hb.name)}</span>` : ""}${st}</p>
     <div class="act" style="${catVars(p.cat)}">
-      <input class="input" type="text" id="pTitle" value="${esc(p.title)}" aria-label="Tên khối"${p.added ? "" : ` style="grid-column:1/-1"`}>
-      ${p.added ? `<button type="button" class="icon-btn act__rm" id="pDel" aria-label="Xoá khối này"><i class="ph ph-trash"></i></button>` : ""}
+      <input class="input" type="text" id="pTitle" value="${esc(p.title)}" aria-label="Tên kế hoạch"${p.added ? "" : ` style="grid-column:1/-1"`}>
+      ${p.added ? `<button type="button" class="icon-btn act__rm" id="pDel" aria-label="Xoá kế hoạch này"><i class="ph ph-trash"></i></button>` : ""}
       <div class="act__times"><input class="input num" type="time" id="pStart" value="${hm(p.start)}" aria-label="Bắt đầu"><span class="faint">–</span><input class="input num" type="time" id="pEnd" value="${hm(p.end)}" aria-label="Kết thúc"></div>
     </div>
-    <p class="faint" style="font-size:13px;margin:0 0 4px">${p.added ? "Khối thêm riêng cho hôm nay." : "Chỉ đổi cho hôm nay, lịch các ngày khác giữ nguyên."}</p>
+    <p class="faint" style="font-size:var(--fs-m);margin:0 0 4px">${p.added ? "Kế hoạch thêm riêng cho hôm nay." : "Chỉ đổi cho hôm nay, lịch các ngày khác giữ nguyên."}</p>
     <div class="sheet-actions"><button class="btn" data-close>Hủy</button><button class="btn btn--primary" id="pSave"><i class="ph ph-check"></i> Lưu</button></div>`);
 }
 async function savePlanEdit() {
@@ -1663,7 +1744,7 @@ async function savePlanEdit() {
     S.today.plan = S.today.plan.map(p => (p.id === prev.id ? Object.assign({}, p, { title: it.title, start: it.start, end: it.end }) : p)).sort((a, b) => a.start - b.start);
   };
   swap(await api().updatePlan(Object.assign({}, old, { title, start: s, end: e }))); closeSheet();
-  toast("Đã đổi khối hôm nay", 2600, async () => swap(await api().updatePlan(prev)));
+  toast("Đã đổi kế hoạch hôm nay", 2600, async () => swap(await api().updatePlan(prev)));
 }
 
 // Chạm chỗ trống ở cột Kế hoạch → thêm khối cho hôm nay
@@ -1673,11 +1754,11 @@ function renderPlanAdd(start) {
   if (next && next.start < end && next.start - start >= 15 * 60000) end = next.start;
   const catOpts = Object.entries(CATS).map(([k, c]) => `<option value="${k}" ${k === "build" ? "selected" : ""}>${c.name}</option>`).join("");
   openSheet("Thêm kế hoạch", `<div class="act" style="${catVars("build")}" id="pAddBox">
-      <input class="input" type="text" id="pTitle" placeholder="Định làm gì?" aria-label="Tên khối" style="grid-column:1/-1">
+      <input class="input" type="text" id="pTitle" placeholder="Định làm gì?" aria-label="Tên kế hoạch" style="grid-column:1/-1">
       <select class="input" id="pCat" aria-label="Nhóm">${catOpts}</select>
       <div class="act__times"><input class="input num" type="time" id="pStart" value="${hm(start)}" aria-label="Bắt đầu"><span class="faint">–</span><input class="input num" type="time" id="pEnd" value="${hm(end)}" aria-label="Kết thúc"></div>
     </div>
-    <p class="faint" style="font-size:13px;margin:0 0 4px">Chỉ thêm cho hôm nay.</p>
+    <p class="faint" style="font-size:var(--fs-m);margin:0 0 4px">Chỉ thêm cho hôm nay.</p>
     <div class="sheet-actions"><button class="btn" data-close>Hủy</button><button class="btn btn--primary" id="pAdd"><i class="ph ph-plus"></i> Thêm</button></div>`);
   setTimeout(() => $("#pTitle")?.focus(), 50);
 }
@@ -1700,6 +1781,188 @@ async function deletePlanAdded() {
     const it = await api().addPlan(old);
     S.today.plan = [...S.today.plan, it].sort((a, b) => a.start - b.start);
   });
+}
+
+// ============================================================ tuần mẫu (lịch lặp hằng tuần)
+// Mọi thay đổi áp dụng từ ngày mai: hôm nay và các ngày trước giữ nguyên, nên timeline ngày cũ vẫn đúng kế hoạch lúc đó.
+// Chuỗi đã có lần lặp tới hôm nay → cắt ở hôm nay (UNTIL) rồi tạo chuỗi mới từ mai.
+// Chuỗi chưa có lần lặp nào tới hôm nay (vd vừa tạo hôm nay) → sửa / xoá thẳng, nên sửa nhiều lần trong một ngày vẫn chỉ ra một bản.
+// N = null là xoá. Trả về hàm hoàn tác.
+async function tplApply(old, N) {
+  const A = api(), T = tomorrowStr();
+  if (!old) { const x = await A.createSeries(N, T); return () => A.deleteSeries(x.id); }
+  if (old.from >= T) {
+    if (!N) { await A.deleteSeries(old.id); return () => A.createSeries(old, old.from); }
+    await A.updateSeries(old.id, Object.assign({}, N, { until: old.until }), T);
+    return () => A.updateSeries(old.id, old, old.from);
+  }
+  await A.endSeries(old, todayStr());
+  let x = null;
+  if (N) {
+    try { x = await A.createSeries(Object.assign({}, N, { until: old.until }), T); }
+    catch (e) { try { await A.endSeries(old, old.until); } catch {} throw e; }   // tạo chuỗi mới lỗi: nối lại chuỗi cũ, không để mất khối
+  }
+  return async () => { if (x) await A.deleteSeries(x.id); await A.endSeries(old, old.until); };
+}
+const TPL_DAYS = [1, 2, 3, 4, 5, 6, 0];
+const REM_OPTS = [["0", "Đúng giờ"], ["10", "Trước 10 phút"], ["30", "Trước 30 phút"], ["none", "Không nhắc"]];
+const remKeyOf = rem => { if (!rem || !rem.length) return "none"; const m = Math.max(...rem); return m >= 30 ? "30" : m >= 10 ? "10" : "0"; };
+const remFromKey = k => (k === "none" ? [] : k === "0" ? [0] : [+k, 0]);
+const tplDaysLabel = days => (days.length === 7 ? "Mỗi ngày" : daysLabel(days));
+const hmShort = t => t.replace(/^0(\d)/, "$1");
+async function tplLoad() { S.tplList = await api().listSeries(); S.tplErr = false; return S.tplList; }
+function openTpl() {
+  S.tplOpen = true; S.tplList = null; S.tplErr = false; S.tplDay = addDays(startOfDay(new Date()), 1).getDay();   // chọn sẵn thứ của ngày mai
+  $("#btnCompose").hidden = true; document.body.classList.add("no-dock"); closeCompose();
+  window.scrollTo({ top: 0 }); renderToday();
+  return tplLoad().catch(e => { S.tplErr = true; handleErr(e); }).then(() => { if (S.tplOpen && S.view === "today") renderToday(); });
+}
+function closeTpl() {
+  S.tplOpen = false;
+  $("#btnCompose").hidden = S.view !== "today"; document.body.classList.toggle("no-dock", S.view !== "today");
+  window.scrollTo({ top: 0 }); renderToday();
+}
+function renderTpl() {
+  const v = $("#view-today"), k = S.tplDay;
+  let html = `<div class="mhead">
+      <button class="icon-btn" id="tplBack" aria-label="Quay lại Hôm nay"><i class="ph ph-arrow-left"></i></button>
+      <h2>Tuần mẫu</h2>
+    </div>
+    <p class="muted mnote">Thay đổi áp dụng từ ngày mai (${dmy(parseYmd(tomorrowStr()))}). Muốn đổi riêng hôm nay thì bấm vào lịch ở trang Hôm nay.</p>
+    <div class="vtoggle vtoggle--7" role="tablist" aria-label="Thứ trong tuần">${TPL_DAYS.map(d => `<button role="tab" data-tday="${d}" aria-selected="${d === k}" aria-label="${DOW[d]}">${DOW_SHORT[d]}</button>`).join("")}</div>`;
+  if (S.tplList) html += tplTimelineHTML(k);
+  else if (S.tplErr) html += `<div class="empty"><p>Chưa tải được tuần mẫu.</p><button class="btn" id="tplRetry"><i class="ph ph-arrow-clockwise"></i> Thử lại</button></div>`;
+  else html += `<p class="muted tpl__load" role="status"><i class="ph ph-circle-notch spin"></i> Đang tải tuần mẫu…</p>`;
+  const prev = v.querySelector(".tl--tpl .tl__scroll"), keep = prev ? prev.scrollTop : null;
+  v.innerHTML = html;
+  const sc = v.querySelector(".tl__scroll"); if (sc && keep != null) sc.scrollTop = keep;
+}
+// Một thứ trong tuần mẫu: một cột kế hoạch, khối = chuỗi lặp có thứ đó
+function tplTimelineHTML(k) {
+  const t0 = startOfDay(new Date()), { PAD, bodyPad, height, geo, hours, grid } = tlFrame(t0);
+  const items = S.tplList.filter(x => x.days.includes(k)).map(x => ({ id: x.id, title: x.title, cat: x.cat, start: atTime(t0, x.s), end: atTime(t0, x.e), rem: x.rem }));
+  const lanes = laneLayout(items, geo);
+  const ev = it => {
+    const g = geo(it); if (!g) return "";
+    const c = CATS[it.cat] || CATS.life, time = g.h > 40 ? `<small class="num">${hm(it.start)}–${hm(it.end)}${it.rem.length ? "" : ' · <i class="ph ph-bell-slash" aria-label="không nhắc"></i>'}</small>` : "";
+    return `<button class="tl__ev${g.h <= 40 ? " is-short" : ""}" data-sid="${esc(it.id)}" style="top:${g.top}px;height:${g.h}px;${laneStyle(lanes.get(it.id))}--cat:${c.hex}" title="${esc(it.title)} ${hm(it.start)}–${hm(it.end)}" aria-label="Sửa kế hoạch: ${esc(it.title)} ${hm(it.start)}–${hm(it.end)}"><span class="tl__t">${esc(it.title)}</span>${time}</button>`;
+  };
+  return `<div class="tl tl--tpl fade-in">
+    <div class="tl__heads"><span></span><div class="tl__head">${DOW[k]}</div></div>
+    <div class="tl__scroll">
+      <div class="tl__body" style="${bodyPad}">
+        <div class="tl__hours" style="height:${height}px">${hours}</div>
+        <div class="tl__col tl__col--plan" style="height:${height}px">${items.map(ev).join("")}</div>
+        ${grid}
+      </div>
+    </div>
+  </div>`;
+}
+// Sheet thêm / sửa một khối lặp. s = null là thêm mới, bắt đầu lúc startHm vào thứ đang chọn.
+function renderTplForm(s, startHm) {
+  S.tplEdit = s ? s.id : null;
+  let t = s;
+  if (!t) {   // dài 30 phút, hoặc tới khối kế tiếp cùng thứ (nếu cách từ 15 phút)
+    const k = S.tplDay, t0 = startOfDay(new Date()), st = atTime(t0, startHm);
+    const next = S.tplList.filter(x => x.days.includes(k) && x.s > startHm).sort((a, b) => (a.s < b.s ? -1 : 1))[0];
+    let en = new Date(+st + 30 * 60000);
+    if (next && atTime(t0, next.s) < en && atTime(t0, next.s) - st >= 15 * 60000) en = atTime(t0, next.s);
+    t = { title: "", cat: "build", days: [k], s: startHm, e: hm(en), habit: "", ess: false, rem: [0] };
+  }
+  const catOpts = Object.entries(CATS).map(([k, c]) => `<option value="${k}" ${k === t.cat ? "selected" : ""}>${esc(c.name)}</option>`).join("");
+  const cur = t.habit && H[t.habit];   // id lạ (thói quen không còn) thì coi như Không gắn
+  const habOpts = `<option value="">Không</option>` + HABITS.map(h => `<option value="${esc(h.id)}" ${h.id === t.habit ? "selected" : ""}>${esc(h.name)}</option>`).join("")
+    + (cur && cur.off ? `<option value="${esc(cur.id)}" selected>${esc(cur.name)} (đã ngừng)</option>` : "");
+  const rk = remKeyOf(t.rem);
+  openSheet(s ? "Sửa kế hoạch" : "Thêm kế hoạch", `<div id="tForm">
+    <div class="act" style="${catVars(t.cat)}" id="tBox">
+      <input class="input" type="text" id="tTitle" value="${esc(t.title)}" placeholder="Định làm gì?" aria-label="Tên kế hoạch" maxlength="80"${s ? "" : ` style="grid-column:1/-1"`}>
+      ${s ? `<button type="button" class="icon-btn act__rm" id="tDel" aria-label="Xoá kế hoạch này"><i class="ph ph-trash"></i></button>` : ""}
+      <select class="input" id="tCat" aria-label="Nhóm">${catOpts}</select>
+      <div class="act__times"><input class="input num" type="time" id="tStart" value="${t.s}" aria-label="Bắt đầu"><span class="faint">–</span><input class="input num" type="time" id="tEnd" value="${t.e}" aria-label="Kết thúc"></div>
+    </div>
+    <div class="field"><span>Lặp vào các thứ</span><div class="daypick" role="group" aria-label="Lặp vào các thứ">
+      ${TPL_DAYS.map(d => `<button type="button" data-hday="${d}" aria-pressed="${t.days.includes(d)}">${DOW_SHORT[d]}</button>`).join("")}
+    </div></div>
+    <label class="field"><span>Làm xong thì đạt thói quen</span><select id="tHabit">${habOpts}</select></label>
+    <div class="tpl__hint" id="tHint" hidden></div>
+    <label class="field"><span>Nhắc</span><select id="tRem">${REM_OPTS.map(([v, l]) => `<option value="${v}" ${v === rk ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+    <label class="switchrow" id="tEssRow" ${rk === "none" ? "hidden" : ""}><span>Vẫn nhắc khi rest day</span><input type="checkbox" class="switch" id="tEss" ${t.ess ? "checked" : ""}></label>
+    <p class="tpl__from"><i class="ph ph-calendar-check"></i> Áp dụng từ ngày mai, ${fmtDate(parseYmd(tomorrowStr()))}.</p>
+    <p class="act__warn" id="tErr" hidden></p>
+    </div>
+    <div class="sheet-actions"><button class="btn" data-close>Hủy</button><button class="btn btn--primary" id="tSave"><i class="ph ph-check"></i> Lưu</button></div>`);
+  tplHint();
+  if (!s) setTimeout(() => $("#tTitle") && $("#tTitle").focus(), 50);
+}
+const tplFormDays = () => $$("#tForm [data-hday]").filter(b => b.getAttribute("aria-pressed") === "true").map(b => +b.dataset.hday).sort();
+// Lịch thói quen (từ ngày mai) khác ngày lặp của khối → câu nhắc; trùng, hoặc thói quen số lần/tuần (ngày nào cũng được) → null
+function habDaysMismatch(hb, days) {
+  const sc = sch(hb, tomorrowStr());
+  if (!days.length || sc.freq === "weekly") return null;
+  const hd = sc.freq === "daily" ? ALL : sc.days;
+  if (JSON.stringify([...hd].sort()) === JSON.stringify([...days].sort())) return null;
+  return `Thói quen ${hb.name} đang tính ${freqLabel(sc)}, kế hoạch này lặp ${tplDaysLabel(days)}.`;
+}
+function tplHint() {
+  const el = $("#tHint"); if (!el) return;
+  const hb = H[$("#tHabit").value], msg = hb && !hb.off ? habDaysMismatch(hb, tplFormDays()) : null;
+  el.hidden = !msg;
+  el.innerHTML = msg ? `<p><i class="ph ph-info"></i> ${esc(msg)}</p><button type="button" class="btn btn--block" id="tHabSync"><i class="ph ph-arrows-clockwise"></i> Lưu & đổi lịch thói quen</button>` : "";
+}
+function readTplForm() {
+  const old = S.tplEdit ? (S.tplList || []).find(x => x.id === S.tplEdit) : null;
+  const title = $("#tTitle").value.trim();
+  if (!title) return { err: "Đặt tên cho kế hoạch nhé.", el: "#tTitle" };
+  const days = tplFormDays();
+  if (!days.length) return { err: "Chọn ít nhất một thứ.", el: "#tForm [data-hday]" };
+  const s = $("#tStart").value || (old ? old.s : "09:00");
+  let e = $("#tEnd").value || (old ? old.e : "");
+  if (!(e > s)) { e = hm(new Date(+atTime(new Date(), s) + 15 * 60000)); if (!(e > s)) e = "23:59"; }
+  const rk = $("#tRem").value;
+  const N = { key: old ? old.key : "", title, cat: $("#tCat").value, days, s, e, habit: $("#tHabit").value || (old && old.habit && !H[old.habit] ? old.habit : ""), ess: $("#tEss").checked,
+    rem: old && remKeyOf(old.rem) === rk ? old.rem : remFromKey(rk) };   // không đổi ô Nhắc thì giữ nguyên kiểu nhắc cũ
+  return { old, N };
+}
+const TPL_F = ["title", "cat", "days", "s", "e", "habit", "ess", "rem"];
+const tplSame = (a, b) => TPL_F.every(k => JSON.stringify(a[k]) === JSON.stringify(b[k]));
+async function saveTplForm() {
+  const r = readTplForm(), err = $("#tErr");
+  if (r.err) { err.innerHTML = `<i class="ph ph-warning"></i> ${esc(r.err)}`; err.hidden = false; const el = $(r.el); if (el) el.focus(); return false; }
+  if (r.old && tplSame(r.old, r.N)) { closeSheet(); return r; }
+  const undo = await tplApply(r.old, r.N);
+  await tplLoad(); closeSheet(); renderToday();
+  toast(r.old ? "Đã lưu, áp dụng từ ngày mai" : `Đã thêm: ${r.N.title}`, 2600, async () => { await undo(); await tplLoad(); });
+  return r;
+}
+async function deleteTpl() {
+  const old = (S.tplList || []).find(x => x.id === S.tplEdit); if (!old) return closeSheet();
+  const undo = await tplApply(old, null);
+  await tplLoad(); closeSheet(); renderToday();
+  toast(`Đã xoá ${old.title} từ ngày mai`, 2600, async () => { await undo(); await tplLoad(); });
+}
+// Sau khi lưu khối: mở Sửa thói quen, điền sẵn lịch theo ngày lặp của khối (áp dụng từ mai). Người dùng tự bấm Lưu.
+function openHabSync(hid, days) {
+  if (!H[hid]) return;
+  renderHabForm(hid);
+  const f = days.length === 7 ? "daily" : "days";
+  setHabFreq(f);
+  $$("#hForm [data-hday]").forEach(b => b.setAttribute("aria-pressed", f === "days" && days.includes(+b.dataset.hday)));
+  $("#hFrom").value = tomorrowStr();
+  const note = document.createElement("p"); note.className = "hai__note"; note.setAttribute("role", "status");
+  note.innerHTML = `<i class="ph ph-info"></i> Đã điền ngày theo lịch vừa lưu, áp dụng từ ngày mai. Xem lại rồi bấm Lưu.`;
+  $("#hForm").prepend(note);
+}
+// Dòng "Nhắc qua khối" ở sheet Sửa thói quen: thói quen chỉ được nhắc qua khối lịch có gắn nó
+function habBlocksText(id) {
+  const list = (S.tplList || []).filter(x => x.habit === id).sort((a, b) => (a.s < b.s ? -1 : 1));
+  if (!list.length) return "Chưa có lịch nào trong Tuần mẫu gắn với thói quen này, nên sẽ không có nhắc.";
+  return "Nhắc qua lịch: " + list.map(x => `${x.title} · ${hmShort(x.s)} · ${tplDaysLabel(x.days)}${x.rem.length ? "" : " (không nhắc)"}`).join("; ");
+}
+async function fillHabBlocks(id) {
+  const el = $("#hBlocks"); if (!el) return;
+  try { await tplLoad(); } catch (e) { console.warn("tpl", e); el.hidden = true; return; }
+  const now = $("#hBlocks"); if (now && S.habEdit === id) now.querySelector("span").textContent = habBlocksText(id);
 }
 
 // Sửa / xoá một việc đã ghi
@@ -1785,7 +2048,7 @@ async function refresh() {
   catch (e) { handleErr(e); render(); }
 }
 function setView(v) {
-  S.view = v;
+  S.view = v; S.tplOpen = false;   // bấm tab (kể cả Hôm nay) thì rời trang Tuần mẫu
   if (v === "habits") S.habManage = false;   // bấm tab Thói quen thì về trang chính của tab
   $$(".tab").forEach(t => t.classList.toggle("is-on", t.dataset.view === v));
   $$(".view").forEach(s => (s.hidden = s.id !== "view-" + v));
@@ -1818,7 +2081,7 @@ document.addEventListener("click", async e => {
     const m = TL.H0 * 60 + (e.clientY - col.getBoundingClientRect().top) / TL.PX * 60;
     const q = Math.max(TL.H0 * 60, Math.min(TL.H1 * 60 - 15, Math.floor(m / 15) * 15));
     const st = startOfDay(new Date()); st.setMinutes(q);
-    return renderPlanAdd(st);
+    return col.closest(".tl--tpl") ? renderTplForm(null, hm(st)) : renderPlanAdd(st);
   }
   if (el.matches("[data-close]")) return closeSheet();
   if (el.id === "btnCompose") return openCompose();
@@ -1850,6 +2113,18 @@ document.addEventListener("click", async e => {
     if ($("#sKeyState").classList.contains("is-bad")) return;   // giữ sheet mở để sửa key
     closeSheet(); toast("Đã lưu cài đặt"); return render();
   }
+  if (id === "btnTpl") return openTpl();
+  if (id === "tplBack") return closeTpl();
+  if (id === "tplRetry") return openTpl();
+  if (el.dataset.tday) { S.tplDay = +el.dataset.tday; return renderTpl(); }
+  if (el.dataset.sid) { const x = (S.tplList || []).find(y => y.id === el.dataset.sid); if (x) renderTplForm(x); return; }
+  if (id === "tSave") { const done = busy(el, "Đang lưu"); try { if (!(await saveTplForm())) done(); } catch (er) { done(); handleErr(er); } return; }
+  if (id === "tDel") { const done = busy(el, "Đang xoá"); try { await deleteTpl(); } catch (er) { done(); handleErr(er); } return; }
+  if (id === "tHabSync") {
+    const done = busy(el, "Đang lưu");
+    try { const r = await saveTplForm(); if (!r) return done(); openHabSync(r.N.habit, r.N.days); } catch (er) { done(); handleErr(er); }
+    return;
+  }
   if (id === "btnOpenCal") return window.open("https://calendar.google.com/calendar/r/day", "_blank", "noopener");
   if (id === "btnUnwell") { busy(el, "Đang chuyển sang ngày nhẹ nhàng"); try { await setUnwell(true); toast("Rest day. Nghỉ ngơi nhé", 2600, () => setUnwell(false)); } catch (er) { handleErr(er); } return render(); }
   if (id === "eSave") { const done = busy(el, "Đang lưu"); try { await saveActEdit(); } catch (er) { done(); handleErr(er); } return renderToday(); }
@@ -1866,7 +2141,7 @@ document.addEventListener("click", async e => {
   if (el.dataset.hmove) return moveHabit(el.dataset.hmove, +el.dataset.dir);
   if (el.dataset.hicon) { $$("[data-hicon]").forEach(b => b.setAttribute("aria-checked", b === el)); return; }
   if (el.dataset.hfreq) return setHabFreq(el.dataset.hfreq);
-  if (el.dataset.hday) { el.setAttribute("aria-pressed", el.getAttribute("aria-pressed") !== "true"); return; }
+  if (el.dataset.hday) { el.setAttribute("aria-pressed", el.getAttribute("aria-pressed") !== "true"); if (el.closest("#tForm")) tplHint(); return; }
   if (id === "hAiGo") return openHabAi();
   if (id === "hSave") { const done = busy(el, "Đang lưu"); try { if (!(await saveHabForm())) done(); } catch (er) { done(); handleErr(er); } return; }
   if (id === "hStop" || id === "hResume" || id === "hDelete") {
@@ -1892,8 +2167,18 @@ document.addEventListener("click", async e => {
   }
   if (el.dataset.day) return renderDaySheet(el.dataset.day);
   if (el.dataset.dh) {
-    try { await setHabit(S.dayDate, el.dataset.dh, el.dataset.lv || null); } catch (er) { handleErr(er); }
-    renderDaySheet(S.dayDate); return S.view === "habits" ? renderHabits() : renderToday();
+    // Đổi nút ngay, icon thói quen bên trái quay vòng tới khi lưu xong. Lỗi thì vẽ lại theo dữ liệu thật.
+    const date = S.dayDate, hid = el.dataset.dh, row = el.closest(".dayrow"), ic = row && row.querySelector("[data-ic]");
+    if (row) {
+      row.querySelectorAll("[data-dh]").forEach(b => b.setAttribute("aria-pressed", String(b === el)));
+      row.dataset.saving = +(row.dataset.saving || 0) + 1; row.setAttribute("aria-busy", "true");
+      if (ic) ic.className = "ph ph-circle-notch spin";
+    }
+    let failed = false;
+    try { await queueHabit(date, hid, el.dataset.lv || null); } catch (er) { failed = true; handleErr(er); }
+    if (row && !(row.dataset.saving = row.dataset.saving - 1)) { row.removeAttribute("aria-busy"); if (ic) ic.className = `ph ${ic.dataset.ic}`; }
+    if (failed && S.dayDate === date && row && row.isConnected) renderDaySheet(date);
+    return S.view === "habits" ? renderHabits() : renderToday();
   }
   if (id === "btnUnwellOff") { busy(el, "Đang bật lại lịch"); try { await setUnwell(false); toast("Đã bật lại lịch bình thường"); } catch (er) { handleErr(er); } return render(); }
   if (id === "cSave") return savePending();
@@ -1908,7 +2193,7 @@ document.addEventListener("click", async e => {
     const cur = (S.today.rec || {}).h?.[hid], want = isMin ? "min" : "full";
     const nextLv = cur === want ? null : want;
     const chip = el.closest(".chip"); if (chip) chip.dataset.st = nextLv || "pending";
-    try { await setHabit(todayStr(), hid, nextLv); } catch (er) { handleErr(er); }
+    try { await queueHabit(todayStr(), hid, nextLv); } catch (er) { handleErr(er); }
     return renderToday();
   }
   if (el.dataset.rm != null && S.pending) {
@@ -1984,6 +2269,7 @@ document.addEventListener("change", e => {
 });
 // Key tự lưu ngay khi dán hoặc rời ô, không cần nhớ bấm "Lưu cài đặt"
 document.addEventListener("change", e => { if (e.target.id === "pCat") $("#pAddBox").setAttribute("style", catVars(e.target.value)); });
+document.addEventListener("change", e => { if (e.target.id === "tCat") $("#tBox").setAttribute("style", catVars(e.target.value)); if (e.target.id === "tHabit") tplHint(); if (e.target.id === "tRem") $("#tEssRow").hidden = e.target.value === "none"; });
 document.addEventListener("change", e => { if (e.target.id === "sModel") { S.settings.model = e.target.value; saveSettings(); } });
 document.addEventListener("change", e => { if (e.target.id === "sKey") saveKey(e.target.value).then(() => { if (S.view === "today" && !ready()) renderToday(); }); });
 document.addEventListener("paste", e => { if (e.target.id === "sKey") setTimeout(() => saveKey(e.target.value).then(() => { if (S.view === "today" && !ready()) renderToday(); }), 0); });
@@ -2056,7 +2342,7 @@ document.addEventListener("keydown", e => { if (e.key !== "Escape") return; if (
 })();
 
 // Cập nhật thanh "Bây giờ" mỗi phút
-setInterval(() => { if (gateStep() && $("#gate").hidden && $("#sheet").hidden) return render(); if (S.view === "today" && $("#sheet").hidden && document.activeElement !== $("#inputText")) renderToday(); }, 60000);
+setInterval(() => { if (gateStep() && $("#gate").hidden && $("#sheet").hidden) return render(); if (S.view === "today" && !S.tplOpen && $("#sheet").hidden && document.activeElement !== $("#inputText")) renderToday(); }, 60000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
 
 if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js").catch(() => {});
