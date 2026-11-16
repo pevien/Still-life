@@ -697,6 +697,29 @@
       ok($(".act__warn", box), "bằng nhau cũng cảnh báo");
       closeSheet();
     });
+    test("bộ chọn giờ trong app: ô giờ readonly, bấm mở TP, Xong ghi giờ + chạy cảnh báo", async () => {
+      await reset();
+      renderConfirm(P({ activities: [act("Đọc sách", "14:00", "14:30")] }));
+      const box = $("#sheetBody .act"), end = $('[data-f="end"]', box);
+      ok(end.readOnly, "ô giờ readonly để Android không mở hộp chọn giờ riêng");
+      end.click(); await frame();
+      ok(TP.isOpen(), "bấm ô giờ mở bộ chọn"); eq($("#tpTitle").textContent, "Kết thúc");
+      const col = k => $(`.tp__col[data-k="${k}"]`);
+      eq([Math.round(col("h").scrollTop / 44), Math.round(col("m").scrollTop / 44)], [14, 30], "mở đúng giờ đang có");
+      col("h").scrollTop = 13 * 44; col("m").scrollTop = 5 * 44;
+      $(".tp [data-tp-ok]").click();
+      eq([TP.isOpen(), end.value], [false, "13:05"]);
+      ok($(".act__warn", box), "giờ ngược vẫn báo ngay");
+      end.click(); await frame(); $(".tp [data-tp-close]").click();
+      eq([TP.isOpen(), end.value], [false, "13:05"], "Hủy không đổi giờ");
+      closeSheet();
+    });
+    test("sheet có nhiều thẻ: Hủy/Lưu dính đáy panel", async () => {
+      await reset();
+      renderConfirm(P({ activities: [act("A", "09:00", "09:30"), act("B", "10:00", "10:30"), act("C", "11:00", "11:30")] }));
+      eq(getComputedStyle($("#sheetBody .sheet-actions")).position, "sticky");
+      closeSheet();
+    });
     test("cảnh báo giờ ngược có cả ở sheet Thêm kế hoạch", async () => {
       await reset();
       renderPlanAdd(at("10:00"));

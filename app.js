@@ -872,6 +872,7 @@ function journalFormFields(j) {
 // ============================================================ sheet
 function openSheet(title, html) {
   $("#sheetTitle").textContent = title; $("#sheetBody").innerHTML = html;
+  $$('#sheetBody input[type="time"]').forEach(i => (i.readOnly = true)); // mở TP (bộ chọn giờ trong app) thay vì hộp của Android
   $$("#sheetBody .act").forEach(timeWarn);
   $("#sheet").hidden = false; document.body.style.overflow = "hidden";
 }
@@ -1589,8 +1590,56 @@ document.addEventListener("change", e => { if (e.target.id === "sModel") { S.set
 document.addEventListener("change", e => { if (e.target.id === "sKey") saveKey(e.target.value).then(() => { if (S.view === "today" && !ready()) renderToday(); }); });
 document.addEventListener("paste", e => { if (e.target.id === "sKey") setTimeout(() => saveKey(e.target.value).then(() => { if (S.view === "today" && !ready()) renderToday(); }), 0); });
 
+// Bộ chọn giờ trong app: hộp chọn giờ của Android bị cắt nút "Set" trên vài máy (Vivo X200 Pro mini),
+// nên ô giờ để readonly và mở bộ chọn này. Chọn xong thì gán value + phát input/change như ô giờ thường.
+const TP = (() => {
+  const H = 44; let target = null;
+  const el = document.createElement("div");
+  el.className = "tp"; el.hidden = true;
+  const col = (n, k) => `<div class="tp__col" data-k="${k}" tabindex="0" role="listbox" aria-label="${k === "h" ? "Giờ" : "Phút"}">${Array.from({ length: n }, (_, i) => `<div class="tp__it" data-v="${i}">${String(i).padStart(2, "0")}</div>`).join("")}</div>`;
+  el.innerHTML = `<div class="tp__backdrop" data-tp-close></div>
+    <div class="tp__panel" role="dialog" aria-modal="true" aria-labelledby="tpTitle">
+      <div class="tp__head"><h3 id="tpTitle"></h3><button type="button" class="btn btn--ghost tp__now" data-tp-now><i class="ph ph-clock"></i> Bây giờ</button></div>
+      <div class="tp__wheels"><div class="tp__band" aria-hidden="true"></div>${col(24, "h")}<span class="tp__colon">:</span>${col(60, "m")}</div>
+      <div class="sheet-actions"><button type="button" class="btn" data-tp-close>Hủy</button><button type="button" class="btn btn--primary" data-tp-ok><i class="ph ph-check"></i> Xong</button></div>
+    </div>`;
+  document.body.append(el);
+  const cols = { h: $('.tp__col[data-k="h"]', el), m: $('.tp__col[data-k="m"]', el) };
+  const get = c => Math.max(0, Math.min(c.children.length - 1, Math.round(c.scrollTop / H)));
+  const set = (c, v, smooth) => c.scrollTo({ top: v * H, behavior: smooth ? "smooth" : "instant" });
+  const mark = c => { const i = get(c); [...c.children].forEach((it, j) => { it.classList.toggle("is-on", j === i); it.setAttribute("aria-selected", j === i); }); };
+  Object.values(cols).forEach(c => {
+    c.addEventListener("scroll", () => mark(c), { passive: true });
+    c.addEventListener("click", e => { const it = e.target.closest(".tp__it"); if (it) set(c, +it.dataset.v, true); });
+    c.addEventListener("keydown", e => { const d = { ArrowUp: -1, ArrowDown: 1 }[e.key]; if (d) { e.preventDefault(); set(c, get(c) + d, true); } });
+  });
+  const close = () => { el.hidden = true; if (target) target.focus({ preventScroll: true }); target = null; };
+  const open = inp => {
+    target = inp; el.hidden = false;
+    $("#tpTitle", el).textContent = inp.getAttribute("aria-label") || "Chọn giờ";
+    const [h, m] = (inp.value || hm(new Date())).split(":").map(Number);
+    set(cols.h, h || 0); set(cols.m, m || 0); mark(cols.h); mark(cols.m);
+    cols.h.focus({ preventScroll: true });
+  };
+  el.addEventListener("click", e => {
+    if (e.target.closest("[data-tp-close]")) return close();
+    if (e.target.closest("[data-tp-now]")) { const n = new Date(); set(cols.h, n.getHours(), true); set(cols.m, n.getMinutes(), true); return; }
+    if (e.target.closest("[data-tp-ok]")) {
+      const p = n => String(n).padStart(2, "0"), inp = target;
+      inp.value = `${p(get(cols.h))}:${p(get(cols.m))}`;
+      close();
+      inp.dispatchEvent(new Event("input", { bubbles: true })); inp.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  });
+  return { open, close, isOpen: () => !el.hidden };
+})();
+// pointerdown đặt readonly trước khi trình duyệt kịp mở hộp chọn giờ mặc định
+document.addEventListener("pointerdown", e => { if (e.target.matches?.('input[type="time"]')) e.target.readOnly = true; }, true);
+document.addEventListener("click", e => { if (e.target.matches?.('input[type="time"]')) { e.preventDefault(); TP.open(e.target); } });
+document.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches?.('input[type="time"]')) { e.preventDefault(); TP.open(e.target); } });
+
 $("#inputText").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && matchMedia("(pointer: fine)").matches) { e.preventDefault(); submitInput(e.target.value); } });
-document.addEventListener("keydown", e => { if (e.key !== "Escape") return; if (!$("#sheet").hidden) closeSheet(); else if ($("#dock").classList.contains("is-open")) closeCompose(); });
+document.addEventListener("keydown", e => { if (e.key !== "Escape") return; if (TP.isOpen()) TP.close(); else if (!$("#sheet").hidden) closeSheet(); else if ($("#dock").classList.contains("is-open")) closeCompose(); });
 
 // Giọng nói (Web Speech, tiếng Việt)
 (() => {

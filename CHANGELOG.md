@@ -5,6 +5,26 @@ Mới nhất ở trên. Số `vNN` là phiên bản cache trong `sw.js`.
 
 ---
 
+## 2026-11-16 · Bộ chọn giờ trong app, nút Lưu dính đáy sheet · v35
+**Đổi gì**
+1. Bấm ô giờ (Thêm/Sửa việc đã làm, thẻ xác nhận, Thêm/Chỉnh sửa kế hoạch) mở bộ chọn giờ của app:
+   hai cột cuộn Giờ / Phút, nút "Bây giờ", Hủy / Xong. Ô giờ có icon đồng hồ vẽ lại.
+2. Hủy / Lưu trong sheet dính đáy sheet, không bị đẩy xuống dưới khi bàn phím bật hoặc có nhiều thẻ việc.
+
+**Vì sao**
+- Trên Vivo X200 Pro mini, hộp chọn giờ của Android bị cắt mất một khúc nút "Set", khó chọn xong giờ.
+  Hộp đó do hệ điều hành vẽ, CSS của app không chỉnh được, nên phải thay bằng bộ chọn của app.
+- Thử trên khung 405×460 (màn có bàn phím): sheet "Thêm việc đã làm" có 2–3 thẻ thì nút Lưu nằm ngoài màn hình, phải đóng bàn phím rồi cuộn mới lưu được.
+
+**Logic**
+- Ô giờ vẫn là `input type="time"` (giá trị `HH:MM` như cũ), chỉ thêm `readOnly` để trình duyệt không mở hộp riêng; `TP` gán giá trị và phát `input` + `change`,
+  nên cảnh báo giờ ngược và code lưu giữ nguyên. Đánh đổi: không gõ giờ bằng bàn phím được nữa (trên điện thoại vốn cũng không gõ).
+- Cột cuộn dùng CSS scroll-snap, không thư viện. Chọn phút theo từng phút (60 dòng) để giữ đúng giờ app tự điền (vd 18:52).
+- Thanh nút sticky dùng `bottom` âm bằng padding-bottom của panel, nền trùng màu panel để che nội dung cuộn phía dưới.
+- Ô ngày (`type="date"`) vẫn dùng hộp của Android.
+
+---
+
 ## 2026-11-14 · Cổng vào 3 bước: Đăng nhập → Gemini → Lịch · v34
 **Đổi gì**
 1. Chưa vào được app thì chỉ hiện một màn full màn hình, không đầu trang, không thanh tab, không nút bút:

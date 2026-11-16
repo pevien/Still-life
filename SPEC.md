@@ -73,6 +73,9 @@ Thanh dưới có 4 ô: Hôm nay · Thói quen · Nhật ký · Cài đặt (Cà
      giờ từ 30 phút trước tới bây giờ). Mở từ "Làm việc khác" thì giờ bắt đầu là đầu khối đang chạy, nhóm theo khối,
      lưu xong khối đó được đánh dấu bỏ qua như khi nhập qua AI.
    - Trên timeline, các việc chồng giờ nằm cạnh nhau.
+   - Chọn giờ (mọi ô giờ trong sheet): mở bộ chọn giờ của app, hai cột cuộn Giờ / Phút, nút "Bây giờ", Hủy / Xong.
+     Không dùng hộp chọn giờ của Android (trên Vivo X200 Pro mini bị cắt mất nút Set).
+   - Nút Hủy / Lưu của sheet luôn dính đáy sheet, kể cả khi bàn phím bật hoặc có nhiều thẻ việc.
 3. **Thói quen**: chuyển Tuần / Tháng, lùi tới từng tuần, tháng (không quá ngày bắt đầu, không quá hiện tại).
    Chú thích trạng thái nằm dưới tiêu đề, căn giữa. Chạm ô một ngày để sửa habit ngày đó. Chuỗi 🔥.
 4. **Nhật ký**: viết hôm nay, xem các ngày trước. Mỗi ngày một trang trên Drive.

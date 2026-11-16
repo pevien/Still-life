@@ -202,6 +202,11 @@ Máy khác mở app → `findConfig()` → `adoptCfg()` lấy key nếu máy đ�
 - `render()` gọi `header()` + view đang mở: `renderToday()`, `renderHabits()`, `renderJournal()`. Mỗi hàm dựng lại HTML của view từ `S`.
 - Mọi nút đi qua **một** `click` listener ở `document`, phân theo `id` hoặc `data-*` (`data-pid`, `data-aid`, `data-day`, `data-week`, `data-hview`…).
 - Sheet (`openSheet` / `closeSheet`) dùng chung cho Cài đặt, sửa, thêm, xác nhận.
+  `.sheet-actions` trong sheet là `position: sticky` ở đáy panel (bù đúng padding-bottom), nên Hủy/Lưu luôn thấy khi panel phải cuộn.
+- Bộ chọn giờ `TP` (một `.tp` gắn vào `body`, z-index trên sheet): `openSheet` đặt mọi `input[type=time]` thành `readOnly`
+  (thêm một listener `pointerdown` ở pha capture làm dự phòng) để Android không mở hộp chọn giờ riêng; `click`/Enter trên ô giờ gọi `TP.open(ô)`.
+  Hai cột `.tp__col` cuộn có scroll-snap, mỗi dòng 44px, giá trị = `round(scrollTop / 44)`. Xong → gán `value` rồi phát `input` + `change`
+  (bubbles), nên `timeWarn` và code lưu không cần biết bộ chọn này. Escape đóng TP trước, sheet sau.
 - Timeline: `TL = { H0: 5, H1: 23, PX: 56 }`. `top = (giờ - H0) * PX`, khối ≤40px thêm class `is-short` (1 dòng, cắt "…").
   Khối chồng nhau (theo vị trí vẽ, gồm cả chiều cao tối thiểu 22px) được `laneLayout()` chia làn, nằm cạnh nhau trong cột.
   `renderToday()` giữ `scrollTop` cũ khi render lại; lần đầu cuộn tới `data-now` (khi khung đã có chiều cao).
