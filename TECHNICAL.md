@@ -71,7 +71,7 @@ Bản ghi ngày được lưu dạng chuỗi trong `extendedProperties.private` 
 ### 2.3 Google Drive · thư mục "Still life"
 | File | Nội dung |
 |---|---|
-| `still-life-config.json` | `{ planCal, actualCal, folderId, journalFolderId, start, v, geminiKey }`. `start` là ngày bắt đầu theo dõi, các ô trước ngày này hiện "none" |
+| `still-life-config.json` | `{ planCal, actualCal, folderId, journalFolderId, start, v, geminiKey, habits }`. `start` là ngày bắt đầu theo dõi, các ô trước ngày này hiện "none". `habits` là danh sách thói quen (mục 3.8); không có thì dùng `DEFAULT_HABITS` |
 | `Nhật ký/YYYY-MM-DD.md` | Markdown: `# Nhật ký · …` rồi các mục `## Vui vì`, `## Biết ơn`, `## Mai muốn`, `## Ghi thêm`. Ghi bằng `journalMd()`, đọc bằng `parseJournal()` |
 
 Scope OAuth chỉ có `calendar.app.created` và `drive.file`: app chỉ thấy lịch và file do chính nó tạo, không đọc được lịch hay file khác của người dùng.
@@ -83,6 +83,7 @@ Scope OAuth chỉ có `calendar.app.created` và `drive.file`: app chỉ thấy 
 | `sl.cfg` | bản sao `still-life-config.json` + `configFileId`, để mở app không phải hỏi Drive |
 | `sl.tok` | `{ t: access_token, exp }`; hết hạn trước 60 giây để không gọi Google bằng token sắp chết |
 | `sl.habView` | đang xem Thói quen theo `week` hay `month` |
+| `sl.habits` · `sl.demoHabits` | danh sách thói quen của chế độ thật / demo (bản trong máy, hiện ngay khi mở app) |
 | `sl.demo` | toàn bộ dữ liệu chế độ demo: `days`, `actual`, `journal`, `muted`, `planEdit` (sửa khối mẫu theo id lần lặp), `planExtra` (khối thêm) |
 
 ### 2.5 State trong bộ nhớ (`S`)
@@ -94,6 +95,7 @@ S = {
   days: { "YYYY-MM-DD": rec },        // bản ghi ngày đã tải (16 tuần gần nhất + tải thêm khi lùi)
   pending,                            // kết quả Gemini đang chờ xác nhận
   habView, habWeek, calMonth,         // đang xem tuần/tháng nào ở tab Thói quen
+  habManage, habEdit, habLooked,      // đang ở trang Quản lý thói quen · id đang sửa · đã đọc danh sách từ Drive trong phiên này
   editPlan, editAct, dayDate,         // id đang mở trong sheet sửa
   jfiles, jprev, jopen,               // nhật ký: danh sách file {id,date,mod}, câu đầu mỗi trang, trang đang mở trong sheet
   jdirty,                             // đang gõ dở trong form (quay lại tab không vẽ lại để khỏi mất chữ)
@@ -176,6 +178,24 @@ sequenceDiagram
 - `weekCount()` đếm theo tuần (unwell không tính vào mẫu số). Gym tính theo số buổi/tuần (1 là đạt, 2 là ★).
 - `streak()`: đi lùi từ hôm nay; `pending`, `rest`, `off` bỏ qua không làm gãy chuỗi; Gym đếm theo tuần.
 
+### 3.8 Danh sách thói quen
+- Biến toàn cục: `ALLH` (mọi thói quen, kể cả `off`, theo thứ tự người dùng) · `HABITS` (đang theo dõi, xếp theo thứ tự nhóm trong `CATS`,
+  trong nhóm giữ thứ tự `ALLH`) · `H` (id → thói quen, gồm cả đã ngừng để đọc lịch sử). `useHabits(list)` dựng cả ba qua `normHabit`.
+- Một thói quen: `{ id, name, short, cat, icon, freq, days, perWeekFull, perWeekMin, full, min, rule, since, off, prev }`.
+  `since`: ngày bắt đầu riêng (`habStart(hb)` = muộn hơn giữa `since` và ngày bắt đầu app). `off`: đã ngừng.
+  `rule` trống thì `aiRule()` ghép từ `full` / `min` cho prompt Gemini; enum id trong schema chỉ gồm `HABITS` (rỗng thì bỏ enum).
+- **Lịch theo thời gian:** lịch = `freq, days, perWeekFull, perWeekMin`. `prev: [{ until, ...lịch }]` là các lịch cũ, mỗi cái áp dụng tới hết
+  ngày `until`; lịch ngoài cùng áp dụng sau đó. `sch(hb, d)` trả lịch của ngày `d`; `scheduled`, `cellStatus` dùng lịch theo ngày,
+  `weekCount` dùng lịch của thứ Hai cho mục tiêu tuần, `streak` dùng lịch hôm nay để chọn cách đếm.
+  `applySched(old, N, F)`: bỏ lịch đã hẹn mà chưa tới, cắt các đoạn tại `F-1`, nối lịch mới `N` từ `F` (giống lịch đang chạy thì không thêm mốc),
+  bỏ các đoạn kết thúc trước `since`. `pendingFrom(hb)` trả ngày lịch hẹn bắt đầu nếu còn ở tương lai.
+- Lưu: `saveHabits(list)` → `useHabits` + `LS` ngay (giao diện đổi trước), rồi `Google.pushHabits()` ghi `habits` vào file cấu hình.
+  `habChange(list, msg)` bọc lại, có toast Hoàn tác (lưu lại bản chụp trước đó).
+- Đọc: `refresh()` gọi `loadLocalHabits()` (đổi demo/thật là đổi danh sách); mỗi phiên mở app đọc file cấu hình một lần (`S.habLooked`),
+  `habits` khác bản trong máy thì thay và vẽ lại. Hai máy sửa cùng lúc: bản ghi sau thắng.
+- Bản ghi ngày không đổi khi sửa thói quen: `h[id]` vẫn nằm trong Calendar kể cả khi thói quen bị xoá hẳn.
+- `markBlock` chỉ đánh dấu habit của khối nếu thói quen đó còn trong `HABITS`.
+
 ### 3.5 Khối kế hoạch hôm nay
 | Hành động | Hàm | Gọi API |
 |---|---|---|
@@ -228,6 +248,7 @@ Máy khác mở app → `findConfig()` → `adoptCfg()` lấy key nếu máy đ�
 
 ## 6. PWA và cập nhật
 `sw.js` network-first cho file cùng origin (luôn lấy bản mới khi có mạng, mất mạng thì dùng cache), không chạm tới request Google hay Gemini.
+Request gửi đi với `cache: "no-cache"` để trình duyệt hỏi lại server thay vì dùng bộ nhớ HTTP, nên bản mới hiện ngay khi mở app.
 Mỗi lần đổi giao diện tăng `V` trong `sw.js` để cache cũ bị xoá khi service worker mới kích hoạt.
 
 ## 7. Kiểm thử

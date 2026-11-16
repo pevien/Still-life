@@ -107,7 +107,7 @@
         if (hb.freq === "weekly") ok(hb.perWeekMin >= 1 && hb.perWeekMin <= hb.perWeekFull, hb.id);
       }
     });
-    test("mỗi habit đều có tên ngắn cho bảng tuần", () => { for (const hb of HABITS) ok(HSHORT[hb.id], hb.id); });
+    test("mỗi habit mặc định đều có tên ngắn cho bảng tuần", () => { for (const hb of DEFAULT_HABITS) ok(hb.short, hb.id); });
   });
 
   // ------------------------------------------------------------ Calendar mapping
@@ -866,6 +866,229 @@
       $('[data-week="1"]').click(); await wait(50);
       eq($(".hnav__t b").textContent, "Tuần này");
       await reset();
+    });
+  });
+
+  // ------------------------------------------------------------ quản lý thói quen
+  describe("Quản lý thói quen", () => {
+    const keep = () => ALLH.map(h => Object.assign({}, h));
+    const back = async list => { await saveHabits(list); localStorage.removeItem("sl.demoHabits"); loadLocalHabits(); };
+    test("nút vào trang quản lý nằm trong tab Thói quen, quay lại được", async () => {
+      await reset(); setView("habits");
+      ok($("#hManage"), "có nút Quản lý");
+      $("#hManage").click(); await wait(20);
+      eq($("#view-habits .mhead h2").textContent, "Quản lý thói quen");
+      eq(document.querySelectorAll("#view-habits .mlist .mrow").length, HABITS.length);
+      $("#hBack").click(); await wait(20);
+      ok($("#view-habits .vtoggle") && !$("#view-habits .mhead"), "về trang Thói quen");
+      $("#hManage").click(); await wait(20); setView("habits");
+      ok(!S.habManage, "bấm tab Thói quen thì về trang chính");
+      await reset();
+    });
+    test("normHabit: sửa lịch sai, mức theo tuần nằm trong 1..7", () => {
+      eq(normHabit({ name: " ", freq: "days", days: [] }).freq, "daily");
+      eq(normHabit({ name: "x", freq: "lạ" }).freq, "daily");
+      const w = normHabit({ name: "x", freq: "weekly", days: [], perWeekFull: 9, perWeekMin: 12 });
+      eq([w.days.length, w.perWeekFull, w.perWeekMin], [7, 7, 7]);
+      eq(normHabit({ name: "x", freq: "days", days: [5, 1, 1, 9] }).days, [1, 5]);
+    });
+    test("freqLabel và aiRule", () => {
+      eq(freqLabel({ freq: "daily" }), "Mỗi ngày");
+      eq(freqLabel({ freq: "days", days: [5, 1, 0] }), "T2 · T6 · CN");
+      eq(freqLabel(normHabit({ freq: "weekly", days: [], perWeekFull: 3 })), "3 lần/tuần");
+      eq(freqLabel(normHabit({ freq: "weekly", days: [2, 6], perWeekFull: 2 })), "2 lần/tuần · T3 · T7");
+      eq(aiRule({ full: "2 lít", min: "1 lít" }), "full: 2 lít. min: 1 lít.");
+      eq(aiRule({ full: "", rule: "full: có đọc sách." }), "full: có đọc sách.");
+    });
+    test("thêm thói quen: hiện ở Hôm nay, ở bảng tuần, có trong luật AI; ngày trước không tính là bỏ", async () => {
+      const prev = keep(); await reset(); setView("habits"); S.habManage = true; renderHabits();
+      $("#hAdd").click(); await wait(20);
+      eq(sheetTitle(), "Thêm thói quen");
+      $("#hSave").click(); await wait(20);
+      ok(!$("#hErr").hidden && sheetOpen(), "thiếu tên thì báo, không đóng sheet");
+      $("#hName").value = "Uống 2 lít nước"; $("#hShort").value = "Nước"; $("#hFull").value = "2 lít"; $("#hMin").value = "1 lít";
+      $('[data-hicon="ph-drop"]').click();
+      $("#hSave").click(); await wait(30);
+      ok(!sheetOpen(), "lưu xong đóng sheet");
+      const h = ALLH[ALLH.length - 1];   // ALLH giữ thứ tự thêm, HABITS xếp theo nhóm
+      eq([h.name, h.short, h.icon, h.freq, h.since], ["Uống 2 lít nước", "Nước", "ph-drop", "daily", todayStr()]);
+      eq(cellStatus(h, day(-1)), "none", "hôm qua chưa theo dõi");
+      ok(geminiPrompt("x").includes(`${h.id} (Uống 2 lít nước): full: 2 lít. min: 1 lít.`), "có trong prompt");
+      ok(geminiSchema().properties.habits.items.properties.id.enum.includes(h.id), "có trong schema");
+      ok(JSON.parse(localStorage.getItem("sl.demoHabits")).some(x => x.id === h.id), "lưu trong máy");
+      setView("today");
+      ok($(`[data-habit="${h.id}"]`), "chip ở Hôm nay");
+      await back(prev); await reset();
+    });
+    test("ngày cố định: chưa chọn ngày thì báo; theo tuần ẩn ô tối thiểu, lưu số lần", async () => {
+      const prev = keep(); await reset();
+      renderHabForm(null); $("#hName").value = "Đọc sách";
+      $('[data-hfreq="days"]').click();
+      eq($("#hForm").dataset.freq, "days");
+      $("#hSave").click(); await wait(20);
+      ok(!$("#hErr").hidden, "báo chọn ngày");
+      $('[data-hfreq="weekly"]').click();
+      eq(getComputedStyle($(".hf-min")).display, "none");
+      ok(getComputedStyle($(".hf-week")).display !== "none", "hiện ô số lần");
+      $("#hPerFull").value = "3"; $("#hPerMin").value = "2";
+      $("#hSave").click(); await wait(30);
+      const h = ALLH[ALLH.length - 1];   // ALLH giữ thứ tự thêm, HABITS xếp theo nhóm
+      eq([h.freq, h.perWeekFull, h.perWeekMin, h.days.length, h.min], ["weekly", 3, 2, 7, "2 lần/tuần"]);
+      await back(prev); await reset();
+    });
+    test("đổi thứ tự, ngừng theo dõi, theo dõi lại, xoá hẳn có hoàn tác", async () => {
+      const prev = keep(); await reset(); setView("habits"); S.habManage = true; renderHabits();
+      const [a, b] = HABITS.map(h => h.id);
+      $(`[data-hmove="${b}"][data-dir="-1"]`).click(); await wait(20);
+      eq(HABITS.slice(0, 2).map(h => h.id), [b, a]);
+      renderHabForm(a); $("#hStop").click(); await wait(20);
+      ok(!HABITS.some(h => h.id === a) && H[a].off, "đã ngừng");
+      ok($("#view-habits").textContent.includes("Đã ngừng"), "có mục Đã ngừng");
+      ok(!geminiPrompt("x").includes(`- ${a} (`), "không còn trong prompt");
+      renderHabForm(a); $("#hResume").click(); await wait(20);
+      ok(HABITS.some(h => h.id === a) && !H[a].off && H[a].since === todayStr(), "theo dõi lại từ hôm nay");
+      renderHabForm(a); $("#hStop").click(); await wait(20);
+      renderHabForm(a); $("#hDelete").click(); await wait(20);
+      ok(!H[a], "đã xoá");
+      $(".toast__undo").click(); await wait(30);
+      ok(H[a] && H[a].off, "hoàn tác: trở lại như trước khi xoá");
+      await back(prev); await reset();
+    });
+    test("thói quen đã ngừng: bấm Đã làm ở khối kế hoạch không đánh dấu", async () => {
+      const prev = keep(); await reset();
+      await saveHabits(ALLH.map(h => (h.id === "yoga" ? Object.assign({}, h, { off: true }) : h)));
+      const now = new Date(), blk = block("Yoga thử", new Date(now - 10 * 60000), new Date(+now + 10 * 60000), { habit: "yoga", cat: "health" });
+      S.today.plan = [blk];
+      const before = (S.today.rec || {}).h?.yoga;
+      await markBlock(blk.id, "done");
+      eq((S.today.rec || {}).h?.yoga, before);
+      await back(prev); await reset();
+    });
+    test("không còn thói quen nào: tab Thói quen có nút thêm, Hôm nay không có tiêu đề thói quen", async () => {
+      const prev = keep(); await reset();
+      await saveHabits([]); setView("habits");
+      ok($("#view-habits .empty #hAdd"), "nút Thêm thói quen");
+      setView("today");
+      ok(![...document.querySelectorAll("#view-today .h2")].some(x => x.textContent.includes("Thói quen hôm nay")));
+      ok(!("enum" in geminiSchema().properties.habits.items.properties.id), "schema không có enum rỗng");
+      await back(prev); await reset();
+    });
+  });
+
+  // ------------------------------------------------------------ đổi lịch từ một ngày
+  describe("Đổi lịch thói quen từ một ngày", () => {
+    const keep = () => ALLH.map(h => Object.assign({}, h));
+    const back = async list => { await saveHabits(list); localStorage.removeItem("sl.demoHabits"); loadLocalHabits(); };
+    const yoga = () => normHabit({ id: "y", name: "Yoga", freq: "days", days: [1, 3, 5] });
+    // ngày gần nhất trước hôm nay không nằm trong T2-4-6
+    const offDay = () => { for (let i = 1; ; i++) { const d = day(-i); if (![1, 3, 5].includes(d.getDay())) return d; } };
+    test("đổi sang Mỗi ngày từ hôm nay: ngày cũ ngoài lịch vẫn là nghỉ, không thành Bỏ", () => {
+      const old = yoga(), d = offDay();
+      setDays([rec(d)]);
+      eq(cellStatus(old, d), "off");
+      const h = applySched(old, { freq: "daily" }, todayStr());
+      eq(h.freq, "daily");
+      eq(h.prev, [{ until: ymd(day(-1)), freq: "days", days: [1, 3, 5] }]);
+      eq(cellStatus(h, d), "off", "ngày cũ giữ lịch cũ");
+      ok(scheduled(h, today), "hôm nay theo lịch mới");
+      eq(pendingFrom(h), null);
+    });
+    test("hẹn đổi lịch ở tương lai: hôm nay vẫn lịch cũ, có ghi chú 'từ ngày'", () => {
+      const old = yoga(), F = ymd(day(3));
+      const h = applySched(old, { freq: "daily" }, F);
+      eq(sch(h, today).freq, "days");
+      eq(sch(h, day(2)).freq, "days");
+      eq(sch(h, day(3)).freq, "daily");
+      eq(pendingFrom(h), F);
+      ok(schedNote(h).includes(`từ ${dm(F)}: Mỗi ngày`), schedNote(h));
+    });
+    test("sửa lại lịch đã hẹn: thay mốc cũ; chọn lại đúng lịch đang chạy thì huỷ hẹn", () => {
+      const old = yoga();
+      let h = applySched(old, { freq: "daily" }, ymd(day(3)));
+      h = applySched(h, { freq: "daily" }, ymd(day(5)));
+      eq([h.prev.length, pendingFrom(h)], [1, ymd(day(5))]);
+      eq(sch(h, day(4)).freq, "days", "ngày 4 vẫn lịch cũ");
+      h = applySched(h, { freq: "days", days: [1, 3, 5] }, ymd(day(5)));
+      eq([h.freq, h.prev, pendingFrom(h)], ["days", undefined, null]);
+    });
+    test("đổi hai lần: mỗi đoạn giữ đúng lịch của nó", () => {
+      const old = Object.assign(yoga(), { prev: [{ until: ymd(day(-10)), freq: "daily" }] });
+      const h = applySched(old, { freq: "weekly", perWeekFull: 2, perWeekMin: 1 }, todayStr());
+      eq(h.prev.map(p => p.freq), ["daily", "days"]);
+      eq([sch(h, day(-11)).freq, sch(h, day(-5)).freq, sch(h, today).freq], ["daily", "days", "weekly"]);
+    });
+    test("số lần/tuần: tuần cũ tính theo lịch thứ Hai đầu tuần; tối thiểu 0 không làm chuỗi vô tận", () => {
+      const mon = mondayOf(today), lastMon = addDays(mon, -7);
+      const h = normHabit({ id: "g", name: "Gym", freq: "weekly", perWeekFull: 3, perWeekMin: 0, prev: [{ until: ymd(addDays(mon, -1)), freq: "weekly", perWeekFull: 2, perWeekMin: 1 }] });
+      setDays([]);
+      eq(weekCount(h, lastMon).total, 2);
+      eq(weekCount(h, mon).total, 3);
+      eq(weekCount(h, lastMon).ok, false);
+    });
+    test("form: không cho chọn ngày đã qua; sửa lịch Yoga từ hôm nay giữ lịch cũ", async () => {
+      const prev = keep(); await reset();
+      renderHabForm("yoga");
+      eq([$("#hFrom").value, $("#hFrom").min], [todayStr(), todayStr()]);
+      $("#hFrom").value = ymd(day(-1)); $("#hSave").click(); await wait(20);
+      ok(!$("#hErr").hidden && sheetOpen(), "báo lỗi ngày đã qua");
+      $("#hFrom").value = todayStr(); $('[data-hfreq="daily"]').click();
+      $("#hSave").click(); await wait(30);
+      ok(!sheetOpen(), "đã lưu");
+      eq([H.yoga.freq, H.yoga.prev && H.yoga.prev[0].days], ["daily", [1, 3, 5]]);
+      await back(prev); await reset();
+    });
+    test("thêm thói quen bắt đầu ở tương lai: chưa hiện ở Hôm nay", async () => {
+      const prev = keep(); await reset();
+      renderHabForm(null); $("#hName").value = "Thiền"; $("#hFrom").value = ymd(day(2));
+      $("#hSave").click(); await wait(30);
+      const h = HABITS.find(x => x.name === "Thiền");
+      eq(h.since, ymd(day(2)));
+      setView("today");
+      ok(!$(`[data-habit="${h.id}"]`), "không có chip hôm nay");
+      ok(schedNote(h).startsWith(`Bắt đầu ${dm(ymd(day(2)))}`), schedNote(h));
+      await back(prev); await reset();
+    });
+  });
+
+  // ------------------------------------------------------------ nhóm thói quen
+  describe("Nhóm thói quen", () => {
+    const keep = () => ALLH.map(h => Object.assign({}, h));
+    const back = async list => { await saveHabits(list); localStorage.removeItem("sl.demoHabits"); loadLocalHabits(); };
+    test("mặc định có nhóm hợp lệ; thiếu nhóm thì lấy theo mặc định hoặc Sinh hoạt", () => {
+      for (const hb of DEFAULT_HABITS) ok(CATS[hb.cat], hb.id);
+      eq(normHabit({ id: "yoga", name: "Yoga" }).cat, "health");
+      eq(normHabit({ id: "lạ", name: "X", cat: "không có" }).cat, "life");
+    });
+    test("HABITS xếp theo nhóm, trong nhóm giữ thứ tự người dùng", async () => {
+      const prev = keep();
+      await saveHabits([{ id: "a", name: "A", cat: "life" }, { id: "b", name: "B", cat: "health" }, { id: "c", name: "C", cat: "life" }, { id: "d", name: "D", cat: "health" }]);
+      eq(HABITS.map(h => h.id), ["b", "d", "a", "c"]);
+      eq(ALLH.map(h => h.id), ["a", "b", "c", "d"]);
+      await moveHabit("c", -1);
+      eq(HABITS.map(h => h.id), ["b", "d", "c", "a"]);
+      await moveHabit("b", -1);
+      eq(HABITS.map(h => h.id), ["b", "d", "c", "a"], "đầu nhóm thì không lên được");
+      await back(prev);
+    });
+    test("trang quản lý gom theo nhóm, không còn mũi tên ›; bảng tuần tô màu nhóm, Hôm nay không chấm", async () => {
+      await reset(); setView("habits");
+      ok([...document.querySelectorAll("#view-habits .wname")].every(x => x.style.getPropertyValue("--cat")), "màu nhóm ở bảng tuần");
+      S.habManage = true; renderHabits();
+      const groups = [...document.querySelectorAll("#view-habits .mgroup")].map(x => x.textContent.trim());
+      eq(groups, Object.entries(CATS).filter(([k]) => HABITS.some(h => h.cat === k)).map(([, c]) => c.name));
+      ok(!$("#view-habits .ph-caret-right"), "không còn ›");
+      setView("today");
+      ok(!document.querySelector("#view-today .chip .dot"), "Hôm nay không có chấm màu");
+      await reset();
+    });
+    test("form: chọn nhóm được lưu; nút Ngừng theo dõi ở đầu form", async () => {
+      const prev = keep(); await reset();
+      renderHabForm("journal");
+      eq($("#hCat").value, "life");
+      ok($("#hForm").firstElementChild.classList.contains("mdanger"), "Ngừng theo dõi ở đầu");
+      $("#hCat").value = "build"; $("#hSave").click(); await wait(30);
+      eq(H.journal.cat, "build");
+      await back(prev); await reset();
     });
   });
 

@@ -5,6 +5,42 @@ Mới nhất ở trên. Số `vNN` là phiên bản cache trong `sw.js`.
 
 ---
 
+## 2026-11-16 · Trang Quản lý thói quen, lịch đổi theo ngày, nhóm thói quen · v36
+**Đổi gì**
+1. Tab Thói quen có nút thanh trượt cạnh Tuần/Tháng, mở trang **Quản lý thói quen**: danh sách gom theo nhóm, ↑ ↓ đổi thứ tự trong nhóm,
+   Thêm thói quen, mục Đã ngừng. Sheet Thêm / Sửa: tên, tên ngắn, nhóm, biểu tượng, lịch (Mỗi ngày · Ngày cố định · Số lần/tuần),
+   ngày áp dụng, mức đạt, bản tối thiểu, ghi chú cho AI; Ngừng theo dõi / Theo dõi lại / Xoá hẳn, đều có hoàn tác.
+2. Đổi lịch chọn được ngày **áp dụng từ** (hôm nay hoặc tương lai); những ngày trước giữ lịch cũ. Thói quen mới chọn được ngày bắt đầu.
+3. Thói quen có **nhóm** (7 nhóm thời gian). Hôm nay và bảng Tuần xếp theo nhóm; bảng Tuần tô màu biểu tượng theo nhóm.
+4. Danh sách thói quen lưu trong máy và trong `still-life-config.json` trên Drive.
+5. Sheet sửa một ngày hiện cả thói quen số lần/tuần vào ngày ngoài ngày gợi ý.
+6. Thói quen số lần/tuần đặt tối thiểu 0 không còn làm chuỗi tăng mãi: phải có ít nhất 1 lần trong tuần.
+7. Service worker tải file với `cache: "no-cache"`.
+
+**Vì sao**
+- Danh sách thói quen nằm cứng trong code: muốn thêm Thiền (đã hẹn ở Bản 2), đổi Yoga sang mỗi ngày, hay bớt một thói quen quá sức
+  đều phải sửa `app.js`. Thói quen nên được chỉnh theo sức của mình, ngay trên điện thoại.
+- Trạng thái Bỏ, nghỉ, x/y và chuỗi không được lưu mà tính từ lịch mỗi lần hiện. Nếu đổi lịch mà áp cho cả quá khứ thì
+  ngày cũ đang "nghỉ" thành "Bỏ" (hoặc ngược lại), chuỗi gãy vì một quyết định của hôm nay. Bạn muốn kết quả cũ giữ nguyên,
+  và chỉ cho chọn ngày áp dụng từ hôm nay trở đi để không sửa lại quá khứ.
+- Nhóm giúp nhìn danh sách gọn hơn, cùng màu với timeline. Chấm màu ở Hôm nay bị bỏ vì thừa (đã có màu Đạt/Tối thiểu).
+- Lưu trên Drive để máy thứ hai thấy cùng danh sách, giống Gemini key.
+- Bản cũ vẫn hiện sau khi cập nhật ở localhost vì trình duyệt dùng bộ nhớ HTTP dù service worker là network-first.
+
+**Logic**
+- `HABITS` từ hằng số thành biến; `ALLH` giữ mọi thói quen kể cả đã ngừng, `H` gồm cả đã ngừng để đọc lịch sử.
+  Thói quen đã ngừng không vào Hôm nay, bảng, chuỗi, prompt Gemini, và bấm "Đã làm" ở khối kế hoạch gắn với nó không đánh dấu.
+- Lịch theo thời gian lưu dạng `prev: [{ until, ...lịch }]` (lịch cũ) + lịch ngoài cùng. Chọn mốc kết thúc (`until`) thay vì mốc bắt đầu
+  để tra `sch(hb, d)` chỉ cần duyệt tới mốc đầu tiên ≥ ngày đó. Form luôn sửa lịch mới nhất, nên lưu lại thì thay lịch đã hẹn chưa tới;
+  chọn lại đúng lịch đang chạy là huỷ hẹn. Tuần có đổi lịch dùng lịch thứ Hai cho mục tiêu tuần: đơn giản, chỉ lệch ở đúng tuần đổi.
+- Theo dõi lại đặt `since` = hôm nay: những ngày đã ngừng hiện "none" thay vì "Bỏ"; ngày đã đánh dấu vẫn hiện vì `cellStatus` xét bản ghi trước `since`.
+- Lịch Số lần/tuần không chọn ngày thì lưu `days` = cả tuần. Bản tối thiểu của loại này ghép từ số lần ("1 lần/tuần").
+- `saveHabits` đổi trong máy trước rồi mới ghi Drive, nên ↑ ↓ và lưu không phải chờ mạng. Đánh đổi: hai máy sửa cùng lúc thì bản ghi sau thắng.
+- Mức đạt vẫn là chữ; loại "mục tiêu bằng số" (app tự chấm theo con số) để sau, chưa chốt.
+- Thêm 19 test: trang quản lý, form, ngừng/theo dõi lại/xoá, đổi lịch từ một ngày, nhóm và thứ tự.
+
+---
+
 ## 2026-11-16 · Bộ chọn giờ trong app, nút Lưu dính đáy sheet · v35
 **Đổi gì**
 1. Bấm ô giờ (Thêm/Sửa việc đã làm, thẻ xác nhận, Thêm/Chỉnh sửa kế hoạch) mở bộ chọn giờ của app:

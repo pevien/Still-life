@@ -15,7 +15,7 @@ Chốt qua buổi grill ngày 14/11/2026, cập nhật theo app hiện tại.
 | Google Calendar · lịch **Still life · Kế hoạch** | Tuần mẫu, sự kiện lặp lại hằng tuần, có nhắc nhở. Sửa trong app chỉ đổi đúng lần lặp của hôm nay. Khối thêm trong app là sự kiện đơn (không lặp), đánh dấu `added=1` |
 | Google Calendar · lịch **Still life · Thực tế** | Việc đã làm (AI tạo từ câu nhập), tô màu theo nhóm. Mỗi ngày 1 sự kiện cả ngày "Thói quen" lưu trạng thái habit + unwell |
 | Google Drive · `Still life/Nhật ký/YYYY-MM-DD.md` | Nhật ký 3 dòng + tự do |
-| Google Drive · `Still life/still-life-config.json` | ID 2 lịch, thư mục, ngày bắt đầu, Gemini key. Máy mới đăng nhập sẽ tự tìm file này để nối vào, không tạo trùng |
+| Google Drive · `Still life/still-life-config.json` | ID 2 lịch, thư mục, ngày bắt đầu, Gemini key, danh sách thói quen. Máy mới đăng nhập sẽ tự tìm file này để nối vào, không tạo trùng |
 
 Scope OAuth: `calendar.app.created` (chỉ các lịch app tự tạo) + `drive.file` (chỉ file app tự tạo).
 
@@ -30,6 +30,8 @@ Người thân & bạn bè (Flamingo) · Giải trí có chủ đích (Tangerine
 - Lớp tiếng Hàn T2-4-6 19:00–21:00 (ăn tối 17:30) · ngày khác tự học 14:00–14:30, ăn tối 18:30, giải trí 20:00
 
 ## Habit (giai đoạn khởi động)
+Đây là danh sách mặc định. Sửa, thêm, ngừng theo dõi ở trang **Quản lý thói quen** (xem mục Màn hình).
+
 | Habit | Tần suất | Tối thiểu |
 |---|---|---|
 | Ăn đủ 3 bữa | hằng ngày | không bỏ bữa |
@@ -44,6 +46,22 @@ Người thân & bạn bè (Flamingo) · Giải trí có chủ đích (Tangerine
 Để sau: Thiền.
 
 Luật chuỗi: bản tối thiểu vẫn tính. Unwell day không làm gãy chuỗi. Hôm nay chưa xong không làm gãy chuỗi.
+Thói quen "số lần/tuần" chỉ tính tuần đạt khi có ít nhất 1 lần (kể cả khi đặt tối thiểu 0).
+
+### Một thói quen gồm
+- **Tên**, **tên ngắn** (cho bảng Tuần), **nhóm** (cùng 7 nhóm thời gian, chỉ để tô màu và xếp), **biểu tượng**.
+- **Lịch**, một trong ba: Mỗi ngày · Ngày cố định (vd T2-4-6, chỉ những ngày đó mới tính) ·
+  Số lần/tuần (mục tiêu và tối thiểu mỗi tuần, ngày gợi ý không bắt buộc; có chọn ngày thì chỉ hiện ở Hôm nay vào ngày đó).
+- **Thế nào là đạt** và **bản tối thiểu** (chữ, tuỳ chọn; có tối thiểu thì chip có nút ½). Số lần/tuần thì tối thiểu là "N lần/tuần".
+- **Ghi chú cho AI** (tuỳ chọn): luật để Gemini biết câu kể có tính là đạt không. Trống thì ghép từ hai ô trên.
+- Mức đạt hiện là chữ, app không tự so số (trừ luật riêng của Đi bộ). Loại "mục tiêu bằng số" (nhập số, app tự chấm) chưa làm.
+
+### Đổi lịch không làm đổi quá khứ
+Đổi phần Lịch thì chọn ngày **áp dụng từ** (chỉ hôm nay hoặc tương lai). Những ngày trước tính theo lịch cũ,
+nên trạng thái Bỏ, nghỉ, x/y của tuần và chuỗi của các ngày đã qua không đổi. Đổi tên, mức đạt, nhóm, biểu tượng thì đổi ngay,
+không đụng tới các lần đã đánh dấu. Hẹn đổi lịch ở tương lai thì danh sách ghi "từ dd/mm: lịch mới"; sửa lại lịch đã hẹn thì thay hẹn cũ.
+Tuần có đổi lịch: số lần/tuần tính theo lịch của thứ Hai đầu tuần.
+Thói quen mới chọn ngày bắt đầu (hôm nay hoặc tương lai); trước ngày đó không tính, chưa hiện ở Hôm nay.
 
 ## Unwell day
 Lịch hôm nay chuyển sang bản nhẹ (ăn 3 bữa, 5 từ, đi bộ ngắn, ngủ). Tắt nhắc nhở các khối không cần thiết còn lại hôm đó
@@ -78,6 +96,15 @@ Thanh dưới có 4 ô: Hôm nay · Thói quen · Nhật ký · Cài đặt (Cà
    - Nút Hủy / Lưu của sheet luôn dính đáy sheet, kể cả khi bàn phím bật hoặc có nhiều thẻ việc.
 3. **Thói quen**: chuyển Tuần / Tháng, lùi tới từng tuần, tháng (không quá ngày bắt đầu, không quá hiện tại).
    Chú thích trạng thái nằm dưới tiêu đề, căn giữa. Chạm ô một ngày để sửa habit ngày đó. Chuỗi 🔥.
+   Thói quen xếp theo nhóm; bảng Tuần tô màu biểu tượng theo nhóm. Hôm nay cũng xếp theo nhóm, không có chấm màu.
+   Sheet sửa một ngày hiện cả thói quen số lần/tuần vào ngày ngoài ngày gợi ý (đi gym ngày khác vẫn ghi được).
+   - **Quản lý thói quen**: nút thanh trượt cạnh Tuần/Tháng mở trang con (nút ← hoặc bấm tab Thói quen để về).
+     Danh sách gom theo nhóm, mỗi dòng: biểu tượng, tên, lịch. Nút ↑ ↓ đổi thứ tự trong nhóm. Chạm dòng mở sheet Sửa thói quen.
+     "Thêm thói quen" ở cuối. Mục "Đã ngừng": thói quen ngừng theo dõi (không hiện ở Hôm nay, không tính chuỗi, không vào luật AI, dữ liệu cũ giữ).
+   - Sheet Thêm / Sửa: nút Ngừng theo dõi (hoặc Theo dõi lại · Xoá hẳn nếu đã ngừng) ở đầu form, rồi các ô ở mục "Một thói quen gồm",
+     ô ngày áp dụng lịch. Thiếu tên, ngày cố định chưa chọn ngày, ngày đã qua: báo dưới form, không đóng sheet.
+     Lưu, ngừng, xoá đều có hoàn tác. Theo dõi lại thì tính từ hôm nay, khoảng đã ngừng không thành Bỏ.
+   - Không còn thói quen nào: tab Thói quen hiện nút Thêm thói quen, Hôm nay không có mục Thói quen hôm nay.
 4. **Nhật ký**: viết hôm nay, xem các ngày trước. Mỗi ngày một trang trên Drive.
    - Form trên cùng **luôn trống**, chỉ để viết. Mở lại app cũng trống.
    - Bấm Lưu: nút chỉ còn vòng quay. Xong thì form trống lại, trang hôm nay hiện ở đầu danh sách "Đã viết" (dòng "Hôm nay", nháy nền một lần).
