@@ -670,3 +670,16 @@ body.is-gated .top, body.is-gated main, body.is-gated .tabs, body.is-gated .fab,
 .mgroup { display: flex; align-items: center; gap: 8px; margin: 18px 2px 8px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
 .mgroup:first-of-type { margin-top: 6px; }
 .mrow__main { padding-right: 4px; }
+
+/* Nhờ AI điền / sửa thói quen: 1 nút ở đầu form, bấm mở popup nhập (#dock, chế độ is-habit) nằm trên sheet */
+.hai { margin: 0 0 14px; }
+.hai__go i { color: var(--good); font-size: 18px; }
+.hai__note { display: flex; gap: 6px; align-items: flex-start; margin: 8px 0 0; font-size: 13px; line-height: 1.4; color: var(--good); }
+.hai__note i { flex: none; font-size: 16px; margin-top: 1px; }
+.dock__title { display: none; }
+.dock.is-habit .dock__title { display: flex; align-items: center; gap: 6px; flex: 1 1 100%; margin: 0 0 2px; font-weight: 700; font-size: 15px; }
+.dock.is-habit .dock__title::before { content: "\2726"; color: var(--good); }
+.dock.is-habit .dock__manual { display: none; }
+.field.is-ai { animation: aiflash 1.6s ease-out; border-radius: var(--r-sm); }
+@keyframes aiflash { 0%, 25% { background: color-mix(in srgb, var(--good) 16%, transparent); } 100% { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .field.is-ai { animation: none; } }

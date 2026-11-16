@@ -5,6 +5,83 @@ Mới nhất ở trên. Số `vNN` là phiên bản cache trong `sw.js`.
 
 ---
 
+## 2026-11-16 · Rest day chỉ giữ thói quen có tối thiểu · bộ thói quen mẫu chỉ cho xem thử · v42
+**Đổi gì**
+- Rest day: chỉ hiện thói quen có **Tối thiểu** (chip ghi luôn bản tối thiểu). Thói quen không có tối thiểu hoặc loại số lần/tuần thì ẩn hôm đó, trừ khi đã đánh dấu. Tiêu đề ghi "rest day" thay vì "xong".
+- Thẻ Rest day không còn 5 dòng viết cứng (bỏ "Ngủ thêm, dậy lúc nào cũng được"): liệt kê các thói quen còn hiện mà chưa làm, kèm bản tối thiểu; không còn gì thì "Hôm nay nghỉ ngơi là đủ."
+- `DEFAULT_HABITS` đổi tên thành `SAMPLE_HABITS`, chỉ là dữ liệu của chế độ xem thử. Tài khoản mới dựng lịch bắt đầu với danh sách trống.
+- Prompt Gemini bỏ ví dụ gắn với id mẫu (yoga, korean); luật riêng về bữa ăn chỉ gửi khi có thói quen `eat`.
+
+**Vì sao**
+QA thấy rest day báo "xong" và đánh mọi thói quen là "nghỉ", trong khi thẻ vẫn bảo ăn đủ 3 bữa, cất điện thoại. Rest day đúng nghĩa là "chỉ làm bản tối thiểu",
+nên thói quen không có tối thiểu thì không có gì để làm hôm đó. Thẻ viết cứng theo bộ mặc định thì lệch ngay khi người dùng sửa danh sách,
+và giờ danh sách là của người dùng nên app không nên tự cài sẵn bộ của một người cụ thể.
+
+**Logic**
+- `restHabits(d)`: có `min`, có lịch ngày `d`, đã bắt đầu, lịch ngày đó không phải `weekly` (tối thiểu "N lần/tuần" là theo tuần). Trạng thái `rest` giữ nguyên: không tính, không gãy chuỗi.
+- `loadLocalHabits()`: bản đã lưu → xem thử thì `SAMPLE_HABITS` → tài khoản thật thì `[]`. Ngoại lệ cấu hình cũ (`legacyCfg()`: có lịch, file cấu hình chưa có `habits`):
+  dùng `SAMPLE_HABITS` như trước, và `refresh()` ghi danh sách đó lên Drive một lần, nên lịch sử dùng id cũ (eat, walk, …) không bị mất. `Google.setup()` ghi `habits: []`.
+  `adoptCfg()` lấy luôn `habits` của cấu hình tìm được, máy thứ hai không thấy bộ mẫu chớp qua.
+- Còn gắn với id mẫu (để sau): luật số bước của `walk`, liên kết khối tuần mẫu → thói quen trong `TEMPLATE`, bộ đọc câu của chế độ xem thử. Với thói quen người dùng tự tạo (id mới) các luật này không áp dụng.
+- Test: rest day (chip, thẻ, tiêu đề, không còn tối thiểu), nguồn danh sách theo từng trường hợp. Hàm test `withState` gọi lại `loadLocalHabits()` khi trả về chế độ xem thử, giống `refresh()` trong app.
+
+---
+
+## 2026-11-16 · Sửa: ↺ trả lại thói quen · v41
+**Đổi gì**
+- Bấm Đã làm ở khối có thói quen (vd Nhật ký & tổng kết) rồi bấm nút ↺ trên thẻ: trước đây chỉ xoá việc đã ghi, thói quen vẫn "đạt". Giờ thói quen trở về mức trước khi bấm, giống Hoàn tác trên toast.
+
+**Vì sao**
+Tìm ra khi QA bằng Playwright. ↺ để lại thói quen đạt sai, làm lệch bảng Tuần và chuỗi.
+
+**Logic**
+- `markBlock` lưu mức thói quen trước đó vào sự kiện việc đã làm (`private.hprev`, `none` nếu chưa có), nên ↺ trả đúng kể cả sau khi mở lại app. `updateActual` giữ nguyên trường này.
+- `unmarkBlock` (dùng cho cả ↺ và Hoàn tác trên toast) chỉ trả lại khi thói quen vẫn là `full`; bạn đã tự đổi sang tối thiểu sau đó thì giữ lựa chọn của bạn. Việc ghi trước bản này không có `hprev` nên ↺ không đụng thói quen.
+- Test mới trong `tests/tests.js`: ↺ với mức trước rỗng / tối thiểu, sau khi tải lại, người dùng tự đổi, hoàn tác trên toast.
+
+---
+
+## 2026-11-16 · Nhờ AI điền / sửa thói quen · v40
+**Đổi gì**
+Sheet Thêm / Sửa thói quen có nút **Nhờ AI điền** (thêm mới) hoặc **Nhờ AI sửa** (đang sửa) ở đầu form. Bấm vào mở popup nhập
+từ dưới lên, giống popup ghi việc ở Hôm nay (có micro). Kể bằng lời rồi gửi: popup đóng,
+Gemini điền tên, tên ngắn, nhóm, biểu tượng, lịch, Thế nào là đạt, Tối thiểu. Ô nào đổi thì nháy nhẹ; dưới nút có 1 câu nói AI đã làm gì.
+AI không tự lưu: xem lại, chỉnh, rồi bấm Lưu như bình thường.
+Ô "Bản tối thiểu" đổi tên thành **Tối thiểu** (gọn hơn, khớp với nhãn "Tối thiểu" ở chú thích lịch và nút ½).
+
+**Vì sao**
+Form có 9–10 ô; nghĩ ra "Thế nào là đạt" đủ rõ để AI chấm và một bản tối thiểu đủ nhỏ là phần khó nhất.
+Nói một câu tự nhiên rồi chỉnh lại nhanh hơn điền từng ô, nhất là khi chỉ muốn đổi một chi tiết ("đổi thành 3 buổi mỗi tuần").
+
+Bản đầu (chưa phát hành) đặt ô nhập ngay trong form: ô quá chật, chữ gợi ý bị cắt, đẩy các ô khác xuống. Nên đổi thành 1 nút + popup.
+
+**Logic**
+- Popup dùng lại `#dock` (không làm thêm một ô nhập thứ hai): cùng cách nhập, cùng micro. `#dock` đã có z-index cao hơn sheet nên nằm đè lên form.
+  Chữ đang gõ dở ở ô Hôm nay được cất và trả lại khi đóng popup, nên hai việc không lẫn vào nhau.
+- Tách `geminiJSON(prompt, schema, temperature)` từ `callGemini` để hai luồng dùng chung việc thử model dự phòng và báo lỗi key (`needKey` → nút Mở Cài đặt).
+- Schema giới hạn `icon` trong `HICONS` và `cat` trong các nhóm trừ "Lướt vô thức", nên AI không chọn được thứ form không hiện.
+- Khi sửa (hoặc form thêm mới đã có tên) prompt gửi kèm các ô hiện tại và dặn chỉ đổi phần được nhờ, nên nhờ AI nhiều lần liên tiếp được.
+- AI chỉ điền form, không ghi Drive: kết quả vẫn qua `readHabForm` → `applySched`, nên đổi lịch qua AI cũng giữ đúng luật "không đổi quá khứ".
+  Ô ngày áp dụng không bị AI đụng tới vì đó là quyết định của người dùng.
+- `fillHabForm` kẹp mọi giá trị (độ dài, ngày 0..6, số lần 1..7, tối thiểu ≤ mục tiêu); giá trị lạ thì giữ ô cũ thay vì báo lỗi.
+- Chưa có Gemini key thì không hiện nút: bấm vào mà không dùng được chỉ gây rối. Bỏ luôn bộ đoán đơn giản cho chế độ xem thử.
+- Đánh đổi: thêm một lượt gọi Gemini (dùng chung quota free).
+
+---
+
+## 2026-11-16 · Đổi tên "Unwell day" thành "Rest day" · v39
+**Đổi gì**
+Mọi chữ người dùng thấy: thẻ ở Hôm nay, toast, chú thích lịch thói quen (Rest), lời hỏi thăm sau 3 ngày, gợi ý sau câu nhập,
+và tên sự kiện cả ngày trên Calendar ("Thói quen · d/m · rest day").
+
+**Vì sao**
+"Unwell" nghe tiêu cực, như đang bị ốm. "Rest" nói đúng ý: hôm nay chọn nghỉ, nhẹ lại, không phải thất bại.
+
+**Logic**
+Chỉ đổi chữ hiển thị. Tên trong code và dữ liệu vẫn là `unwell` (`rec.unwell`, `setUnwell`, `private.unwell`, class CSS),
+nên bản ghi cũ đọc vẫn đúng, không cần chuyển dữ liệu. Sự kiện Calendar của những ngày cũ giữ tên "unwell day" cho tới khi được lưu lại.
+Nút "Hôm nay mình không ổn" giữ nguyên vì là lời người dùng tự nói.
+
 ## 2026-11-16 · Ô giờ chỉ còn icon đồng hồ, chữ ô ngày cùng màu, chọn biểu tượng gọn hơn, gộp ô Ghi chú cho AI · v37
 **Đổi gì**
 1. Ô chọn giờ (thêm/sửa việc đã làm, kế hoạch) trên điện thoại chỉ hiện icon đồng hồ; bỏ mũi tên ▾ bị chồng lên.

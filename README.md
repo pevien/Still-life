@@ -44,7 +44,7 @@ Rồi mở http://localhost:8123/?demo
 - `index.html`, `styles.css`, `app.js`: toàn bộ app, không cần build.
 - `sw.js`, `manifest.webmanifest`, `icon*`: PWA.
 - `tests/`: unit test (xem mục Kiểm thử).
-- Sửa danh sách thói quen: ngay trong app (tab Thói quen → nút thanh trượt). `DEFAULT_HABITS` đầu file `app.js` chỉ là danh sách ban đầu.
+- Sửa danh sách thói quen: ngay trong app (tab Thói quen → nút thanh trượt). Trong form có ô Nhờ AI điền / sửa: kể bằng lời, Gemini điền sẵn, bạn xem lại rồi Lưu. Tài khoản mới bắt đầu không có thói quen nào; `SAMPLE_HABITS` đầu file `app.js` chỉ là dữ liệu của chế độ xem thử.
 - Sửa tuần mẫu: hằng số `TEMPLATE` đầu file `app.js`.
 - Đổi giờ, tên một khối hoặc thêm khối cho hôm nay: làm ngay trong app (tab Hôm nay → bấm vào timeline).
   Muốn đổi lịch lặp hằng tuần thì vẫn sửa trong Google Calendar.

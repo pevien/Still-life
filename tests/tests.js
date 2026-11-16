@@ -107,7 +107,7 @@
         if (hb.freq === "weekly") ok(hb.perWeekMin >= 1 && hb.perWeekMin <= hb.perWeekFull, hb.id);
       }
     });
-    test("mỗi habit mặc định đều có tên ngắn cho bảng tuần", () => { for (const hb of DEFAULT_HABITS) ok(hb.short, hb.id); });
+    test("mỗi habit mặc định đều có tên ngắn cho bảng tuần", () => { for (const hb of SAMPLE_HABITS) ok(hb.short, hb.id); });
   });
 
   // ------------------------------------------------------------ Calendar mapping
@@ -524,7 +524,9 @@
         render(); await frame(); await fn();
       } finally {
         S.settings = keep.settings;
-        saveSettings(); S.cfg = keep.cfg; S.tok = keep.tok; S.cfgLooked = keep.looked; await reset();
+        saveSettings(); S.cfg = keep.cfg; S.tok = keep.tok; S.cfgLooked = keep.looked;
+        loadLocalHabits();   // như refresh() khi đổi giữa thật và xem thử: chế độ thật chưa có lịch thì danh sách trống
+        await reset();
       }
     };
     const shown = sel => { const el = $(sel); return !!el && getComputedStyle(el).display !== "none"; };
@@ -974,6 +976,71 @@
       eq((S.today.rec || {}).h?.yoga, before);
       await back(prev); await reset();
     });
+    test("Đã làm rồi bấm ↺ ở thẻ: thói quen trở về mức trước (cả khi mở lại app)", async () => {
+      await reset();
+      const d = todayStr(), orig = (S.days[d] || {}).h?.journal, lv = () => (S.days[d] || {}).h?.journal;
+      const now = new Date(), blk = block("Nhật ký thử", new Date(now - 10 * 60000), new Date(+now + 10 * 60000), { habit: "journal", cat: "life" });
+      try {
+        for (const before of [undefined, "min"]) {
+          await setHabit(d, "journal", before || null); S.today.plan = [blk];
+          await markBlock(blk.id, "done"); eq(lv(), "full", "Đã làm đánh dấu đạt");
+          await unmarkBlock(blk.id); eq(lv(), before, "↺ trả về " + before);
+        }
+        // mở lại app: việc đã làm đọc lại từ lịch, vẫn biết mức cũ
+        await setHabit(d, "journal", null); S.today.plan = [blk];
+        await markBlock(blk.id, "done");
+        S.today.actual = (await api().listActual(today, day(1))).map(a => Object.assign({}, a));
+        await unmarkBlock(blk.id); eq(lv(), undefined, "sau khi tải lại");
+        // tự đổi sang tối thiểu sau khi bấm Đã làm: ↺ không đè lên lựa chọn đó
+        await markBlock(blk.id, "done"); await setHabit(d, "journal", "min");
+        await unmarkBlock(blk.id); eq(lv(), "min", "giữ lựa chọn của người dùng");
+        // hoàn tác trên toast đi cùng đường
+        await setHabit(d, "journal", null); await markBlock(blk.id, "done");
+        $(".toast__undo").click(); await wait(30); eq(lv(), undefined, "toast hoàn tác");
+      } finally { await setHabit(d, "journal", orig || null); await reset(); }
+    });
+    test("Rest day: chỉ hiện thói quen có tối thiểu; thẻ Rest day liệt kê đúng những thói quen đó", async () => {
+      const prev = keep(); await reset();
+      const d = todayStr(), keepRec = Object.assign({}, S.days[d] || blankRec(d));
+      const base = { cat: "life", icon: "ph-drop", freq: "daily", full: "x" };
+      try {
+        await saveHabits([
+          Object.assign({}, base, { id: "rA", name: "Uống nước", min: "1 ly" }),
+          Object.assign({}, base, { id: "rB", name: "Chạy bộ" }),                                                  // không có tối thiểu → ẩn
+          Object.assign({}, base, { id: "rC", name: "Bơi", freq: "weekly", days: [...ALL], perWeekFull: 2, perWeekMin: 1, min: "1 lần/tuần" }), // số lần/tuần → ẩn
+          Object.assign({}, base, { id: "rD", name: "Đọc sách" }),                                                 // không có tối thiểu nhưng đã làm → vẫn hiện
+        ]);
+        await saveRec(Object.assign(blankRec(d), { id: keepRec.id, unwell: true, h: { rD: "full" } }));
+        renderToday();
+        eq($$("#view-today [data-habit]").map(b => b.dataset.habit).sort(), ["rA", "rD"], "chip hiện");
+        const a = $('#view-today [data-habit="rA"]');
+        eq(a.getAttribute("aria-label"), "Uống nước: rest day, tối thiểu 1 ly"); ok(a.textContent.includes("1 ly"), "chip ghi bản tối thiểu");
+        const card = $(".unwell-card");
+        eq($$(".unwell-card li").map(li => li.textContent.trim()), ["Uống nước · 1 ly"], "thẻ Rest day");
+        ok(!card.textContent.includes("Ngủ thêm"), "không còn dòng viết cứng");
+        const h = [...document.querySelectorAll("#view-today .h2")].find(x => x.textContent.includes("Thói quen hôm nay"));
+        ok(h.textContent.includes("rest day") && !h.textContent.includes("xong"), h.textContent);
+        // không còn thói quen nào có tối thiểu: thẻ chỉ nói nghỉ ngơi là đủ
+        await saveHabits([Object.assign({}, base, { id: "rB", name: "Chạy bộ" })]); renderToday();
+        ok(!$(".unwell-card ul") && $(".unwell-card").textContent.includes("nghỉ ngơi là đủ"), $(".unwell-card").textContent);
+      } finally { await saveRec(keepRec); await back(prev); await reset(); }
+    });
+    test("bộ thói quen mẫu chỉ dành cho xem thử: người mới bắt đầu trống, cấu hình cũ giữ bộ cũ", async () => {
+      const keepS = Object.assign({}, S.settings), keepCfg = S.cfg, keepLS = localStorage.getItem("sl.habits");
+      try {
+        localStorage.removeItem("sl.habits");
+        S.settings.demo = false;
+        S.cfg = null; loadLocalHabits(); eq(ALLH.length, 0, "chưa có lịch");
+        S.cfg = { planCal: "x", configFileId: "f", habits: [] }; loadLocalHabits(); eq(ALLH.length, 0, "lịch mới dựng");
+        S.cfg = { planCal: "x", configFileId: "f" }; loadLocalHabits(); eq(ALLH.map(h => h.id), SAMPLE_HABITS.map(h => h.id), "cấu hình cũ chưa có habits");
+        localStorage.setItem("sl.habits", JSON.stringify([{ id: "mine", name: "Của tôi" }])); loadLocalHabits(); eq(ALLH.map(h => h.id), ["mine"], "đã lưu thì dùng danh sách đã lưu");
+        S.settings.demo = true; localStorage.removeItem("sl.demoHabits"); loadLocalHabits(); eq(ALLH.length, SAMPLE_HABITS.length, "xem thử dùng bộ mẫu");
+      } finally {
+        S.settings = keepS; S.cfg = keepCfg;
+        if (keepLS == null) localStorage.removeItem("sl.habits"); else localStorage.setItem("sl.habits", keepLS);
+        loadLocalHabits(); await reset();
+      }
+    });
     test("không còn thói quen nào: tab Thói quen có nút thêm, Hôm nay không có tiêu đề thói quen", async () => {
       const prev = keep(); await reset();
       await saveHabits([]); setView("habits");
@@ -983,6 +1050,94 @@
       ok(!("enum" in geminiSchema().properties.habits.items.properties.id), "schema không có enum rỗng");
       await back(prev); await reset();
     });
+  });
+
+  // ------------------------------------------------------------ nhờ AI điền form thói quen
+  describe("Nhờ AI điền / sửa thói quen", () => {
+    const keep = () => ALLH.map(h => Object.assign({}, h));
+    const back = async list => { await saveHabits(list); localStorage.removeItem("sl.demoHabits"); loadLocalHabits(); };
+    test("fillHabForm điền mọi ô, chưa lưu gì cho tới khi bấm Lưu", async () => {
+      const prev = keep(), n = ALLH.length; await reset();
+      renderHabForm(null); const from = $("#hFrom").value;
+      fillHabForm({ name: "Đọc sách", short: "Đọc sách dài quá mười bốn", cat: "build", icon: "ph-book-open", freq: "days", days: [5, 1, 3, 9], full: "đọc 10 trang", min: "1 trang" });
+      eq([$("#hName").value, $("#hShort").value, $("#hCat").value, $("#hForm").dataset.freq], ["Đọc sách", "Đọc sách dài q", "build", "days"]);
+      eq($$("[data-hday][aria-pressed=true]").map(b => +b.dataset.hday).sort(), [1, 3, 5]);
+      eq($(".iconpick button").dataset.hicon, "ph-book-open", "biểu tượng AI chọn đứng đầu, đang chọn");
+      eq($(".iconpick button").getAttribute("aria-checked"), "true");
+      eq([$("#hFull").value, $("#hMin").value, $("#hFrom").value], ["đọc 10 trang", "1 trang", from]);
+      ok($("#hName").closest(".field").classList.contains("is-ai"), "ô đổi thì nháy");
+      eq(ALLH.length, n, "chưa lưu");
+      $("#hSave").click(); await wait(30);
+      const h = ALLH[ALLH.length - 1];
+      eq([h.name, h.cat, h.freq, h.days, h.full], ["Đọc sách", "build", "days", [1, 3, 5], "đọc 10 trang"]);
+      await back(prev); await reset();
+    });
+    test("theo tuần: số lần trong 1..7, tối thiểu không quá mục tiêu; giá trị lạ bị bỏ qua", async () => {
+      await reset(); renderHabForm(null);
+      fillHabForm({ name: "Gym", cat: "scroll", icon: "ph-không-có", freq: "weekly", days: [0, 1, 2, 3, 4, 5, 6], perWeekFull: 12, perWeekMin: 9, full: "tập" });
+      eq([$("#hForm").dataset.freq, $("#hPerFull").value, $("#hPerMin").value, $("#hCat").value], ["weekly", "7", "7", "health"]);
+      eq($$("[data-hday][aria-pressed=true]").length, 0, "đủ 7 ngày = không gợi ý ngày");
+      eq($("[data-hicon][aria-checked=true]").dataset.hicon, "ph-check-circle", "biểu tượng lạ giữ nguyên");
+      await reset();
+    });
+    test("sửa: prompt gửi kèm thói quen hiện tại; schema đúng danh sách", async () => {
+      await reset(); renderHabForm("gym");
+      const cur = habFormRaw();
+      eq([cur.name, cur.freq, cur.perWeekFull, "min" in cur], ["Gym", "weekly", 2, false]);
+      const p = habAiPrompt("đổi thành 3 buổi", cur);
+      ok(p.includes("SỬA") && p.includes('"name":"Gym"') && p.includes("đổi thành 3 buổi"), "prompt sửa");
+      ok(habAiPrompt("uống nước", null).includes("TẠO") && !habAiPrompt("x", null).includes("hiện tại"), "prompt tạo mới");
+      const sc = habAiSchema().properties;
+      eq(sc.icon.enum, HICONS); ok(!sc.cat.enum.includes("scroll"), "không có nhóm Lướt");
+      await reset();
+    });
+    // Có key giả, geminiJSON trả kết quả cố định: không gọi Gemini thật. Xong thì trả lại như cũ.
+    const withAi = async (reply, fn) => {
+      const key = S.settings.geminiKey, real = window.geminiJSON, sent = [];
+      S.settings.geminiKey = "TEST"; window.geminiJSON = async (prompt) => { sent.push(prompt); return { p: reply, model: "test" }; };
+      try { await fn(sent); } finally { S.settings.geminiKey = key; window.geminiJSON = real; }
+    };
+    test("chưa có Gemini key: form không có nút Nhờ AI", async () => {
+      const key = S.settings.geminiKey; S.settings.geminiKey = "";
+      try { await reset(); renderHabForm(null); ok(!$("#hAiGo"), "thêm"); renderHabForm("gym"); ok(!$("#hAiGo"), "sửa"); }
+      finally { S.settings.geminiKey = key; }
+      await reset();
+    });
+    test("sửa: nút Nhờ AI sửa mở popup nhập trên sheet; gửi thì điền form, đóng popup, sheet vẫn mở", () => withAi(
+      { name: "Gym", cat: "health", icon: "ph-barbell", freq: "weekly", days: [2, 6], perWeekFull: 3, perWeekMin: 1, full: "có tập gym hôm đó.", reply: "Đã đổi thành 3 buổi." }, async sent => {
+      await reset();
+      $("#inputText").value = "đang gõ dở"; const ph = $("#inputText").placeholder;
+      renderHabForm("gym");
+      ok(!$("#hAi") && $("#hAiGo").textContent.includes("Nhờ AI sửa"), "form chỉ còn 1 nút");
+      ok($("#hAiNote").hidden, "chưa có ghi chú");
+      $("#hAiGo").click(); await wait(20);
+      ok($("#dock").classList.contains("is-open") && $("#dock").classList.contains("is-habit"), "mở popup chế độ thói quen");
+      eq([$("#inputText").value, $("#dockTitle").textContent], ["", "Nhờ AI sửa thói quen"]);
+      ok(getComputedStyle($("#btnManual")).display === "none", "ẩn nút Tự thêm");
+      ok(+getComputedStyle($("#dock")).zIndex > +getComputedStyle($("#sheet")).zIndex, "popup nằm trên sheet");
+      $("#dock").requestSubmit(); await wait(20);
+      ok($("#dock").classList.contains("is-open"), "trống thì không gửi");
+      eq(sent.length, 0, "chưa gọi AI");
+      $("#inputText").value = "đổi thành 3 buổi mỗi tuần"; $("#dock").requestSubmit(); await wait(40);
+      ok(sent.length === 1 && sent[0].includes("SỬA") && sent[0].includes("đổi thành 3 buổi mỗi tuần"), "gửi prompt sửa");
+      ok(!$("#dock").classList.contains("is-open") && sheetOpen(), "đóng popup, sheet vẫn mở");
+      eq($("#hPerFull").value, "3");
+      ok(!$("#hAiNote").hidden && $("#hAiNote").textContent.includes("Đã đổi thành 3 buổi.") && $("#hAiNote").textContent.includes("bấm Lưu"), "báo đã điền");
+      eq(H.gym.perWeekFull, 2, "chưa lưu");
+      eq([$("#inputText").value, $("#inputText").placeholder], ["đang gõ dở", ph], "trả lại chữ ô Hôm nay");
+      $("#inputText").value = ""; await reset();
+    }));
+    test("thêm: nút Nhờ AI điền; đóng popup bằng Esc không đóng sheet, không đổi form", () => withAi({}, async () => {
+      await reset(); renderHabForm(null);
+      ok($("#hAiGo").textContent.includes("Nhờ AI điền"));
+      $("#hAiGo").click(); await wait(20);
+      eq($("#dockTitle").textContent, "Nhờ AI điền thói quen");
+      $("#inputText").value = "đọc sách";
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); await wait(20);
+      ok(!$("#dock").classList.contains("is-open") && !$("#dock").classList.contains("is-habit") && sheetOpen(), "chỉ đóng popup");
+      eq([$("#hName").value, $("#inputText").value], ["", ""]);
+      await reset();
+    }));
   });
 
   // ------------------------------------------------------------ đổi lịch từ một ngày
@@ -1065,7 +1220,7 @@
     const keep = () => ALLH.map(h => Object.assign({}, h));
     const back = async list => { await saveHabits(list); localStorage.removeItem("sl.demoHabits"); loadLocalHabits(); };
     test("mặc định có nhóm hợp lệ; thiếu nhóm thì lấy theo mặc định hoặc Sinh hoạt", () => {
-      for (const hb of DEFAULT_HABITS) ok(CATS[hb.cat], hb.id);
+      for (const hb of SAMPLE_HABITS) ok(CATS[hb.cat], hb.id);
       eq(normHabit({ id: "yoga", name: "Yoga" }).cat, "health");
       eq(normHabit({ id: "lạ", name: "X", cat: "không có" }).cat, "life");
     });

@@ -30,7 +30,9 @@ Người thân & bạn bè (Flamingo) · Giải trí có chủ đích (Tangerine
 - Lớp tiếng Hàn T2-4-6 19:00–21:00 (ăn tối 17:30) · ngày khác tự học 14:00–14:30, ăn tối 18:30, giải trí 20:00
 
 ## Habit (giai đoạn khởi động)
-Đây là danh sách mặc định. Sửa, thêm, ngừng theo dõi ở trang **Quản lý thói quen** (xem mục Màn hình).
+Người dùng mới bắt đầu **không có thói quen nào** và tự thêm ở trang **Quản lý thói quen** (xem mục Màn hình).
+Bảng dưới chỉ là **bộ mẫu của chế độ xem thử** (`SAMPLE_HABITS`), app không tự thêm bộ này cho tài khoản thật.
+Ngoại lệ: tài khoản đã dựng lịch từ trước khi có danh sách riêng (file cấu hình chưa có `habits`) thì giữ bộ đang dùng và ghi nó lên Drive một lần, để lịch sử cũ vẫn khớp.
 
 | Habit | Tần suất | Tối thiểu |
 |---|---|---|
@@ -45,14 +47,14 @@ Người thân & bạn bè (Flamingo) · Giải trí có chủ đích (Tangerine
 
 Để sau: Thiền.
 
-Luật chuỗi: bản tối thiểu vẫn tính. Unwell day không làm gãy chuỗi. Hôm nay chưa xong không làm gãy chuỗi.
+Luật chuỗi: bản tối thiểu vẫn tính. Rest day không làm gãy chuỗi. Hôm nay chưa xong không làm gãy chuỗi.
 Thói quen "số lần/tuần" chỉ tính tuần đạt khi có ít nhất 1 lần (kể cả khi đặt tối thiểu 0).
 
 ### Một thói quen gồm
 - **Tên**, **tên ngắn** (cho bảng Tuần), **nhóm** (cùng 7 nhóm thời gian, chỉ để tô màu và xếp), **biểu tượng** (một hàng vuốt ngang, cái đang chọn đứng đầu).
 - **Lịch**, một trong ba: Mỗi ngày · Ngày cố định (vd T2-4-6, chỉ những ngày đó mới tính) ·
   Số lần/tuần (mục tiêu và tối thiểu mỗi tuần, ngày gợi ý không bắt buộc; có chọn ngày thì chỉ hiện ở Hôm nay vào ngày đó).
-- **Thế nào là đạt** (chữ tự do, vài dòng, vd "2 lít, tính cả trà") và **bản tối thiểu** (chữ ngắn, tuỳ chọn; có tối thiểu thì chip có nút ½).
+- **Thế nào là đạt** (chữ tự do, vài dòng, vd "2 lít, tính cả trà") và **tối thiểu** (chữ ngắn, tuỳ chọn; có tối thiểu thì chip có nút ½).
   Số lần/tuần thì tối thiểu là "N lần/tuần". Gemini đọc hai ô này để biết câu kể có tính là đạt không (không còn ô Ghi chú cho AI riêng).
 - Mức đạt hiện là chữ, app không tự so số (trừ luật riêng của Đi bộ). Loại "mục tiêu bằng số" (nhập số, app tự chấm) chưa làm.
 
@@ -63,17 +65,25 @@ không đụng tới các lần đã đánh dấu. Hẹn đổi lịch ở tươ
 Tuần có đổi lịch: số lần/tuần tính theo lịch của thứ Hai đầu tuần.
 Thói quen mới chọn ngày bắt đầu (hôm nay hoặc tương lai); trước ngày đó không tính, chưa hiện ở Hôm nay.
 
-## Unwell day
-Lịch hôm nay chuyển sang bản nhẹ (ăn 3 bữa, 5 từ, đi bộ ngắn, ngủ). Tắt nhắc nhở các khối không cần thiết còn lại hôm đó
+## Rest day
+Lịch hôm nay chuyển sang bản nhẹ: chỉ làm bản tối thiểu của thói quen. Tắt nhắc nhở các khối không cần thiết còn lại hôm đó
 trong lịch Kế hoạch: thêm 💤 vào tên, bỏ nhắc, gọi song song (bật lại được bằng "Mình ổn hơn rồi").
-Trong lúc chờ, nút khoá lại và hiện vòng quay. 3 ngày liền là unwell → app hỏi thăm.
+Trong lúc chờ, nút khoá lại và hiện vòng quay. 3 ngày liền là rest day → app hỏi thăm.
+Thói quen nào còn hiện trong rest day:
+- Có **Tối thiểu** và lịch hôm đó → hiện, chip ghi bản tối thiểu (vd "Ăn đủ 3 bữa · không bỏ bữa"). Không làm cũng không gãy chuỗi.
+- Không có tối thiểu, hoặc loại số lần/tuần (tối thiểu tính theo tuần, không có bản nhẹ cho riêng một ngày) → ẩn.
+- Đã đánh dấu Đạt / Tối thiểu trước khi bật rest day → vẫn hiện như bình thường.
+
+Thẻ Rest day liệt kê các thói quen còn hiện mà chưa làm, kèm bản tối thiểu ("Nếu còn sức, chỉ cần bản tối thiểu:"). Không còn thói quen nào thì ghi "Hôm nay nghỉ ngơi là đủ."
+Tiêu đề Thói quen hôm nay ghi "rest day" thay vì "xong".
 
 ## Màn hình
 Thanh dưới có 4 ô: Hôm nay · Thói quen · Nhật ký · Cài đặt (Cài đặt mở sheet, không đổi tab).
 Đầu trang là 1 dòng chữ nhỏ: lời chào theo buổi · thứ, ngày tháng.
 
 1. **Hôm nay**
-   - Bây giờ / Tiếp theo: nút Đã làm, Bỏ qua, Làm việc khác.
+   - Bây giờ / Tiếp theo: nút Đã làm, Bỏ qua, Làm việc khác. Đã làm ở khối có thói quen (vd Nhật ký) thì đánh dấu thói quen đó đạt.
+     Nút ↺ trên thẻ (hoặc Hoàn tác trên toast) bỏ việc đã ghi và trả thói quen về mức trước khi bấm, trừ khi bạn đã tự đổi mức sau đó.
    - Habit hôm nay, nút "Hôm nay mình không ổn".
    - Thời gian theo nhóm + timeline kế hoạch vs thực tế 5:00–23:00 trong khung cao cố định, cuộn bên trong,
      mở ra tự cuộn tới giờ hiện tại, render lại giữ nguyên chỗ đang xem. Khối ngắn hiện 1 dòng, cắt bằng "…".
@@ -101,8 +111,13 @@ Thanh dưới có 4 ô: Hôm nay · Thói quen · Nhật ký · Cài đặt (Cà
    - **Quản lý thói quen**: nút thanh trượt cạnh Tuần/Tháng mở trang con (nút ← hoặc bấm tab Thói quen để về).
      Danh sách gom theo nhóm, mỗi dòng: biểu tượng, tên, lịch. Nút ↑ ↓ đổi thứ tự trong nhóm. Chạm dòng mở sheet Sửa thói quen.
      "Thêm thói quen" ở cuối. Mục "Đã ngừng": thói quen ngừng theo dõi (không hiện ở Hôm nay, không tính chuỗi, không vào luật AI, dữ liệu cũ giữ).
-   - Sheet Thêm / Sửa: nút Ngừng theo dõi (hoặc Theo dõi lại · Xoá hẳn nếu đã ngừng) ở đầu form, rồi các ô ở mục "Một thói quen gồm",
+   - Sheet Thêm / Sửa: nút Ngừng theo dõi (hoặc Theo dõi lại · Xoá hẳn nếu đã ngừng) ở đầu form, rồi nút **Nhờ AI điền / Nhờ AI sửa**, rồi các ô ở mục "Một thói quen gồm",
      ô ngày áp dụng lịch. Thiếu tên, ngày cố định chưa chọn ngày, ngày đã qua: báo dưới form, không đóng sheet.
+     Nút Nhờ AI chỉ hiện khi đã có Gemini key. Bấm vào mở popup nhập từ dưới lên (giống popup ghi việc ở Hôm nay, có micro), nằm trên form. Kể bằng lời
+     (vd "uống 2 lít nước mỗi ngày, mệt thì 1 lít"; khi sửa: "đổi thành 3 buổi mỗi tuần") rồi gửi. Popup đóng lại,
+     Gemini điền tên, tên ngắn, nhóm, biểu tượng, lịch, Thế nào là đạt, Tối thiểu; ô nào đổi thì nháy nhẹ, dưới nút hiện 1 câu AI đã làm gì.
+     Lỗi thì popup giữ nguyên chữ để thử lại. Đóng popup (Esc, chạm nền) không đóng form.
+     AI **không tự lưu** và không đụng ô ngày áp dụng: người dùng xem lại, chỉnh rồi bấm Lưu. Khi sửa (hoặc form đã có chữ), AI chỉ đổi phần được nhờ.
      Lưu, ngừng, xoá đều có hoàn tác. Theo dõi lại thì tính từ hôm nay, khoảng đã ngừng không thành Bỏ.
    - Không còn thói quen nào: tab Thói quen hiện nút Thêm thói quen, Hôm nay không có mục Thói quen hôm nay.
 4. **Nhật ký**: viết hôm nay, xem các ngày trước. Mỗi ngày một trang trên Drive.

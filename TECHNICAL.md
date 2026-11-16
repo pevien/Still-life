@@ -55,7 +55,7 @@ các ngày khác của chuỗi lặp giữ nguyên. Đây là lý do "sửa kế
 ### 2.2 Google Calendar · lịch "Still life · Thực tế"
 | Loại | Cách nhận ra | Nội dung |
 |---|---|---|
-| Việc đã làm | `private.sl=act` | `summary`, giờ, `colorId` theo nhóm, `private.cat`, `private.plan` (id khối kế hoạch nếu bấm "Đã làm"), `private.habit` |
+| Việc đã làm | `private.sl=act` | `summary`, giờ, `colorId` theo nhóm, `private.cat`, `private.plan` (id khối kế hoạch nếu bấm "Đã làm"), `private.habit`, `private.hprev` (mức thói quen trước khi bấm Đã làm: `none`/`min`/`full`/`skip`; rỗng nếu không đụng thói quen) |
 | Bản ghi ngày | `private.sl=day`, sự kiện **cả ngày** "Thói quen · d/m" | trạng thái habit, unwell, khối bỏ qua, khối đã tắt |
 
 Bản ghi ngày được lưu dạng chuỗi trong `extendedProperties.private` (Calendar chỉ cho chuỗi), qua `recToProps()` / `recFromEv()`:
@@ -71,7 +71,7 @@ Bản ghi ngày được lưu dạng chuỗi trong `extendedProperties.private` 
 ### 2.3 Google Drive · thư mục "Still life"
 | File | Nội dung |
 |---|---|
-| `still-life-config.json` | `{ planCal, actualCal, folderId, journalFolderId, start, v, geminiKey, habits }`. `start` là ngày bắt đầu theo dõi, các ô trước ngày này hiện "none". `habits` là danh sách thói quen (mục 3.8); không có thì dùng `DEFAULT_HABITS` |
+| `still-life-config.json` | `{ planCal, actualCal, folderId, journalFolderId, start, v, geminiKey, habits }`. `start` là ngày bắt đầu theo dõi, các ô trước ngày này hiện "none". `habits` là danh sách thói quen (mục 3.8). Dựng lịch mới ghi `habits: []`. Không có trường này là cấu hình cũ: dùng `SAMPLE_HABITS` rồi ghi lên Drive một lần |
 | `Nhật ký/YYYY-MM-DD.md` | Markdown: `# Nhật ký · …` rồi các mục `## Vui vì`, `## Biết ơn`, `## Mai muốn`, `## Ghi thêm`. Ghi bằng `journalMd()`, đọc bằng `parseJournal()` |
 
 Scope OAuth chỉ có `calendar.app.created` và `drive.file`: app chỉ thấy lịch và file do chính nó tạo, không đọc được lịch hay file khác của người dùng.
@@ -160,7 +160,8 @@ sequenceDiagram
   App->>Cal: setUnwell(true) nếu câu nói không khỏe
   App->>U: toast "Đã ghi", có Hoàn tác
 ```
-- Gemini: thử model đang chọn, rồi lần lượt các model dự phòng nếu gặp 429, 5xx, 404 (`callGemini`).
+- Gemini: thử model đang chọn, rồi lần lượt các model dự phòng nếu gặp 429, 5xx, 404 (`geminiJSON(prompt, schema, temperature)`, dùng chung;
+  `callGemini(text)` là lời gọi cho câu kể hằng ngày).
   Thiếu key, key sai (401, 403, thông báo có "API key") → lỗi có `needKey`, toast hiện nút "Mở Cài đặt".
 - Sheet xác nhận: mỗi thẻ việc có ô ngày sửa được (`dateField`, giá trị qua `validDay`: không rỗng, không tương lai),
   tô màu khi khác hôm nay; chip thói quen có `date` khác hôm nay hiện nhãn ngắn (`dayShort`: "Hôm qua" hoặc "T6 13/11/2026"). Không còn gì để ghi (`pendingEmpty`)
@@ -192,8 +193,21 @@ sequenceDiagram
   bỏ các đoạn kết thúc trước `since`. `pendingFrom(hb)` trả ngày lịch hẹn bắt đầu nếu còn ở tương lai.
 - Lưu: `saveHabits(list)` → `useHabits` + `LS` ngay (giao diện đổi trước), rồi `Google.pushHabits()` ghi `habits` vào file cấu hình.
   `habChange(list, msg)` bọc lại, có toast Hoàn tác (lưu lại bản chụp trước đó).
+- Nguồn danh sách (`loadLocalHabits()`): bản đã lưu trong máy (`sl.habits`, xem thử là `sl.demoHabits`); chưa có thì xem thử dùng `SAMPLE_HABITS`,
+  tài khoản thật dùng `[]`, trừ cấu hình cũ (`legacyCfg()`: có `S.cfg` mà không có mảng `habits`) thì dùng `SAMPLE_HABITS`.
+  `refresh()` đọc file cấu hình: thiếu `habits` thì `pushHabits(ALLH)` một lần để chốt danh sách đó thành của người dùng. `adoptCfg()` (máy mới) lấy luôn `habits` trong cấu hình tìm được.
+- Rest day: `restHabits(d)` = thói quen đang theo dõi có `min`, có lịch ngày `d`, đã bắt đầu, lịch ngày đó không phải `weekly`.
+  Hôm nay chỉ hiện chip `rest` của các thói quen này (chip đã Đạt / Tối thiểu luôn hiện); thẻ Rest day liệt kê những cái còn `rest`.
 - Đọc: `refresh()` gọi `loadLocalHabits()` (đổi demo/thật là đổi danh sách); mỗi phiên mở app đọc file cấu hình một lần (`S.habLooked`),
   `habits` khác bản trong máy thì thay và vẽ lại. Hai máy sửa cùng lúc: bản ghi sau thắng.
+- **Nhờ AI điền form**: `#hAiGo` → `openHabAi()` mở lại `#dock` ở chế độ `is-habit` (z-index 56 > sheet 50; ẩn Tự thêm, hiện `#dockTitle`).
+  `S.compose = { mode: "habit", text, ph }` cất chữ + placeholder của ô Hôm nay; `closeCompose()` gặp chế độ này thì `endHabAi()` trả lại, không đụng `S.otherFor`.
+  Gửi (`submit` / Enter) khi `habAiOpen()` → `habAi(text)`; thành công thì đóng popup rồi điền form, lỗi thì giữ popup. Esc đóng popup trước sheet.
+   `habFormRaw()` đọc các ô đang có (chưa kiểm tra); sửa hoặc form đã có tên thì gửi kèm làm "thói quen hiện tại".
+  `habAiPrompt(text, cur)` + `habAiSchema()` (enum `icon` = `HICONS`, `cat` bỏ `scroll`) → `geminiJSON(…, 0.3)`. `fillHabForm(a)` chỉ đặt giá trị vào form:
+  cắt độ dài như maxlength, ngày lọc 0..6, số lần/tuần kẹp 1..7 và tối thiểu ≤ mục tiêu, giá trị lạ (icon/nhóm/lịch) giữ ô cũ, không đụng `#hFrom`.
+  Ô đổi thì thêm class `is-ai` (nháy nền). Không ghi gì cho tới khi bấm Lưu, nên vẫn đi qua `readHabForm` → `applySched` như sửa tay.
+  Chưa có Gemini key thì form không có nút `#hAiGo`.
 - Bản ghi ngày không đổi khi sửa thói quen: `h[id]` vẫn nằm trong Calendar kể cả khi thói quen bị xoá hẳn.
 - `markBlock` chỉ đánh dấu habit của khối nếu thói quen đó còn trong `HABITS`.
 
@@ -210,7 +224,7 @@ Chạm chỗ trống: `y` trong cột → phút = `TL.H0*60 + y / TL.PX * 60`, l
 Kết thúc mặc định +30 phút, hoặc tới khối kế tiếp nếu khối đó cách ≥15 phút.
 Vạch giờ, vạch hiện tại có `pointer-events: none` để không chặn cú chạm.
 
-### 3.6 Unwell day
+### 3.6 Rest day (trong code vẫn là `unwell`)
 `setUnwell(true)`: lấy các khối không thiết yếu còn lại trong ngày → `mutePlan(items, true)` (song song, đổi tên thành `💤 …`, bỏ nhắc)
 → lưu `rec.unwell = true`, `rec.muted = [ids]`. `setUnwell(false)` bật lại đúng các id trong `rec.muted`, khôi phục nhắc theo `TEMPLATE`.
 Nếu gọi Calendar lỗi, bản ghi ngày vẫn được lưu (unwell là trạng thái quan trọng hơn việc tắt nhắc).
