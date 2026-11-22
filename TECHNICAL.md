@@ -65,7 +65,7 @@ Chỉ nhận `FREQ=WEEKLY` / `DAILY`, không `COUNT`, không `INTERVAL` khác 1 
 | Loại | Cách nhận ra | Nội dung |
 |---|---|---|
 | Việc đã làm | `private.sl=act` | `summary`, giờ, `colorId` theo nhóm, `private.cat`, `private.plan` (id khối kế hoạch nếu bấm "Đã làm"), `private.habit`, `private.hprev` (mức thói quen trước khi bấm Đã làm: `none`/`min`/`full`/`skip`; rỗng nếu không đụng thói quen) |
-| Bản ghi ngày | `private.sl=day`, sự kiện **cả ngày** "Thói quen · d/m" | trạng thái habit, unwell, khối bỏ qua, khối đã tắt |
+| Bản ghi ngày | `private.sl=day`, sự kiện **cả ngày** "Thói quen · d/m" | trạng thái habit, unwell, khối đã tắt |
 
 Bản ghi ngày được lưu dạng chuỗi trong `extendedProperties.private` (Calendar chỉ cho chuỗi), qua `recToProps()` / `recFromEv()`:
 ```js
@@ -73,7 +73,7 @@ Bản ghi ngày được lưu dạng chuỗi trong `extendedProperties.private` 
   h: { eat: "full" | "min" | "skip", ... },   // trạng thái từng habit
   v: { walk: 2400 },                          // giá trị đo được (số bước…)
   unwell: bool, reason: string /* ≤500 ký tự */,
-  skip:  [planId, ...],   // khối kế hoạch đã bấm "Bỏ qua"
+  skip:  [planId, ...],   // chỉ đọc: bản cũ đánh dấu "Bỏ qua". clearOldSkips() xoá các khối này trên Calendar rồi ghi lại bản ghi (recToProps không ghi skip nữa)
   muted: [planId, ...] }  // khối bị tắt khi bật unwell, để bật lại đúng những khối đó
 ```
 
@@ -229,10 +229,9 @@ sequenceDiagram
 | Hành động | Hàm | Gọi API |
 |---|---|---|
 | Đã làm | `markBlock(id, "done")` | `addActual({ plan: id })` + `setHabit` nếu khối có habit |
-| Bỏ qua | `markBlock(id, "skip")` | `saveDay` với `skip += id` |
+| Xoá (chỉ hôm nay) | `deletePlanToday` → `dropPlans([id])` | `cancelPlan` (PATCH `status: cancelled`; lần lặp thành exception, chuỗi giữ nguyên). Hoàn tác: `restorePlans` → `restorePlan` (PATCH `status: confirmed`) rồi `loadToday` |
 | Sửa tên, giờ | `renderPlanEdit` → `savePlanEdit` | `updatePlan` (PATCH lần lặp hôm nay) |
 | Thêm | chạm chỗ trống cột Kế hoạch → `renderPlanAdd` → `savePlanAdd` | `addPlan` (sự kiện đơn, `added=1`) |
-| Xoá khối đã thêm | `deletePlanAdded` | `deletePlan` (chỉ cho `added`) |
 | Kéo dời / kéo mép dưới (cả 2 cột) | `Drag` → `applyPlanTime` / `applyActTime` | `updatePlan` / `updateActual` |
 | Kéo chỗ trống cột Kế hoạch | `Drag` → `renderPlanAdd(start, end)` | như Thêm |
 

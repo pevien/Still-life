@@ -134,9 +134,10 @@
       eq([it.cat, it.plan, it.added], ["life", "", false]);
     });
     test("recToProps → recFromEv đi vòng giữ nguyên dữ liệu", () => {
-      const r = { id: "d1", date: "2026-11-14", h: { eat: "full", walk: "min" }, v: { walk: 2400 }, unwell: true, reason: "mệt", skip: ["a"], muted: ["b", "c"], late: null };
+      const r = { id: "d1", date: "2026-11-14", h: { eat: "full", walk: "min" }, v: { walk: 2400 }, unwell: true, reason: "mệt", skip: [], muted: ["b", "c"], late: null };
       const back = recFromEv({ id: "d1", extendedProperties: { private: recToProps(r) } });
       eq(back, r);
+      ok(!("skip" in recToProps(Object.assign({}, r, { skip: ["a"] }))), "không ghi trường skip nữa");
     });
     test("recToProps cắt lý do quá 500 ký tự", () => {
       eq(recToProps(blankRec("2026-11-14")).reason, "");
@@ -284,11 +285,9 @@
       const c = currentBlocks();
       eq([c.cur && c.cur.title, c.next && c.next.title, !!c.done], ["Đang", "Sau", false]);
     });
-    test("đã ghi thực tế / bỏ qua thì khối hiện tại là xong", () => {
+    test("đã ghi thực tế thì khối hiện tại là xong", () => {
       S.today = { plan: [p1, p2], actual: [{ id: "a", plan: p1.id }], rec: blankRec(todayStr()) };
       eq(!!currentBlocks().done, true);
-      S.today = { plan: [p1, p2], actual: [], rec: Object.assign(blankRec(todayStr()), { skip: [p1.id] }) };
-      const c = currentBlocks(); eq([!!c.done, !!c.skipped], [true, true]);
     });
     test("unwell day ẩn khối không thiết yếu", () => {
       S.today = { plan: [p1, p2], actual: [], rec: Object.assign(blankRec(todayStr()), { unwell: true }) };
@@ -336,11 +335,11 @@
       eq(b.querySelector(".tl__t").textContent, "<b>x</b>");
       eq(b.querySelectorAll(".tl__t b").length, 0);
     });
-    test("khối bỏ qua / đang tắt có class riêng", () => {
+    test("khối đang tắt có class riêng", () => {
       const p = block("A", at("09:00"), at("10:00")), m = block("B", at("10:00"), at("11:00"), { muted: true });
-      S.today = { plan: [p, m], actual: [], rec: Object.assign(blankRec(todayStr()), { skip: [p.id] }) };
+      S.today = { plan: [p, m], actual: [], rec: blankRec(todayStr()) };
       const b = html(timelineHTML());
-      ok(b.querySelector('[data-pid="t_A"]').classList.contains("is-skip"));
+      ok(!b.querySelector('[data-pid="t_A"]').classList.contains("is-muted"));
       ok(b.querySelector('[data-pid="t_B"]').classList.contains("is-muted"));
     });
   });
@@ -372,6 +371,17 @@
       ok(!(await Demo.listPlan(today, day(1))).some(p => p.id === it.id));
       ok((await Demo.listPlan(day(1), day(2))).some(p => p.id === it.id));
       await Demo.deletePlan(it.id);
+    });
+    test("cancelPlan xoá đúng lần lặp hôm nay, restorePlan trả lại", async () => {
+      const list = await Demo.listPlan(today, day(2));
+      const t0 = list.find(p => p.key === "free" && +startOfDay(p.start) === +today);
+      const t1 = list.find(p => p.key === "free" && +startOfDay(p.start) === +day(1));
+      await Demo.cancelPlan(t0.id);
+      const after = await Demo.listPlan(today, day(2));
+      ok(!after.some(p => p.id === t0.id), "hôm nay mất");
+      ok(after.some(p => p.id === t1.id), "ngày mai giữ nguyên");
+      await Demo.restorePlan(t0.id);
+      ok((await Demo.listPlan(today, day(1))).some(p => p.id === t0.id), "trả lại được");
     });
     test("mutePlan bật / tắt", async () => {
       const [p] = await Demo.listPlan(today, day(1));
@@ -519,13 +529,38 @@
   });
 
   describe("Chỉnh sửa kế hoạch", () => {
-    test("bấm khối kế hoạch mở sheet; khối tuần mẫu không có nút xoá", async () => {
+    test("bấm khối kế hoạch mở sheet; khối tuần mẫu cũng có nút xoá", async () => {
       await reset(); renderToday();
       const p = S.today.plan.find(x => !x.added);
       $(`.tl__col--plan [data-pid="${p.id}"]`).click(); await wait(30);
       eq([sheetTitle(), $("#pTitle").value, $("#pStart").value], ["Chỉnh sửa kế hoạch", p.title, hm(p.start)]);
-      ok(!$("#pDel"), "không có nút xoá");
+      ok($("#pDel"), "có nút xoá");
       closeSheet();
+    });
+    test("xoá khối tuần mẫu: chỉ mất hôm nay, ngày mai còn, hoàn tác trả lại", async () => {
+      await reset();
+      const p = S.today.plan.find(x => x.key === "free");
+      renderPlanEdit(p); $("#pDel").click(); await wait(30);
+      ok(!S.today.plan.some(x => x.id === p.id), "mất khỏi màn hình");
+      ok(!(await Demo.listPlan(today, day(1))).some(x => x.id === p.id), "mất khỏi lịch Kế hoạch");
+      ok((await Demo.listPlan(day(1), day(2))).some(x => x.key === "free"), "ngày mai còn");
+      await toast._undo();
+      ok(S.today.plan.some(x => x.id === p.id), "hoàn tác trả lại");
+    });
+    test("không còn nút Bỏ qua ở khối đang chạy", async () => {
+      await reset(); renderToday();
+      ok(!$('[data-act="skip"]'));
+    });
+    test("dọn Bỏ qua cũ: xoá khối khỏi lịch, bản ghi ngày hết skip", async () => {
+      await reset();
+      const p = S.today.plan.find(x => x.key === "free");
+      await saveRec(Object.assign(blankRec(todayStr()), S.today.rec || {}, { skip: [p.id] }));
+      S.days[todayStr()].skip = [p.id];   // Demo giữ nguyên object; giả lập bản ghi cũ còn skip
+      await clearOldSkips();
+      ok(!S.today.plan.some(x => x.id === p.id), "mất khỏi màn hình");
+      ok(!(await Demo.listPlan(today, day(1))).some(x => x.id === p.id), "mất khỏi lịch");
+      eq(S.days[todayStr()].skip, []);
+      await Demo.restorePlan(p.id); await reset();
     });
     test("sửa tên, giờ chỉ hôm nay, hoàn tác về như cũ", async () => {
       await reset();
@@ -554,7 +589,7 @@
       await loadToday();
       renderPlanEdit(S.today.plan.find(x => x.id === it.id));
       ok($("#pDel"), "có nút xoá");
-      await deletePlanAdded();
+      await deletePlanToday();
       ok(!S.today.plan.some(x => x.title === "Xoá thử"), "đã xoá khỏi màn hình");
       ok(!(await Demo.listPlan(today, day(1))).some(x => x.title === "Xoá thử"), "đã xoá khỏi dữ liệu");
       await toast._undo();
@@ -831,7 +866,7 @@
         ok(!$("#sheetBody").textContent.includes("Thời gian thực tế"), "không có dòng nhóm");
       } finally { window.callGemini = orig; closeSheet(); $("#inputText").value = ""; resetOther(); }
     });
-    test("Tự thêm khi Làm việc khác: giờ từ đầu khối đang chạy, nhóm theo khối; lưu thì ghi việc + bỏ qua khối", async () => {
+    test("Tự thêm khi Làm việc khác: giờ từ đầu khối đang chạy, nhóm theo khối; lưu thì ghi việc + xoá khối khỏi kế hoạch", async () => {
       await reset();
       const blk = block("Khối test", new Date(Date.now() - 40 * 60000), new Date(Date.now() + 20 * 60000), { id: "t_manual", cat: "korean" });
       S.today.plan.push(blk); S.otherFor = blk.id;
@@ -841,7 +876,7 @@
         renderConfirm(p); await savePending();
         const a = S.today.actual[S.today.actual.length - 1];
         eq(a.title, CATS.korean.name, "tên trống thì lấy tên nhóm");
-        ok((S.today.rec.skip || []).includes(blk.id), "khối đang chạy được đánh dấu bỏ qua");
+        ok(!S.today.plan.some(b => b.id === blk.id), "khối đang chạy bị xoá khỏi kế hoạch");
       } finally { S.today.plan = S.today.plan.filter(b => b.id !== blk.id); resetOther(); closeSheet(); }
     });
     test("+ Thêm việc: thẻ mới nối tiếp thẻ cuối, không mất chỗ đã sửa", async () => {
@@ -1630,31 +1665,33 @@
     });
     test("Áp dụng → Trả lại lịch cũ; sắp lại lần 2 tính từ giờ gốc; Hoàn tác về trạng thái trước", async () => {
       await reset();
-      const b0 = lateBase(), [x, y] = b0.filter(b => !b.done && !b.skip).slice(1, 3);
-      ok(x && y, "cần 2 khối");
-      const orig = new Map(S.today.plan.map(p => [p.id, [hm(p.start), hm(p.end)]])), skip0 = [...(S.today.rec.skip || [])];
+      const b0 = lateBase(), [x, y, z] = b0.filter(b => !b.done).slice(1, 4);
+      ok(x && y && z, "cần 3 khối");
+      const orig = new Map(S.today.plan.map(p => [p.id, [hm(p.start), hm(p.end)]]));
       const shift = (b, m) => ({ start: new Date(+b.start + m * 60000), end: new Date(+b.end + m * 60000) });
       S.late = { text: "t", base: b0, wake: b0[0].start, res: new Map([[x.k, shift(x, 7)], [y.k, { skip: true }]]), reply: "", hab: null };
       const undo = await applyLate();
       const px = () => S.today.plan.find(p => p.id === x.p.id);
       eq(hm(px().start), hm(shift(x, 7).start), "đã dời");
-      ok(S.today.rec.skip.includes(y.p.id), "đã bỏ qua");
+      ok(!S.today.plan.some(p => p.id === y.p.id), "y đã xoá khỏi kế hoạch");
+      ok(!(await Demo.listPlan(today, day(1))).some(p => p.id === y.p.id), "y đã xoá khỏi lịch");
       eq(S.today.rec.late.moved, [{ id: x.p.id, s: orig.get(x.p.id)[0], e: orig.get(x.p.id)[1] }]);
       const saved = (await Demo.listPlan(startOfDay(new Date()), addDays(startOfDay(new Date()), 1))).find(p => p.id === x.p.id);
       eq(hm(saved.start), hm(shift(x, 7).start), "đã ghi vào lịch");
-      // lần 2: chỉ dời y, x phải về giờ gốc, y không còn bị bỏ qua do lần 1
+      // lần 2: chỉ dời z, x phải về giờ gốc, y vẫn xoá (Trả lại lịch cũ mới trả lại)
       const b1 = lateBase();
       eq(hm(b1.find(b => b.p.id === x.p.id).start), orig.get(x.p.id)[0], "lateBase trả giờ gốc");
-      S.late = { text: "t", base: b1, wake: b1[0].start, res: new Map([[b1.find(b => b.p.id === y.p.id).k, shift(y, 5)]]), reply: "", hab: null };
+      S.late = { text: "t", base: b1, wake: b1[0].start, res: new Map([[b1.find(b => b.p.id === z.p.id).k, shift(z, 5)]]), reply: "", hab: null };
       await applyLate();
       eq(hm(px().start), orig.get(x.p.id)[0], "x về giờ gốc");
-      ok(!S.today.rec.skip.includes(y.p.id), "bỏ Bỏ qua của lần 1");
-      eq(S.today.rec.late.moved.map(m => m.id), [y.p.id]);
+      ok(!S.today.plan.some(p => p.id === y.p.id), "y vẫn xoá");
+      eq(S.today.rec.late.moved.map(m => m.id), [z.p.id]);
+      eq(S.today.rec.late.skipped, [y.p.id]);
       await undoLate();
       eq(S.today.rec.late, null);
       const key = l => l.map(r => r.join(" ")).sort().join("|");
       eq(key(S.today.plan.map(p => [p.id, hm(p.start), hm(p.end)])), key([...orig].map(([id, [s, e]]) => [id, s, e])), "về đúng giờ gốc");
-      eq(S.today.rec.skip, skip0);
+      ok(S.today.plan.some(p => p.id === y.p.id), "y được trả lại");
       await undo();   // hoàn tác của lần 1 = trở về trạng thái trước lần 1 (đã là lịch gốc), không lỗi
       eq(S.today.rec.late, null);
       await reset();
@@ -1710,7 +1747,7 @@
       // sửa trên dòng: bỏ, giữ lại, đổi giờ, chồng giờ thì khoá Áp dụng
       const k0 = $("#sheetBody [data-lskip]").dataset.lskip;
       $(`#sheetBody [data-lskip="${k0}"]`).click(); await wait(20);
-      ok($(`#sheetBody [data-lkeep="${k0}"]`), "Bỏ hôm nay → sang mục Bỏ");
+      ok($(`#sheetBody [data-lkeep="${k0}"]`), "Xoá → sang mục Xoá khỏi lịch hôm nay");
       $(`#sheetBody [data-lkeep="${k0}"]`).click(); await wait(20);
       if (!tp().hidden) { tpOk().click(); await wait(20); }
       ok($(`#sheetBody [data-lt="${k0}"]`), "Giữ lại → về danh sách");

@@ -5,6 +5,23 @@ Mới nhất ở trên. Số `vNN` là phiên bản cache trong `sw.js`.
 
 ---
 
+## 2026-11-22 · Bỏ "Bỏ qua": không làm thì xoá khối khỏi lịch Kế hoạch · v78
+**Đổi gì**
+- Bỏ nút Bỏ qua ở thẻ Bây giờ và nhãn "Đã bỏ qua". Sheet "Chỉnh sửa kế hoạch" có nút 🗑 cho mọi khối (trước chỉ khối thêm trong app): xoá khỏi lịch hôm nay, có Hoàn tác.
+- Những chỗ trước đây đánh dấu Bỏ qua giờ xoá khối khỏi lịch Kế hoạch hôm nay, cả trên Google Calendar: "Làm việc khác", và khối AI bỏ khi "Mình dậy trễ" (mục "Xoá khỏi lịch hôm nay"). Hoàn tác / Trả lại lịch cũ trả các khối đó lại.
+- Các khối đã Bỏ qua từ trước (hôm nay và các ngày đã tải) được xoá khỏi Google Calendar một lần khi mở app.
+
+**Vì sao**
+Khối bị bỏ qua vẫn nằm trên Google Calendar (vẫn nhắc, vẫn chiếm chỗ), còn trong app thì chỉ gạch ngang. Không làm thì xoá luôn cho lịch gọn và khớp.
+
+**Logic**
+- `cancelPlan(id)` = PATCH `status: "cancelled"` vào id lần lặp (singleEvents): Calendar tạo exception đã huỷ cho đúng ngày đó, chuỗi lặp các ngày khác không đổi. Dùng PATCH thay DELETE để `restorePlan` (PATCH `status: "confirmed"`) trả lại được, cho cả lần lặp lẫn sự kiện đơn.
+- Trả lại thì tải lại hôm nay (`loadToday`) để khối về đúng giờ trên Calendar, không phải giữ bản sao trong máy.
+- Bản ghi ngày không ghi trường `skip` nữa. `clearOldSkips()` đọc `skip` cũ, xoá các khối đó (404/410 coi như đã xoá), ghi lại bản ghi không còn `skip`, nên tự dừng và chạy được trên máy khác.
+- Dậy trễ: `rec.late.skipped` cộng dồn qua các lần sắp lại, khối đã xoá ở lần trước không quay lại khi sắp lần 2 (không còn trong lịch), "Trả lại lịch cũ" trả lại hết.
+
+---
+
 ## 2026-11-22 · Lịch mới hôm nay: ô giờ không nền, không viền · v77
 **Đổi gì**
 - Ô giờ trong sheet "Lịch mới hôm nay" bỏ nền xám và viền, vẫn chạm được. Có lỗi thì chỉ tô đỏ giờ mới (kèm dòng báo bên dưới).

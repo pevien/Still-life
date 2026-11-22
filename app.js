@@ -267,7 +267,7 @@ function recFromEv(ev) {
   return { id: ev.id, date: p.date, h: j(p.h, {}), v: j(p.v, {}), unwell: p.unwell === "1", reason: p.reason || "", skip: j(p.skip, []), muted: j(p.muted, []), late: lateParse(p.late, p.lm) };
 }
 function recToProps(r) {
-  return { sl: "day", date: r.date, h: JSON.stringify(r.h || {}), v: JSON.stringify(r.v || {}), unwell: r.unwell ? "1" : "0", reason: (r.reason || "").slice(0, 500), skip: JSON.stringify(r.skip || []), muted: JSON.stringify(r.muted || []), ...lateProps(r.late) };
+  return { sl: "day", date: r.date, h: JSON.stringify(r.h || {}), v: JSON.stringify(r.v || {}), unwell: r.unwell ? "1" : "0", reason: (r.reason || "").slice(0, 500), muted: JSON.stringify(r.muted || []), ...lateProps(r.late) };
 }
 // Dậy trễ: lưu gọn thành 2 thuộc tính (mỗi thuộc tính của Calendar tối đa 1024 ký tự). lm = giờ gốc các khối đã dời [[id, s, e]]
 function lateProps(L) {
@@ -448,6 +448,14 @@ const Google = {
   async deletePlan(id) {
     await g(`${CAL}/calendars/${encodeURIComponent(S.cfg.planCal)}/events/${encodeURIComponent(id)}`, { method: "DELETE" });
   },
+  // Xoá khối khỏi lịch Kế hoạch chỉ cho ngày đó: lần lặp thì Calendar tạo exception "cancelled", chuỗi lặp các ngày khác giữ nguyên.
+  // Dùng PATCH status thay cho DELETE để hoàn tác được bằng restorePlan (cả lần lặp lẫn sự kiện đơn).
+  async cancelPlan(id) {
+    await g(`${CAL}/calendars/${encodeURIComponent(S.cfg.planCal)}/events/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ status: "cancelled" }) });
+  },
+  async restorePlan(id) {
+    await g(`${CAL}/calendars/${encodeURIComponent(S.cfg.planCal)}/events/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ status: "confirmed" }) });
+  },
   async updatePlan(it) {   // id là 1 lần lặp (singleEvents) → chỉ đổi ngày đó
     const body = { summary: (it.muted ? "💤 " : "") + it.title, start: { dateTime: rfc(it.start), timeZone: TZ }, end: { dateTime: rfc(it.end), timeZone: TZ } };
     const ev = await g(`${CAL}/calendars/${encodeURIComponent(S.cfg.planCal)}/events/${encodeURIComponent(it.id)}`, { method: "PATCH", body: JSON.stringify(body) });
@@ -516,10 +524,10 @@ const Demo = (() => {
     if (now.getHours() >= 15) days[ds].h.korean = "full";
     return { days, actual, journal, muted: [] };
   }
-  db.planEdit = db.planEdit || {}; db.planExtra = db.planExtra || [];
+  db.planEdit = db.planEdit || {}; db.planExtra = db.planExtra || []; db.gone = db.gone || [];
   // Tuần mẫu của demo: mỗi chuỗi { id, ...khối, from, until }. Chuỗi gốc lấy id = key để id lần lặp giữ dạng key_ngày như trước
   db.tpl = db.tpl || TEMPLATE.map(t => ({ id: t.key, key: t.key, title: t.title, cat: t.cat, days: [...t.days], s: t.s, e: t.e, habit: t.habit || "", ess: !!t.ess, rem: t.rem || [0], from: "2000-01-01", until: null }));
-  const persist = () => LS.set("demo", { days: db.days, actual: db.actual.map(a => Object.assign({}, a, { start: +a.start, end: +a.end })), journal: db.journal, jmod: db.jmod, muted: db.muted, planEdit: db.planEdit, planExtra: db.planExtra, tpl: db.tpl });
+  const persist = () => LS.set("demo", { days: db.days, actual: db.actual.map(a => Object.assign({}, a, { start: +a.start, end: +a.end })), journal: db.journal, jmod: db.jmod, muted: db.muted, planEdit: db.planEdit, planExtra: db.planExtra, tpl: db.tpl, gone: db.gone });
   const SF = ["key", "title", "cat", "days", "s", "e", "habit", "ess", "rem"];
   const pickS = t => { const o = {}; for (const k of SF) o[k] = Array.isArray(t[k]) ? [...t[k]] : t[k]; o.key = o.key || ""; o.habit = o.habit || ""; o.ess = !!o.ess; o.rem = o.rem || [0]; return o; };
   db.actual = db.actual.map(a => Object.assign(a, { start: new Date(a.start), end: new Date(a.end) }));
@@ -538,7 +546,7 @@ const Demo = (() => {
         const ed = db.planEdit[x.id] || {}, st = new Date(ed.start || x.start), en = new Date(ed.end || x.end);
         if (st >= startOfDay(from) && st < to) out.push({ id: x.id, kind: "plan", title: ed.title || x.title, start: st, end: en, cat: x.cat, habit: "", ess: false, added: true, muted: db.muted.includes(x.id) });
       }
-      return out.sort((a, b) => a.start - b.start);
+      return out.filter(p => !db.gone.includes(p.id)).sort((a, b) => a.start - b.start);
     },
     async listActual(from, to) { return db.actual.filter(a => a.start >= from && a.start < to).sort((a, b) => a.start - b.start); },
     async listDays(from, to) { const o = {}; for (const [k, v] of Object.entries(db.days)) { const d = parseYmd(k); if (d >= startOfDay(from) && d <= to) o[k] = v; } return o; },
@@ -548,6 +556,8 @@ const Demo = (() => {
     async saveDay(rec) { rec = Object.assign({}, rec, { id: rec.id || "d" + rec.date }); db.days[rec.date] = rec; persist(); return rec; },
     async addPlan(it) { const x = { id: "p" + Date.now(), title: it.title, cat: it.cat, start: +it.start, end: +it.end }; db.planExtra.push(x); persist(); return Object.assign({ kind: "plan", habit: "", ess: false, added: true, muted: false }, it, { id: x.id }); },
     async deletePlan(id) { db.planExtra = db.planExtra.filter(x => x.id !== id); delete db.planEdit[id]; persist(); },
+    async cancelPlan(id) { if (!db.gone.includes(id)) db.gone.push(id); persist(); },
+    async restorePlan(id) { db.gone = db.gone.filter(x => x !== id); persist(); },
     async updatePlan(it) { db.planEdit[it.id] = { title: it.title, start: +it.start, end: +it.end }; persist(); return Object.assign({}, it); },
     async listSeries() { const T = tomorrowStr(); return db.tpl.filter(t => !t.until || t.until >= T).map(t => Object.assign({}, t, pickS(t))); },
     async createSeries(t, from) { const x = Object.assign(pickS(t), { id: "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), from: ymd(firstOn(t.days, from)), until: t.until || null }); db.tpl.push(x); persist(); return Object.assign({}, x); },
@@ -648,6 +658,33 @@ async function saveRec(rec) {
   if (saved.date === todayStr()) S.today.rec = saved;
   return saved;
 }
+// Xoá các khối khỏi lịch Kế hoạch hôm nay (chỉ ngày này), gọi song song. Khối mất khỏi timeline và khỏi Google Calendar.
+async function dropPlans(ids) {
+  ids = [...new Set(ids)]; if (!ids.length) return;
+  const r = await Promise.allSettled(ids.map(id => api().cancelPlan(id)));
+  const ok = new Set(ids.filter((_, i) => r[i].status === "fulfilled"));
+  S.today.plan = S.today.plan.filter(p => !ok.has(p.id));
+  const f = r.find(x => x.status === "rejected"); if (f) throw f.reason;
+}
+// Trả lại các khối đã xoá rồi tải lại hôm nay (khối về đúng giờ của nó trên Calendar)
+async function restorePlans(ids) {
+  ids = [...new Set(ids)]; if (!ids.length) return;
+  const r = await Promise.allSettled(ids.map(id => api().restorePlan(id)));
+  await loadToday();
+  const f = r.find(x => x.status === "rejected"); if (f) throw f.reason;
+}
+// Bản cũ đánh dấu "Bỏ qua" trong bản ghi ngày (rec.skip) mà khối vẫn nằm trên lịch Kế hoạch.
+// Giờ bỏ qua = xoá: xoá các khối đó trên Calendar rồi ghi lại bản ghi ngày (không còn trường skip). Chạy mỗi lần tải, tự dừng khi hết.
+async function clearOldSkips() {
+  const gone = e => /lỗi (404|410)/.test(e && e.message || "");   // đã xoá rồi
+  for (const rec of Object.values(S.days)) {
+    if (!rec || !(rec.skip || []).length || !rec.id) continue;
+    const r = await Promise.allSettled(rec.skip.map(id => api().cancelPlan(id)));
+    if (r.some(x => x.status === "rejected" && !gone(x.reason))) continue;   // lỗi khác: để lần sau thử lại
+    if (rec.date === todayStr()) S.today.plan = S.today.plan.filter(p => !rec.skip.includes(p.id));
+    await saveRec(Object.assign({}, rec, { skip: [] }));
+  }
+}
 // Ghi lần lượt: bấm nhanh nhiều nút thì lần sau đợi lần trước xong, đọc bản đã lưu (có id), không tạo hai sự kiện cho một ngày
 let habQ = Promise.resolve();
 function queueHabit(date, id, level, value) {
@@ -673,7 +710,7 @@ function currentBlocks() {
   const doneIds = new Set(S.today.actual.map(a => a.plan).filter(Boolean));
   const cur = plan.find(p => p.start <= now && now < p.end);
   const next = plan.find(p => p.start > now);
-  return { cur, next, done: cur && (doneIds.has(cur.id) || (rec.skip || []).includes(cur.id)), skipped: cur && (rec.skip || []).includes(cur.id) };
+  return { cur, next, done: cur && doneIds.has(cur.id) };
 }
 
 function renderToday() {
@@ -681,7 +718,7 @@ function renderToday() {
   if (!ready()) return;   // cổng vào đang che app
   if (S.tplOpen) return renderTpl();
   const rec = S.today.rec || blankRec(todayStr()), now = new Date();
-  const { cur, next, done, skipped } = currentBlocks();
+  const { cur, next, done } = currentBlocks();
   let html = "";
 
   if (unwellRun() >= 3) html += `<div class="care fade-in"><b>Mấy hôm nay bạn ổn không?</b>Đã ${unwellRun()} ngày liền là rest day. Nếu thấy nặng nề, nhắn cho một người bạn tin tưởng hoặc tìm chuyên gia tâm lý nhé. Bạn không phải tự gồng một mình.</div>`;
@@ -705,11 +742,10 @@ function renderToday() {
       <h2 class="now__title">${esc(cur.title)}</h2>
       <p class="now__time num">${hm(cur.start)} – ${hm(cur.end)} · còn ${Math.max(0, Math.round((cur.end - now) / 60000))} phút</p>
       <div class="bar" aria-hidden="true"><span style="transform:scaleX(${pct / 100})"></span></div>
-      ${done ? `<div class="now__done"><span class="badge ${skipped ? "" : "badge--good"}"><i class="ph${skipped ? "" : "-fill"} ${skipped ? "ph-skip-forward" : "ph-check-circle"}"></i> ${skipped ? "Đã bỏ qua" : "Đã làm"}</span>
+      ${done ? `<div class="now__done"><span class="badge badge--good"><i class="ph-fill ph-check-circle"></i> Đã làm</span>
           <button class="btn btn--icon" data-act="undo" data-id="${esc(cur.id)}" aria-label="Hoàn tác" title="Hoàn tác"><i class="ph ph-arrow-counter-clockwise"></i></button></div>`
         : `<div class="now__actions">
         <button class="btn btn--primary" data-act="done" data-id="${esc(cur.id)}"><i class="ph ph-check"></i> Đã làm</button>
-        <button class="btn btn--icon" data-act="skip" data-id="${esc(cur.id)}" aria-label="Bỏ qua" title="Bỏ qua"><i class="ph ph-skip-forward"></i></button>
         <button class="btn btn--icon" data-act="other" data-id="${esc(cur.id)}" aria-label="Đang làm việc khác" title="Đang làm việc khác"><i class="ph ph-pencil-simple"></i></button>
       </div>`}
       ${next ? `<p class="now__next"><i class="ph ph-arrow-right"></i> <b>${esc(next.title)}</b> <span class="num">${hm(next.start)}</span></p>` : ""}
@@ -825,7 +861,7 @@ function timelineHTML() {
     const time = h > 40 ? `<small class="num">${hm(it.start)}–${hm(it.end)}</small>` : "";
     const short = h <= 40 ? " is-short" : "", tt = `<span class="tl__t">${esc(it.title)}</span>`;
     if (it.kind === "plan") {
-      const extra = ((rec.skip || []).includes(it.id) ? " is-skip" : "") + (it.muted || (rec.unwell && !it.ess) ? " is-muted" : "");
+      const extra = (it.muted || (rec.unwell && !it.ess) ? " is-muted" : "");
       return `<button class="tl__ev${extra}${short}" data-pid="${esc(it.id)}" style="top:${top}px;height:${h}px;${lane}--cat:${c.hex}" title="${esc(it.title)} ${hm(it.start)}–${hm(it.end)}" aria-label="Chi tiết: ${esc(it.title)} ${hm(it.start)}–${hm(it.end)}">${tt}${time}</button>`;
     }
     return `<button class="tl__ev${c.lightInk ? " light-ink" : ""}${short}" title="${esc(it.title)} ${hm(it.start)}–${hm(it.end)}" data-aid="${esc(it.id)}" style="top:${top}px;height:${h}px;${lane}--cat:${c.hex}" aria-label="Sửa: ${esc(it.title)} ${hm(it.start)}–${hm(it.end)}">${tt}${time}</button>`;
@@ -1742,20 +1778,20 @@ async function savePending() {
     const byDate = {};
     for (const h of p.habits) { const d = h.date || today; (byDate[d] = byDate[d] || []).push(h); }
     if (p.journal && p.journal.trim()) (byDate[today] = byDate[today] || []).push({ id: "journal", level: "min" });
-    // "Việc khác": khối kế hoạch đang chạy được đánh dấu bỏ qua
-    const other = S.otherFor && !(S.today.rec && (S.today.rec.skip || []).includes(S.otherFor)) ? S.otherFor : null;
-    if (other) byDate[today] = byDate[today] || [];
+    // "Việc khác": khối kế hoạch đang chạy bị xoá khỏi lịch Kế hoạch hôm nay
+    const other = S.otherFor && S.today.plan.some(x => x.id === S.otherFor) ? S.otherFor : null;
     for (const [d, hs] of Object.entries(byDate)) {
       snap(d);
       const rec = Object.assign(blankRec(d), S.days[d] || {}); rec.h = Object.assign({}, rec.h); rec.v = Object.assign({}, rec.v);
       for (const h of hs) { rec.h[h.id] = h.level === "skip" ? (rec.h[h.id] === "full" || rec.h[h.id] === "min" ? rec.h[h.id] : "skip") : better(h.level, rec.h[h.id]); if (h.value) rec.v[h.id] = h.value; }
-      if (d === today && other) rec.skip = [...new Set([...(rec.skip || []), other])];
       await saveRec(rec);
     }
     if (p.journal && p.journal.trim()) jPrev = await appendJournal(p.journal.trim());
     if (p.unwell && !(S.today.rec && S.today.rec.unwell)) { snap(today); await setUnwell(true); unwellOn = true; }
+    if (other) await dropPlans([other]);
     closeSheet(); $("#inputText").value = ""; resetOther(); autosize();
     toast(S.settings.demo ? "Đã ghi (dữ liệu mẫu)" : "Đã ghi vào Google Calendar", 2600, async () => {
+      if (other) await restorePlans([other]);
       if (unwellOn) await setUnwell(false);
       for (const id of created) { await api().deleteActual(id); S.today.actual = S.today.actual.filter(a => a.id !== id); }
       for (const [d, prev] of Object.entries(prevRecs)) await restoreRec(d, prev);
@@ -1817,15 +1853,14 @@ const floor15 = d => { const x = new Date(d); x.setSeconds(0, 0); x.setMinutes(x
 // Các khối hôm nay theo giờ gốc (trước lần sắp lại), k = mã ngắn gửi cho AI (b1, b2…)
 function lateBase() {
   const rec = S.today.rec || {}, L = rec.late, mv = new Map(((L && L.moved) || []).map(m => [m.id, m]));
-  const doneIds = new Set(S.today.actual.map(a => a.plan).filter(Boolean)), lateSkip = (L && L.skipped) || [];
-  const userSkip = new Set((rec.skip || []).filter(id => !lateSkip.includes(id)));
-  return S.today.plan.map(p => { const m = mv.get(p.id); return { p, start: m ? atTime(p.start, m.s) : p.start, end: m ? atTime(p.start, m.e) : p.end, done: doneIds.has(p.id), skip: userSkip.has(p.id) }; })
+  const doneIds = new Set(S.today.actual.map(a => a.plan).filter(Boolean));
+  return S.today.plan.map(p => { const m = mv.get(p.id); return { p, start: m ? atTime(p.start, m.s) : p.start, end: m ? atTime(p.start, m.e) : p.end, done: doneIds.has(p.id), skip: false }; })
     .sort((a, b) => a.start - b.start).map((b, i) => Object.assign(b, { k: "b" + (i + 1) }));
 }
-// Còn khối nào chưa làm, chưa bỏ qua, chưa kết thúc thì mới cần nút
+// Còn khối nào chưa làm, chưa kết thúc thì mới cần nút
 function lateNeeded() {
-  const now = new Date(), rec = S.today.rec || {}, done = new Set(S.today.actual.map(a => a.plan).filter(Boolean));
-  return S.today.plan.some(p => p.end > now && !done.has(p.id) && !(rec.skip || []).includes(p.id));
+  const now = new Date(), done = new Set(S.today.actual.map(a => a.plan).filter(Boolean));
+  return S.today.plan.some(p => p.end > now && !done.has(p.id));
 }
 function lateAiSchema() {
   return {
@@ -1861,7 +1896,7 @@ Lời người dùng:
 """${text}"""`;
 }
 // Kiểm tra đề xuất của AI. Trả { wake, res: Map(k → {start,end} | {skip:true}) } hoặc { err }.
-// Khối đã qua giờ mà AI để nguyên (chưa làm) thì coi như bỏ hôm nay, hiện trong mục "Bỏ hôm nay".
+// Khối đã qua giờ mà AI để nguyên (chưa làm) thì coi như xoá khỏi lịch hôm nay, hiện trong mục "Xoá khỏi lịch hôm nay".
 // Giờ AI trả về không luôn đúng HH:MM ("9:00", "09:00:00", "9h30"): chuẩn hoá trước, sai hẳn mới báo.
 function normT(v) {
   const m = String(v == null ? "" : v).trim().match(/^(\d{1,2})\s*[:hg.]\s*(\d{1,2})?(?::\d{2})?$/i);
@@ -1992,7 +2027,7 @@ function renderLateSheet() {
   const bad = lateIssues(L);
   const row = (b, s, e, moved) => `<li class="late__row${bad.has(b.k) ? " is-bad" : ""}" style="${catVars(b.p.cat)}"><span class="dot"></span><span class="late__name">${esc(b.p.title)}</span>
     <button type="button" class="late__time num" data-lt="${b.k}" aria-label="Đổi giờ ${esc(b.p.title)}">${moved ? `<s>${hm(b.start)}</s> <i class="ph ph-arrow-right" aria-label="thành"></i> ` : ""}<b>${hm(s)}–${hm(e)}</b></button>
-    <button type="button" class="late__x" data-lskip="${b.k}" aria-label="Bỏ ${esc(b.p.title)} hôm nay" title="Bỏ hôm nay"><i class="ph ph-minus-circle"></i></button></li>
+    <button type="button" class="late__x" data-lskip="${b.k}" aria-label="Xoá ${esc(b.p.title)} khỏi lịch hôm nay" title="Xoá khỏi lịch hôm nay"><i class="ph ph-minus-circle"></i></button></li>
     ${bad.has(b.k) ? `<li class="act__warn late__warn"><i class="ph ph-warning"></i> ${esc(bad.get(b.k))}</li>` : ""}`;
   const dropRow = b => `<li class="late__row" style="${catVars(b.p.cat)}"><span class="dot"></span><span class="late__name">${esc(b.p.title)}</span>
     <span class="late__time num">${hm(b.start)}–${hm(b.end)}</span>
@@ -2012,7 +2047,7 @@ function renderLateSheet() {
     <div class="late__wake"><span class="muted">Dậy lúc <b class="num">${hm(L.wake)}</b></span><button type="button" class="late__retell" id="lRetell" aria-label="Đổi giờ dậy"><i class="ph ph-alarm"></i> Đổi</button></div>
     ${(S.today.rec || {}).unwell ? `<p class="late__rest muted"><i class="ph ph-moon"></i> Đang rest day: các khối 💤 vẫn dời nhưng không nhắc.</p>` : ""}
     ${keep.length ? `<ul class="late__list">${keep.map(x => row(x.b, x.s, x.e, x.moved)).join("")}</ul>` : `<p class="muted">Không còn khối nào cho hôm nay.</p>`}
-    ${drop.length ? `<p class="mgroup">Bỏ hôm nay</p><ul class="late__list late__list--drop">${drop.map(dropRow).join("")}</ul>` : ""}
+    ${drop.length ? `<p class="mgroup">Xoá khỏi lịch hôm nay</p><ul class="late__list late__list--drop">${drop.map(dropRow).join("")}</ul>` : ""}
     ${h ? `<p class="mgroup">Thói quen</p><div class="daylist late__hab"><div class="dayrow"><i class="ph ${h.icon}" style="${icVars(h.cat)}"></i><span>${esc(h.name)}${h.min ? `<small class="dayrow__min">Tối thiểu: ${esc(h.min)}</small>` : ""}</span><div class="seg" role="group" aria-label="${esc(h.name)}">
       ${opts.map(([lv, ic, lab]) => lv === "min" && !h.min ? `<span class="seg__gap"></span>` : `<button type="button" data-llv="${lv}" data-lv="${lv}" aria-pressed="${L.hab.lv === lv}" aria-label="${lab}" title="${lab}"><i class="ph ${ic}"></i></button>`).join("")}
     </div></div></div>` : ""}
@@ -2035,13 +2070,12 @@ async function applyLate() {
   const target = new Map(), moved = [], skipped = [];
   for (const b of L.base) {
     const r = L.res.get(b.k);
-    if (r && r.skip) skipped.push(b.p.id);
+    if (r && r.skip) { skipped.push(b.p.id); continue; }
     const t = r && !r.skip ? r : { start: b.start, end: b.end };   // khối không đổi: về giờ gốc (sắp lại lần 2 không chồng lên lần trước)
     target.set(b.p.id, t);
     if (+t.start !== +b.start || +t.end !== +b.end) moved.push({ id: b.p.id, s: hm(b.start), e: hm(b.end) });
   }
-  const oldSkip = (old && old.skipped) || [];
-  rec.skip = [...new Set([...(rec.skip || []).filter(id => !oldSkip.includes(id)), ...skipped])];
+  const oldSkip = (old && old.skipped) || [];   // khối lần sắp trước đã xoá: vẫn xoá, "Trả lại lịch cũ" trả lại hết
   let hprev = (old && old.hprev) || {}, hset = "";
   if (L.hab) {
     const { hid, lv } = L.hab;
@@ -2049,21 +2083,22 @@ async function applyLate() {
     rec.h = Object.assign({}, rec.h); if (lv) rec.h[hid] = lv; else delete rec.h[hid];
     hset = lv || "none";
   }
-  rec.late = { wake: hm(L.wake), moved, skipped, hprev, hset };
+  rec.late = { wake: hm(L.wake), moved, skipped: [...new Set([...oldSkip, ...skipped])], hprev, hset };
   await saveRec(rec);   // lưu giờ gốc trước, lỡ đổi giờ hỏng giữa chừng vẫn "Trả lại lịch cũ" được
+  await dropPlans(skipped);
   await setPlanTimes(target);
   S.late = null;
-  return async () => { await restoreRec(todayStr(), prevRec); await setPlanTimes(prevTimes); };
+  return async () => { await restoreRec(todayStr(), prevRec); await restorePlans(skipped); await setPlanTimes(prevTimes); };
 }
-// Trả lại lịch cũ: giờ gốc, bỏ các Bỏ qua do lần sắp lại đặt, thói quen về mức trước (trừ khi người dùng đã tự đổi)
+// Trả lại lịch cũ: giờ gốc, trả lại các khối lần sắp lại đã xoá, thói quen về mức trước (trừ khi người dùng đã tự đổi)
 async function undoLate() {
   const rec = Object.assign(blankRec(todayStr()), JSON.parse(JSON.stringify(S.today.rec || {}))), L = rec.late; if (!L) return;
   const base = new Map(L.moved.map(m => [m.id, { start: atTime(new Date(), m.s), end: atTime(new Date(), m.e) }]));
-  rec.skip = (rec.skip || []).filter(id => !L.skipped.includes(id));
   rec.h = Object.assign({}, rec.h);
   for (const [hid, pv] of Object.entries(L.hprev || {})) if ((rec.h[hid] || "none") === (L.hset || "none")) { if (pv === "none") delete rec.h[hid]; else rec.h[hid] = pv; }
   rec.late = null;
   await saveRec(rec);
+  await restorePlans(L.skipped || []);
   await setPlanTimes(base);
 }
 
@@ -2078,16 +2113,10 @@ async function markBlock(id, how) {
     item.plan = blk.id; S.today.actual.push(item);
     if (hid) await setHabit(todayStr(), hid, better("full", prevLv));
     toast(`Đã ghi: ${blk.title}`, 2600, () => unmarkBlock(blk.id));
-  } else {
-    const rec = Object.assign(blankRec(todayStr()), S.today.rec || {});
-    rec.skip = [...new Set([...(rec.skip || []), id])];
-    await saveRec(rec); toast("Đã bỏ qua", 2600, () => unmarkBlock(id));
   }
 }
-// Bỏ trạng thái đã làm / đã bỏ qua của một khối kế hoạch
+// Bỏ trạng thái đã làm của một khối kế hoạch
 async function unmarkBlock(id) {
-  const rec = Object.assign(blankRec(todayStr()), S.today.rec || {});
-  if ((rec.skip || []).includes(id)) { rec.skip = rec.skip.filter(x => x !== id); await saveRec(rec); }
   for (const a of S.today.actual.filter(a => a.plan === id)) {
     await api().deleteActual(a.id);
     // Trả thói quen về mức trước khi bấm Đã làm, chỉ khi nó vẫn là "full" do Đã làm đặt (người dùng tự đổi sau đó thì giữ nguyên)
@@ -2101,18 +2130,17 @@ async function unmarkBlock(id) {
 function renderPlanEdit(p) {
   S.editPlan = p.id;
   const rec = S.today.rec || {}, c = CATS[p.cat] || CATS.life;
-  const done = S.today.actual.some(a => a.plan === p.id), skip = (rec.skip || []).includes(p.id);
+  const done = S.today.actual.some(a => a.plan === p.id);
   const st = done ? `<span class="badge badge--good"><i class="ph-fill ph-check-circle"></i> Đã làm</span>`
-    : skip ? `<span class="badge"><i class="ph ph-skip-forward"></i> Đã bỏ qua</span>`
     : p.muted || (rec.unwell && !p.ess) ? `<span class="badge"><i class="ph ph-moon"></i> Đang tắt</span>` : "";
   const hb = p.habit && HABITS.find(h => h.id === p.habit);   // thói quen đã ngừng thì không hiện nhãn
   openSheet("Chỉnh sửa kế hoạch", `<p class="plan-meta"><span class="badge" style="${catVars(p.cat)}"><span class="dot"></span>${esc(c.name)}</span>${hb ? `<span class="badge"><i class="ph ${hb.icon} hic" style="${icVars(hb.cat)}"></i> ${esc(hb.name)}</span>` : ""}${st}</p>
     <div class="act" style="${catVars(p.cat)}">
-      <input class="input" type="text" id="pTitle" value="${esc(p.title)}" aria-label="Tên kế hoạch"${p.added ? "" : ` style="grid-column:1/-1"`}>
-      ${p.added ? `<button type="button" class="icon-btn act__rm" id="pDel" aria-label="Xoá kế hoạch này"><i class="ph ph-trash"></i></button>` : ""}
+      <input class="input" type="text" id="pTitle" value="${esc(p.title)}" aria-label="Tên kế hoạch">
+      <button type="button" class="icon-btn act__rm" id="pDel" aria-label="Xoá kế hoạch này (chỉ hôm nay)" title="Xoá khỏi lịch hôm nay"><i class="ph ph-trash"></i></button>
       <div class="act__times"><input class="input num" type="time" id="pStart" value="${hm(p.start)}" aria-label="Bắt đầu"><span class="faint">–</span><input class="input num" type="time" id="pEnd" value="${hm(p.end)}" aria-label="Kết thúc"></div>
     </div>
-    <p class="faint" style="font-size:var(--fs-m);margin:0 0 4px">${p.added ? "Kế hoạch thêm riêng cho hôm nay." : "Chỉ đổi cho hôm nay, lịch các ngày khác giữ nguyên."}</p>
+    <p class="faint" style="font-size:var(--fs-m);margin:0 0 4px">${p.added ? "Kế hoạch thêm riêng cho hôm nay." : "Sửa hay xoá chỉ áp dụng cho hôm nay, lịch các ngày khác giữ nguyên."}</p>
     <div class="sheet-actions"><button class="btn" data-close>Hủy</button><button class="btn btn--primary" id="pSave"><i class="ph ph-check"></i> Lưu</button></div>`);
 }
 async function savePlanEdit() {
@@ -2163,14 +2191,11 @@ async function savePlanAdd() {
   toast("Đã thêm kế hoạch", 2600, async () => { await api().deletePlan(it.id); S.today.plan = S.today.plan.filter(p => p.id !== it.id); });
   return true;
 }
-async function deletePlanAdded() {
-  const old = S.today.plan.find(p => p.id === S.editPlan); if (!old || !old.added) return closeSheet();
-  await api().deletePlan(old.id);
-  S.today.plan = S.today.plan.filter(p => p.id !== old.id); closeSheet();
-  toast("Đã xoá kế hoạch", 2600, async () => {
-    const it = await api().addPlan(old);
-    S.today.plan = [...S.today.plan, it].sort((a, b) => a.start - b.start);
-  });
+// Xoá khối đang mở khỏi lịch Kế hoạch hôm nay (khối lặp: chỉ lần lặp hôm nay; khối thêm: cả sự kiện)
+async function deletePlanToday() {
+  const old = S.today.plan.find(p => p.id === S.editPlan); if (!old) return closeSheet();
+  await dropPlans([old.id]); closeSheet();
+  toast("Đã xoá kế hoạch hôm nay", 2600, () => restorePlans([old.id]));
 }
 
 // ============================================================ tuần mẫu (lịch lặp hằng tuần)
@@ -2437,7 +2462,11 @@ async function refresh() {
       LS.set("habits", c.habits); useHabits(c.habits); render();
     }).catch(e => console.warn("habits", e));
   }
-  try { await loadToday(); render(); loadHistory().then(() => { if (S.view === "habits") renderHabits(); }).catch(handleErr); }
+  try {
+    await loadToday(); render();
+    loadHistory().then(() => { if (S.view === "habits") renderHabits(); return clearOldSkips(); })
+      .then(() => { if (S.view === "today" && !S.tplOpen) renderToday(); }).catch(handleErr);
+  }
   catch (e) { handleErr(e); render(); }
 }
 function setView(v) {
@@ -2524,7 +2553,7 @@ document.addEventListener("click", async e => {
   if (id === "eSave") { const done = busy(el, "Đang lưu"); try { await saveActEdit(); } catch (er) { done(); handleErr(er); } return renderToday(); }
   if (id === "eDel") { const done = busy(el, "Đang xoá"); try { await deleteAct(); } catch (er) { done(); handleErr(er); } return renderToday(); }
   if (id === "pAdd") { const done = busy(el, "Đang thêm"); try { if (!(await savePlanAdd())) { done(); return; } } catch (er) { done(); handleErr(er); } return renderToday(); }
-  if (id === "pDel") { const done = busy(el, "Đang xoá"); try { await deletePlanAdded(); } catch (er) { done(); handleErr(er); } return renderToday(); }
+  if (id === "pDel") { const done = busy(el, "Đang xoá"); try { await deletePlanToday(); } catch (er) { done(); handleErr(er); } return renderToday(); }
   if (id === "pSave") { const done = busy(el, "Đang lưu"); try { await savePlanEdit(); } catch (er) { done(); handleErr(er); } return renderToday(); }
   if (el.dataset.pid) { const p = S.today.plan.find(x => x.id === el.dataset.pid); if (p) renderPlanEdit(p); return; }
   if (el.dataset.aid) { const a = S.today.actual.find(x => x.id === el.dataset.aid); if (a) renderActEdit(a); return; }

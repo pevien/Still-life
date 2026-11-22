@@ -93,10 +93,10 @@ Nút "Mình dậy trễ" và "Mình không khoẻ" nằm chung 1 hàng ở tab H
   - sửa từng dòng: chạm giờ để đổi giờ bắt đầu (giữ độ dài), ⊖ bỏ hôm nay, ⊕ giữ lại. Chồng giờ / quá khứ / quá 23:00 thì báo dưới dòng và khoá Áp dụng;
   - nút Đổi (giờ dậy) cạnh dòng giờ dậy ở đầu sheet; Hủy / Áp dụng.
 - Áp dụng:
-  - chỉ đổi **lần lặp của hôm nay** (chuỗi lặp không đổi), khối bị bỏ thì đánh dấu Bỏ qua, nhắc của Google Calendar theo giờ mới;
+  - chỉ đổi **lần lặp của hôm nay** (chuỗi lặp không đổi), khối bị bỏ thì xoá khỏi lịch Kế hoạch hôm nay (cả trên Google Calendar), nhắc của Google Calendar theo giờ mới;
   - toast có Hoàn tác;
   - chỗ nút đổi thành "Đã sắp lại từ HH:MM · Trả lại lịch cũ". Chạm phần chữ thì chọn lại giờ dậy. Sắp lại lần nữa luôn tính từ lịch gốc.
-- Trả lại lịch cũ: các khối về giờ gốc, bỏ những Bỏ qua do lần sắp lại đặt, thói quen về mức trước (trừ khi bạn đã tự đổi mức).
+- Trả lại lịch cũ: các khối về giờ gốc, trả lại những khối lần sắp lại đã xoá, thói quen về mức trước (trừ khi bạn đã tự đổi mức).
 - Rest day và dậy trễ độc lập: đang rest day thì sheet ghi "các khối 💤 vẫn dời nhưng không nhắc".
 - Lưu: `late` và `lm` trong sự kiện "Thói quen" của ngày (giờ dậy, giờ gốc các khối đã dời, khối đã bỏ, mức thói quen trước đó).
 
@@ -105,13 +105,12 @@ Thanh dưới có 4 ô: Hôm nay · Thói quen · Nhật ký · Cài đặt (Cà
 Đầu trang là 1 dòng chữ nhỏ: lời chào theo buổi · thứ, ngày tháng.
 
 1. **Hôm nay**
-   - Bây giờ / Tiếp theo: nút Đã làm, Bỏ qua, Làm việc khác. Đã làm ở khối có thói quen (vd Nhật ký) thì đánh dấu thói quen đó đạt.
+   - Bây giờ / Tiếp theo: nút Đã làm, Làm việc khác (không còn nút Bỏ qua: không làm thì xoá khối khỏi kế hoạch). Đã làm ở khối có thói quen (vd Nhật ký) thì đánh dấu thói quen đó đạt.
      Nút ↺ trên thẻ (hoặc Hoàn tác trên toast) bỏ việc đã ghi và trả thói quen về mức trước khi bấm, trừ khi bạn đã tự đổi mức sau đó.
    - Habit hôm nay, nút "Mình không khoẻ".
    - Thời gian theo nhóm + timeline kế hoạch vs thực tế 5:00–23:00 trong khung cao cố định, cuộn bên trong,
      mở ra tự cuộn tới giờ hiện tại, render lại giữ nguyên chỗ đang xem. Khối ngắn hiện 1 dòng, cắt bằng "…".
-   - Bấm khối Kế hoạch → "Chỉnh sửa kế hoạch": đổi tên, giờ cho riêng hôm nay, có hoàn tác.
-     Khối thêm trong app có thêm nút xoá.
+   - Bấm khối Kế hoạch → "Chỉnh sửa kế hoạch": đổi tên, giờ, hoặc xoá (🗑) cho riêng hôm nay, có hoàn tác. Xoá là xoá lần lặp hôm nay trên Google Calendar, các ngày khác giữ nguyên.
    - **Tuần mẫu** (icon bút bên trái icon lịch ở tiêu đề "Thời gian hôm nay"): trang con có nút ←, bấm ← hoặc tab Hôm nay để về.
      Hàng chip T2…CN (chọn sẵn thứ của ngày mai) + timeline 5:00–23:00 của thứ đó, chỉ một cột kế hoạch.
      Bấm khối → "Sửa kế hoạch", bấm chỗ trống → "Thêm kế hoạch" (giờ theo chỗ bấm, dài 30 phút hoặc tới khối kế tiếp, lặp vào thứ đang chọn).
@@ -137,7 +136,7 @@ Thanh dưới có 4 ô: Hôm nay · Thói quen · Nhật ký · Cài đặt (Cà
    - Thiếu hoặc sai Gemini key: thông báo có nút mở Cài đặt.
    - Nút "Tự thêm" trong ô nhập: bỏ qua AI, mở sheet "Thêm việc đã làm" (không có dòng nhóm "Thời gian thực tế") với một thẻ việc trống (tên lấy từ dòng đầu chữ đã gõ, nếu có;
      giờ từ 30 phút trước tới bây giờ). Mở từ "Làm việc khác" thì giờ bắt đầu là đầu khối đang chạy, nhóm theo khối,
-     lưu xong khối đó được đánh dấu bỏ qua như khi nhập qua AI.
+     lưu xong khối đó bị xoá khỏi lịch Kế hoạch hôm nay như khi nhập qua AI.
    - Trên timeline, các việc chồng giờ nằm cạnh nhau.
    - Chọn giờ (mọi ô giờ trong sheet): mở bộ chọn giờ của app, hai cột cuộn Giờ / Phút, nút "Bây giờ", Hủy / Xong.
      Không dùng hộp chọn giờ của Android (trên Vivo X200 Pro mini bị cắt mất nút Set).
