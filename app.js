@@ -722,11 +722,11 @@ function renderToday() {
     </article>`;
   }
 
-  // Hàng nút nhẹ: "Mình dậy trễ" (có key, còn khối chưa xong) hoặc dòng "Đã sắp lại", rồi "Hôm nay mình không ổn"
+  // Hàng nút nhẹ: "Mình dậy trễ" (có key, còn khối chưa xong) hoặc dòng "Đã sắp lại", rồi "Mình không khoẻ"
   const lateBtn = rec.late
     ? `<div class="late-state"><button class="late-state__main" id="btnLateRedo"${canLate() ? "" : " disabled"}><i class="ph ph-alarm"></i> Đã sắp lại từ <b class="num">${esc(rec.late.wake)}</b></button><button class="late-state__undo" id="btnLateUndo"><i class="ph ph-arrow-counter-clockwise"></i> Trả lại lịch cũ</button></div>`
     : canLate() && lateNeeded() ? `<button class="unwell-toggle unwell-toggle--late" id="btnLate"><i class="ph ph-alarm"></i> Mình dậy trễ</button>` : "";
-  const toggles = lateBtn + (rec.unwell ? "" : `<button class="unwell-toggle" id="btnUnwell"><i class="ph-fill ph-hand-heart"></i> Hôm nay mình không ổn</button>`);
+  const toggles = lateBtn + (rec.unwell ? "" : `<button class="unwell-toggle" id="btnUnwell"><i class="ph-fill ph-hand-heart"></i> Mình không khoẻ</button>`);
   if (toggles) html += `<div class="day-toggles">${toggles}</div>`;
 
   // habits today: giữ thứ tự của HABITS (theo nhóm), không đổi chỗ khi đánh dấu. Chạm thẻ = đạt, nút ½ = tối thiểu.
@@ -844,6 +844,114 @@ function timelineHTML() {
     </div>
   </div>`;
 }
+
+// y trên màn hình → phút trong ngày (chưa làm tròn), theo vị trí hiện tại của cột (đã tính phần cuộn)
+const yToMin = (col, clientY) => TL.H0 * 60 + (clientY - col.getBoundingClientRect().top) / TL.PX * 60;
+
+// ============================================================ kéo-thả trên timeline Hôm nay (giống Google Calendar)
+// Cảm ứng: giữ yên HOLD ms rồi mới kéo, để vuốt dọc vẫn cuộn timeline. Chuột: kéo quá MSLOP px là bắt đầu.
+// Kéo thân khối = dời giờ · bắt đầu ở mép dưới = đổi giờ kết thúc · kéo chỗ trống cột Kế hoạch = chọn khoảng rồi mở sheet Thêm.
+// Bước 15 phút, kẹp trong TL.H0..TL.H1. Thả tay: Kế hoạch → updatePlan (chỉ hôm nay), Thực tế → updateActual, có hoàn tác.
+const Drag = {
+  HOLD: 350, SLOP: 8, MSLOP: 4, EDGE: 40, st: null, dropped: 0,
+  minOf: d => d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60,
+  at(min) { const d = startOfDay(new Date()); d.setMinutes(Math.round(min)); return d; },
+  down(e) {
+    if (Drag.st || e.button !== 0 || !e.isPrimary) return;
+    const col = e.target.closest(".tl:not(.tl--tpl) .tl__col"); if (!col) return;
+    const ev = e.target.closest(".tl__ev"), touch = e.pointerType !== "mouse";
+    let kind = "new", it = null, mode = "create";
+    if (ev) {
+      kind = ev.dataset.pid ? "plan" : "act";
+      it = kind === "plan" ? S.today.plan.find(x => x.id === ev.dataset.pid) : S.today.actual.find(x => x.id === ev.dataset.aid);
+      const t0 = startOfDay(new Date());
+      // khối tràn ra ngoài khung 5:00–23:00 hoặc sang ngày khác thì chỉ bấm được, không kéo
+      if (!it || startOfDay(it.start) - t0 || it.end - Drag.at(TL.H1 * 60) > 0 || Drag.minOf(it.start) < TL.H0 * 60) return;
+      const r = ev.getBoundingClientRect(), zone = Math.min(touch ? 12 : 6, r.height / 4);
+      mode = e.clientY > r.bottom - zone ? "resize" : "move";
+    } else if (!col.classList.contains("tl__col--plan")) return;
+    const s0 = it ? Drag.minOf(it.start) : 0, e0 = it ? Drag.minOf(it.end) : 0;
+    Drag.st = { id: e.pointerId, col, sc: col.closest(".tl__scroll"), ev, kind, it, mode, touch, x0: e.clientX, y0: e.clientY, cy: e.clientY, m0: yToMin(col, e.clientY), s0, e0, s: s0, e: e0, lifted: false };
+    if (touch) Drag.st.timer = setTimeout(Drag.lift, Drag.HOLD);
+  },
+  move(e) {
+    const st = Drag.st; if (!st || e.pointerId !== st.id) return;
+    st.cy = e.clientY;
+    if (!st.lifted) {
+      const d = Math.max(Math.abs(e.clientX - st.x0), Math.abs(e.clientY - st.y0));
+      if (st.touch) { if (d > Drag.SLOP) Drag.clear(); return; }   // vuốt trước khi giữ đủ lâu = cuộn
+      if (d <= Drag.MSLOP) return;
+      Drag.lift();
+    }
+    e.preventDefault(); Drag.update();
+  },
+  lift() {
+    const st = Drag.st; if (!st) return;
+    st.lifted = true; clearTimeout(st.timer);
+    if (st.touch) navigator.vibrate?.(10);
+    try { st.col.setPointerCapture(st.id); } catch {}
+    st.sc.classList.add("is-dragging");
+    if (st.ev) st.ev.classList.add("is-lifted", st.mode === "resize" ? "is-resizing" : "is-moving");
+    else { st.ghost = document.createElement("div"); st.ghost.className = "tl__ghost"; st.col.append(st.ghost); }
+    st.label = document.createElement("div"); st.label.className = "tl__dragtime num"; st.col.append(st.label);
+    const loop = () => {   // tự cuộn khi kéo gần mép trên / dưới
+      if (Drag.st !== st) return;
+      const r = st.sc.getBoundingClientRect(), v = st.cy < r.top + Drag.EDGE ? -1 : st.cy > r.bottom - Drag.EDGE ? 1 : 0;
+      if (v) { const before = st.sc.scrollTop; st.sc.scrollTop += v * 8; if (st.sc.scrollTop !== before) Drag.update(); }
+      st.raf = requestAnimationFrame(loop);
+    };
+    st.raf = requestAnimationFrame(loop);
+    Drag.update();
+  },
+  // tính giờ mới theo chỗ ngón tay rồi vẽ lại đúng một phần tử (không render cả trang)
+  update() {
+    const st = Drag.st, H0 = TL.H0 * 60, H1 = TL.H1 * 60, q = m => Math.round(m / 15) * 15;
+    const dm = yToMin(st.col, st.cy) - st.m0, still = Math.abs(dm) < 7.5;   // chưa kéo quá nửa bước: giữ giờ cũ (kể cả giờ lẻ)
+    if (st.mode === "move") {
+      const dur = st.e0 - st.s0;
+      st.s = still ? st.s0 : Math.max(H0, Math.min(H1 - dur, q(st.s0 + dm))); st.e = st.s + dur;
+    } else if (st.mode === "resize") {
+      st.s = st.s0; st.e = still ? st.e0 : Math.max(st.s0 + 15, Math.min(H1, q(st.e0 + dm)));
+    } else {
+      const a = Math.floor(Math.max(H0, Math.min(H1 - 15, st.m0)) / 15) * 15;
+      if (still) { st.s = a; st.e = a + 30; st.pick = false; }
+      else { const b = Math.max(H0, Math.min(H1, st.m0 + dm)); st.s = Math.min(a, Math.floor(b / 15) * 15); st.e = Math.max(a + 15, Math.ceil(b / 15) * 15); st.pick = true; }
+      st.e = Math.min(H1, st.e);
+    }
+    const top = (st.s - H0) / 60 * TL.PX, h = Math.max(22, (st.e - st.s) / 60 * TL.PX - 2), el = st.ev || st.ghost;
+    el.style.top = top + "px"; el.style.height = h + "px";
+    st.label.textContent = `${hm(Drag.at(st.s))}–${hm(Drag.at(st.e))}`;
+    st.label.style.top = Math.max(0, top - 22) + "px";
+  },
+  clear() {
+    const st = Drag.st; if (!st) return;
+    clearTimeout(st.timer); cancelAnimationFrame(st.raf);
+    st.sc.classList.remove("is-dragging"); st.ghost?.remove(); st.label?.remove();
+    st.ev?.classList.remove("is-lifted", "is-moving", "is-resizing");
+    Drag.st = null; return st;
+  },
+  cancel() { const st = Drag.clear(); if (st?.lifted) renderToday(); },
+  async up(e) {
+    const st = Drag.st; if (!st || e.pointerId !== st.id) return;
+    if (!st.lifted) return Drag.clear();   // chạm nhanh: để click mở sheet như cũ
+    Drag.clear(); Drag.dropped = Date.now();
+    const s = Drag.at(st.s), en = Drag.at(st.e);
+    if (st.kind === "new") return st.pick ? renderPlanAdd(s, en) : renderPlanAdd(s);
+    if (st.s === st.s0 && st.e === st.e0) return renderToday();
+    st.ev.classList.add("is-saving");
+    const msg = st.mode === "move" ? `Đã dời sang ${hm(s)}–${hm(en)}` : `Đã đổi thành ${hm(s)}–${hm(en)}`;
+    try { await (st.kind === "plan" ? applyPlanTime(st.it, { start: s, end: en }, msg) : applyActTime(st.it, { start: s, end: en }, msg)); }
+    catch (er) { handleErr(er); }
+    renderToday();
+  },
+};
+document.addEventListener("pointerdown", Drag.down);
+document.addEventListener("pointermove", Drag.move, { passive: false });
+document.addEventListener("pointerup", Drag.up);
+document.addEventListener("pointercancel", e => { if (Drag.st && e.pointerId === Drag.st.id) Drag.cancel(); });
+// đã nhấc khối thì chặn cuộn của trình duyệt (touch-action đặt sau pointerdown không có tác dụng với cú chạm đang diễn ra)
+document.addEventListener("touchmove", e => { if (Drag.st?.lifted) e.preventDefault(); }, { passive: false });
+document.addEventListener("contextmenu", e => { if (Drag.st) e.preventDefault(); });
 
 // ============================================================ cổng vào: Đăng nhập → Gemini → Lịch
 // Mỗi lúc chỉ một việc, full màn hình: ẩn header, tab, nút bút. Demo bỏ qua cổng (không cần Google).
@@ -1164,15 +1272,14 @@ function openHabAi() {
     : "Kể thói quen bằng lời của bạn. vd uống 2 lít nước mỗi ngày, ngày mệt thì 1 lít cũng được");
 }
 const habAiOpen = () => !!(S.compose && S.compose.mode === "habit");
-const lateAiOpen = () => !!(S.compose && S.compose.mode === "late");
-// Đóng popup của chế độ riêng (Nhờ AI thói quen / Dậy trễ): trả lại chữ đang gõ dở ở ô Hôm nay
+// Đóng popup của chế độ riêng (Nhờ AI thói quen): trả lại chữ đang gõ dở ở ô Hôm nay
 function endHabAi() {
   if (!S.compose) return;
   const t = $("#inputText");
   t.value = S.compose.text; t.placeholder = S.compose.ph; S.compose = null;
-  $("#dock").classList.remove("is-habit", "is-late"); autosize();
+  $("#dock").classList.remove("is-habit"); autosize();
 }
-const dockSend = text => (habAiOpen() ? habAi(text) : lateAiOpen() ? lateAi(text) : submitInput(text));
+const dockSend = text => (habAiOpen() ? habAi(text) : submitInput(text));
 async function habAi(text) {
   text = text.trim(); if (!text) return $("#inputText").focus();
   const dock = $("#dock"), ic = $("#btnSend i");
@@ -1672,7 +1779,7 @@ function openCompose(placeholder) {
 }
 function closeCompose(keepOther) {
   $("#dock").classList.remove("is-open"); $("#dockBackdrop").hidden = true;
-  if (S.compose) return endHabAi();   // popup Nhờ AI / Dậy trễ: trả lại chữ của ô Hôm nay, không đụng S.otherFor
+  if (S.compose) return endHabAi();   // popup Nhờ AI: trả lại chữ của ô Hôm nay, không đụng S.otherFor
   if (!keepOther && !$("#inputText").value.trim()) resetOther();
 }
 
@@ -1702,7 +1809,8 @@ async function setUnwell(on) {
 }
 
 // ============================================================ dậy trễ: AI sắp lại lịch hôm nay
-// Luồng: nút "Mình dậy trễ" → popup kể (có micro) → Gemini đề xuất → app kiểm tra (lateCheck) → sheet xem trước → Áp dụng.
+// Luồng: nút "Mình dậy trễ" → sheet chọn giờ dậy → Gemini đề xuất → app kiểm tra (lateCheck) → sheet xem trước → Áp dụng.
+// AI đề xuất sai luật thì dùng bản dời đơn giản (demoLate) thay vì báo lỗi, vẫn qua bước xem trước.
 // Chỉ đổi lần lặp của hôm nay (updatePlan). rec.late giữ giờ gốc để "Trả lại lịch cũ" và để sắp lại lần nữa từ lịch gốc.
 const canLate = () => !!(cleanKey(S.settings.geminiKey) || S.settings.demo);   // xem thử không có key thì dùng demoLate
 const floor15 = d => { const x = new Date(d); x.setSeconds(0, 0); x.setMinutes(x.getMinutes() - (x.getMinutes() % 15)); return x; };
@@ -1739,26 +1847,33 @@ function lateAiPrompt(text, base, now) {
 Các khối kế hoạch hôm nay (giờ gốc):
 ${rows}
 Luật:
-- wake = giờ họ nói đã dậy; không nói thì lấy ${hm(floor15(now))}. wake không được sau ${hm(now)}.
+- wake = giờ người dùng chọn trong lời bên dưới, giữ nguyên.
 - Khối đầu tiên trong ngày (thường là khối dậy) có thể đặt bắt đầu đúng lúc wake. Các khối khác dời thì bắt đầu từ ${hm(floor15(now))} trở đi, không xếp vào quá khứ.
 - Khối "đã làm" hoặc "đã bỏ qua": không đổi, không nhắc tới.
 - Khối "đã qua giờ" mà chưa làm: dời ra sau, hoặc skip nếu không còn chỗ / không còn hợp lý.
 - Khối có giờ hẹn với người khác (lớp học, hẹn) và bữa ăn chính (trưa, tối) cố giữ đúng giờ. quan_trong = true là khối quan trọng, ưu tiên giữ.
 - Không chồng giờ nhau, kể cả với khối đã làm. Không kết thúc sau 23:00.
 - Không vừa thì rút ngắn khối linh hoạt hoặc skip khối ít quan trọng (giải trí trước, rồi tới việc có thể làm ngày khác).
-- Nghe theo lời người dùng (vd có hẹn lúc nào, muốn bỏ gì).
 - items chỉ gồm các khối bị đổi giờ hoặc skip. Khối không nhắc tới giữ nguyên.
+- Giờ luôn viết đủ 2 chữ số HH:MM (vd 09:00, không viết 9:00). Khối đổi giờ phải có cả s và e.
 - reply: 1 câu tiếng Việt, không trách, không phán xét.
 Lời người dùng:
 """${text}"""`;
 }
 // Kiểm tra đề xuất của AI. Trả { wake, res: Map(k → {start,end} | {skip:true}) } hoặc { err }.
 // Khối đã qua giờ mà AI để nguyên (chưa làm) thì coi như bỏ hôm nay, hiện trong mục "Bỏ hôm nay".
+// Giờ AI trả về không luôn đúng HH:MM ("9:00", "09:00:00", "9h30"): chuẩn hoá trước, sai hẳn mới báo.
+function normT(v) {
+  const m = String(v == null ? "" : v).trim().match(/^(\d{1,2})\s*[:hg.]\s*(\d{1,2})?(?::\d{2})?$/i);
+  if (!m || +m[1] > 23 || +(m[2] || 0) > 59) return "";
+  return `${pad(+m[1])}:${pad(+(m[2] || 0))}`;
+}
 function lateCheck(base, out, now) {
-  const T = /^([01]\d|2[0-3]):[0-5]\d$/, day = startOfDay(now), fl = floor15(now), end = atTime(day, "23:00");
-  const bad = m => ({ err: m });
-  if (!out || !T.test(out.wake || "")) return bad("thiếu giờ dậy");
-  const wake = atTime(day, out.wake);
+  const day = startOfDay(now), fl = floor15(now), end = atTime(day, "23:00");
+  const bad = m => ({ err: m }), has = x => x != null && String(x).trim() !== "";
+  const w = out && normT(out.wake);
+  if (!w) return bad("thiếu giờ dậy");
+  const wake = atTime(day, w);
   if (wake > now) return bad("giờ dậy sau bây giờ");
   const by = new Map(base.map(b => [b.k, b])), res = new Map();
   for (const it of out.items || []) {
@@ -1770,8 +1885,11 @@ function lateCheck(base, out, now) {
       if (b.done) return bad(`bỏ khối đã làm (${b.p.title})`);
       res.set(it.id, { skip: true }); continue;
     }
-    if (!T.test(it.s || "") || !T.test(it.e || "")) return bad(`giờ của ${b.p.title} sai dạng`);
-    const s = atTime(day, it.s), e = atTime(day, it.e);
+    if (!has(it.s) && !has(it.e)) continue;   // AI nhắc khối mà không đổi giờ
+    const s0 = has(it.s) ? normT(it.s) : "", e0 = has(it.e) ? normT(it.e) : "";
+    if ((has(it.s) && !s0) || (has(it.e) && !e0)) return bad(`giờ của ${b.p.title} sai dạng`);
+    const len = b.end - b.start;   // thiếu một đầu thì giữ độ dài cũ
+    const s = s0 ? atTime(day, s0) : new Date(+atTime(day, e0) - len), e = e0 ? atTime(day, e0) : new Date(+s + len);
     if (+s === +b.start && +e === +b.end) continue;
     if (b.done || b.skip) return bad(`đổi khối đã xong (${b.p.title})`);
     if (s >= e) return bad(`${b.p.title} kết thúc trước khi bắt đầu`);
@@ -1813,27 +1931,36 @@ function lateHabit(base, wake) {
   const rule = wake <= new Date(+b.start + 5 * 60000) ? "full" : "";
   return { hid, lv: prior === "full" || prior === "min" ? better(rule, prior) : rule };
 }
-function openLateAi(text) {
-  const t = $("#inputText");
-  if (!S.compose) S.compose = { mode: "late", text: t.value, ph: t.placeholder };
-  t.value = text != null ? text : `Mình dậy lúc ${hm(floor15(new Date()))}`;
-  $("#dock").classList.add("is-late");
-  $("#dockTitle").textContent = "Dậy trễ cũng không sao. Kể mình nghe";
-  openCompose("Mình dậy lúc mấy giờ? Hôm nay có hẹn gì không?");
+// Bấm "Mình dậy trễ" mở thẳng bộ chọn giờ, nút chính "Sắp lại lịch hôm nay". Bộ chọn giữ nguyên (vòng quay ở nút) tới khi có lịch mới.
+// Mặc định: bây giờ làm tròn xuống 15 phút, hoặc giờ của lần sắp lại trước.
+function openLateAi(wake) {
+  const v = wake || ((S.today.rec || {}).late || {}).wake || hm(floor15(new Date()));
+  TP.open(null, { title: "Mình dậy lúc", value: v, ok: `<i class="ph ph-sparkle"></i> Sắp lại lịch hôm nay`, onOk: lateGo });
 }
-async function lateAi(text) {
-  text = text.trim(); if (!text) return $("#inputText").focus();
-  const dock = $("#dock"), ic = $("#btnSend i");
-  dock.classList.add("is-busy"); ic.className = "ph ph-circle-notch";
-  try {
-    const now = new Date(), base = lateBase();
-    const out = S.settings.demo && !cleanKey(S.settings.geminiKey) ? demoLate(text, base, now) : (await geminiJSON(lateAiPrompt(text, base, now), lateAiSchema(), 0.3)).p;
-    const c = lateCheck(base, out, now);
-    if (c.err) { console.warn("lateCheck", c.err, out); return toast(`AI sắp chưa ổn (${c.err}), thử lại nhé`, 4200); }
-    S.late = { text, base, wake: c.wake, res: c.res, reply: out.reply || "", hab: lateHabit(base, c.wake) };
-    closeCompose(); renderLateSheet();
-  } catch (e) { handleErr(e); }   // lỗi thì giữ popup và chữ để thử lại
-  finally { dock.classList.remove("is-busy"); ic.className = "ph ph-paper-plane-tilt"; }
+async function lateGo(v, btn) {
+  const now = hm(new Date());
+  if (v > now) return toast(`Giờ dậy phải trước bây giờ (${now})`, 3000);   // giữ bộ chọn để chọn lại
+  const done = busy(btn, "Đang sắp lại lịch");
+  try { await lateAi(v); TP.close(); } catch (er) { handleErr(er); } finally { done(); }
+}
+async function lateAi(wake) {
+  const now = new Date(), base = lateBase(), text = `Mình dậy lúc ${wake}`;
+  let out, fb = false, c;
+  S.late = null;
+  if (S.settings.demo && !cleanKey(S.settings.geminiKey)) out = demoLate(text, base, now);
+  else {
+    try { out = Object.assign((await geminiJSON(lateAiPrompt(text, base, now), lateAiSchema(), 0.3)).p || {}, { wake }); }
+    catch (e) { if (e.needKey) throw e; console.warn("lateAi", e); out = null; }   // key sai thì báo; AI bận / trả hỏng thì dời đơn giản
+  }
+  c = out ? lateCheck(base, out, now) : { err: "AI không trả lời được" };
+  if (c.err) {   // AI sắp sai luật hoặc lỗi: dùng bản dời đơn giản, vẫn xem trước được
+    console.warn("lateCheck", c.err, out);
+    out = demoLate(text, base, now); c = lateCheck(base, out, now); fb = true;
+    if (c.err) throw new Error(`Chưa sắp lại được (${c.err}), thử giờ khác nhé`);
+  }
+  const reply = fb ? "AI chưa sắp được nên app dời đơn giản: khối quan trọng giữ giờ, khối khác nối tiếp." : out.reply || "";
+  S.late = { wake: c.wake, base, res: c.res, reply, hab: lateHabit(base, c.wake) };
+  renderLateSheet();
 }
 function renderLateSheet() {
   const L = S.late; if (!L) return;
@@ -1856,7 +1983,7 @@ function renderLateSheet() {
     ${h ? `<p class="mgroup">Thói quen</p><div class="daylist"><div class="dayrow"><i class="ph ${h.icon}" style="${icVars(h.cat)}"></i><span>${esc(h.name)}${h.min ? `<small class="dayrow__min">Tối thiểu: ${esc(h.min)}</small>` : ""}</span><div class="seg" role="group" aria-label="${esc(h.name)}">
       ${opts.map(([lv, ic, lab]) => lv === "min" && !h.min ? `<span class="seg__gap"></span>` : `<button type="button" data-llv="${lv}" data-lv="${lv}" aria-pressed="${L.hab.lv === lv}" aria-label="${lab}" title="${lab}"><i class="ph ${ic}"></i></button>`).join("")}
     </div></div></div>` : ""}
-    <button type="button" class="btn btn--ghost late__retell" id="lRetell"><i class="ph ph-pencil-simple"></i> Kể lại</button>
+    <button type="button" class="btn btn--ghost late__retell" id="lRetell"><i class="ph ph-alarm"></i> Đổi giờ dậy</button>
     <div class="sheet-actions"><button type="button" class="btn" data-close>Hủy</button><button type="button" class="btn btn--primary" id="lApply"><i class="ph ph-check"></i> Áp dụng</button></div>`);
 }
 // Đổi giờ (chỉ hôm nay) cho các khối trong map id → {start, end}; khối đã đúng giờ thì bỏ qua. Gọi song song.
@@ -1962,19 +2089,26 @@ async function savePlanEdit() {
   if (e <= s) e = new Date(s.getTime() + 15 * 60000);
   const title = $("#pTitle").value.trim() || old.title;
   if (title === old.title && +s === +old.start && +e === +old.end) return closeSheet();
+  await applyPlanTime(old, { title, start: s, end: e }); closeSheet();
+}
+// Đổi tên / giờ một khối kế hoạch hôm nay (chỉ lần lặp hôm nay), có hoàn tác. Sheet sửa và kéo-thả dùng chung.
+async function applyPlanTime(old, next, msg = "Đã đổi kế hoạch hôm nay") {
   const prev = Object.assign({}, old);
   const swap = it => {
     S.today.plan = S.today.plan.map(p => (p.id === prev.id ? Object.assign({}, p, { title: it.title, start: it.start, end: it.end }) : p)).sort((a, b) => a.start - b.start);
   };
-  swap(await api().updatePlan(Object.assign({}, old, { title, start: s, end: e }))); closeSheet();
-  toast("Đã đổi kế hoạch hôm nay", 2600, async () => swap(await api().updatePlan(prev)));
+  swap(await api().updatePlan(Object.assign({}, old, next)));
+  toast(msg, 2600, async () => swap(await api().updatePlan(prev)));
 }
 
 // Chạm chỗ trống ở cột Kế hoạch → thêm khối cho hôm nay
-function renderPlanAdd(start) {
-  const next = S.today.plan.find(p => p.start > start);
-  let end = new Date(+start + 30 * 60000);
-  if (next && next.start < end && next.start - start >= 15 * 60000) end = next.start;
+// end: giờ kết thúc khi kéo chọn khoảng; không có thì 30 phút, hoặc tới khối kế tiếp nếu khối đó cách ≥ 15 phút
+function renderPlanAdd(start, end) {
+  if (!end) {
+    const next = S.today.plan.find(p => p.start > start);
+    end = new Date(+start + 30 * 60000);
+    if (next && next.start < end && next.start - start >= 15 * 60000) end = next.start;
+  }
   const catOpts = Object.entries(CATS).map(([k, c]) => `<option value="${k}" ${k === "build" ? "selected" : ""}>${c.name}</option>`).join("");
   openSheet("Thêm kế hoạch", `<div class="act" style="${catVars("build")}" id="pAddBox">
       <input class="input" type="text" id="pTitle" placeholder="Định làm gì?" aria-label="Tên kế hoạch" style="grid-column:1/-1">
@@ -2205,11 +2339,14 @@ async function saveActEdit() {
   const day = startOfDay(old.start);
   let s = atTime(day, $("#eStart").value || hm(old.start)), e = atTime(day, $("#eEnd").value || hm(old.end));
   if (e <= s) e = new Date(s.getTime() + 15 * 60000);
-  const next = Object.assign({}, old, { title: $("#eTitle").value.trim() || old.title, cat: $("#eCat").value, start: s, end: e });
+  await applyActTime(old, { title: $("#eTitle").value.trim() || old.title, cat: $("#eCat").value, start: s, end: e }); closeSheet();
+}
+// Sửa một việc đã làm, có hoàn tác. Sheet sửa và kéo-thả dùng chung.
+async function applyActTime(old, next, msg = "Đã sửa") {
   const prev = Object.assign({}, old);
   const swap = it => { S.today.actual = S.today.actual.map(a => (a.id === it.id ? Object.assign({}, it, { plan: it.plan || prev.plan, kind: "act" }) : a)); };
-  swap(await api().updateActual(next)); closeSheet();
-  toast("Đã sửa", 2600, async () => swap(await api().updateActual(prev)));
+  swap(await api().updateActual(Object.assign({}, old, next)));
+  toast(msg, 2600, async () => swap(await api().updateActual(prev)));
 }
 async function deleteAct() {
   const old = S.today.actual.find(a => a.id === S.editAct); if (!old) return closeSheet();
@@ -2298,10 +2435,11 @@ function busy(el, label = "Đang xử lý") {
 }
 
 document.addEventListener("click", async e => {
+  if (Date.now() - Drag.dropped < 400 && e.target.closest(".tl__col")) return;   // cú click ngay sau khi thả khối
   const el = e.target.closest("button, [data-close]");
   if (!el) {   // chỗ trống ở cột Kế hoạch → thêm khối (làm tròn xuống 15 phút)
     const col = e.target.closest(".tl__col--plan"); if (!col) return;
-    const m = TL.H0 * 60 + (e.clientY - col.getBoundingClientRect().top) / TL.PX * 60;
+    const m = yToMin(col, e.clientY);
     const q = Math.max(TL.H0 * 60, Math.min(TL.H1 * 60 - 15, Math.floor(m / 15) * 15));
     const st = startOfDay(new Date()); st.setMinutes(q);
     return col.closest(".tl--tpl") ? renderTplForm(null, hm(st)) : renderPlanAdd(st);
@@ -2404,7 +2542,7 @@ document.addEventListener("click", async e => {
     return S.view === "habits" ? renderHabits() : renderToday();
   }
   if (id === "btnLate" || id === "btnLateRedo") return openLateAi();
-  if (id === "lRetell") return openLateAi(S.late ? S.late.text : null);
+  if (id === "lRetell") return openLateAi(S.late ? hm(S.late.wake) : null);
   if (el.dataset.llv != null && S.late && S.late.hab) {
     S.late.hab.lv = el.dataset.llv;
     $$("#sheetBody [data-llv]").forEach(b => b.setAttribute("aria-pressed", b.dataset.llv === S.late.hab.lv));
@@ -2518,7 +2656,7 @@ document.addEventListener("paste", e => { if (e.target.id === "sKey") setTimeout
 // Bộ chọn giờ trong app: hộp chọn giờ của Android bị cắt nút "Set" trên vài máy (Vivo X200 Pro mini),
 // nên ô giờ để readonly và mở bộ chọn này. Chọn xong thì gán value + phát input/change như ô giờ thường.
 const TP = (() => {
-  const H = 44; let target = null;
+  const H = 44; let target = null, custom = null;   // custom: { title, value, ok (html nút chính), onOk(v, nút) } — dùng không cần ô giờ
   const el = document.createElement("div");
   el.className = "tp"; el.hidden = true;
   const col = (n, k) => `<div class="tp__col" data-k="${k}" tabindex="0" role="listbox" aria-label="${k === "h" ? "Giờ" : "Phút"}">${Array.from({ length: n }, (_, i) => `<div class="tp__it" data-v="${i}">${String(i).padStart(2, "0")}</div>`).join("")}</div>`;
@@ -2529,7 +2667,7 @@ const TP = (() => {
       <div class="sheet-actions"><button type="button" class="btn" data-tp-close>Hủy</button><button type="button" class="btn btn--primary" data-tp-ok><i class="ph ph-check"></i> Xong</button></div>
     </div>`;
   document.body.append(el);
-  const cols = { h: $('.tp__col[data-k="h"]', el), m: $('.tp__col[data-k="m"]', el) };
+  const cols = { h: $('.tp__col[data-k="h"]', el), m: $('.tp__col[data-k="m"]', el) }, okBtn = $("[data-tp-ok]", el), okHtml = okBtn.innerHTML;
   const get = c => Math.max(0, Math.min(c.children.length - 1, Math.round(c.scrollTop / H)));
   const set = (c, v, smooth) => c.scrollTo({ top: v * H, behavior: smooth ? "smooth" : "instant" });
   const mark = c => { const i = get(c); [...c.children].forEach((it, j) => { it.classList.toggle("is-on", j === i); it.setAttribute("aria-selected", j === i); }); };
@@ -2538,25 +2676,27 @@ const TP = (() => {
     c.addEventListener("click", e => { const it = e.target.closest(".tp__it"); if (it) set(c, +it.dataset.v, true); });
     c.addEventListener("keydown", e => { const d = { ArrowUp: -1, ArrowDown: 1 }[e.key]; if (d) { e.preventDefault(); set(c, get(c) + d, true); } });
   });
-  const close = () => { el.hidden = true; if (target) target.focus({ preventScroll: true }); target = null; };
-  const open = inp => {
-    target = inp; el.hidden = false;
-    $("#tpTitle", el).textContent = inp.getAttribute("aria-label") || "Chọn giờ";
-    const [h, m] = (inp.value || hm(new Date())).split(":").map(Number);
+  const close = () => { el.hidden = true; if (target) target.focus({ preventScroll: true }); target = null; custom = null; };
+  const open = (inp, o = null) => {
+    target = inp; custom = o; el.hidden = false;
+    okBtn.innerHTML = o && o.ok ? o.ok : okHtml;
+    $("#tpTitle", el).textContent = (o && o.title) || (inp && inp.getAttribute("aria-label")) || "Chọn giờ";
+    const [h, m] = ((o && o.value) || (inp && inp.value) || hm(new Date())).split(":").map(Number);
     set(cols.h, h || 0); set(cols.m, m || 0); mark(cols.h); mark(cols.m);
     cols.h.focus({ preventScroll: true });
   };
   el.addEventListener("click", e => {
-    if (e.target.closest("[data-tp-close]")) return close();
+    if (e.target.closest("[data-tp-close]")) return okBtn.disabled ? null : close();   // đang sắp lịch thì chưa cho đóng
     if (e.target.closest("[data-tp-now]")) { const n = new Date(); set(cols.h, n.getHours(), true); set(cols.m, n.getMinutes(), true); return; }
     if (e.target.closest("[data-tp-ok]")) {
       const p = n => String(n).padStart(2, "0"), inp = target;
+      if (custom) { if (!okBtn.disabled) custom.onOk(`${p(get(cols.h))}:${p(get(cols.m))}`, okBtn); return; }
       inp.value = `${p(get(cols.h))}:${p(get(cols.m))}`;
       close();
       inp.dispatchEvent(new Event("input", { bubbles: true })); inp.dispatchEvent(new Event("change", { bubbles: true }));
     }
   });
-  return { open, close, isOpen: () => !el.hidden };
+  return { open, close, isOpen: () => !el.hidden, isBusy: () => okBtn.disabled };
 })();
 // pointerdown đặt readonly trước khi trình duyệt kịp mở hộp chọn giờ mặc định
 document.addEventListener("pointerdown", e => { if (e.target.matches?.('input[type="time"]')) e.target.readOnly = true; }, true);
@@ -2564,7 +2704,7 @@ document.addEventListener("click", e => { if (e.target.matches?.('input[type="ti
 document.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches?.('input[type="time"]')) { e.preventDefault(); TP.open(e.target); } });
 
 $("#inputText").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && matchMedia("(pointer: fine)").matches) { e.preventDefault(); dockSend(e.target.value); } });
-document.addEventListener("keydown", e => { if (e.key !== "Escape") return; if (TP.isOpen()) TP.close(); else if ($("#dock").classList.contains("is-open")) closeCompose(); else if (!$("#sheet").hidden) closeSheet(); });
+document.addEventListener("keydown", e => { if (e.key !== "Escape") return; if (Drag.st) Drag.cancel(); else if (TP.isOpen()) { if (!TP.isBusy()) TP.close(); } else if ($("#dock").classList.contains("is-open")) closeCompose(); else if (!$("#sheet").hidden) closeSheet(); });
 
 // Giọng nói (Web Speech, tiếng Việt)
 (() => {
@@ -2583,7 +2723,7 @@ document.addEventListener("keydown", e => { if (e.key !== "Escape") return; if (
 })();
 
 // Cập nhật thanh "Bây giờ" mỗi phút
-setInterval(() => { if (gateStep() && $("#gate").hidden && $("#sheet").hidden) return render(); if (S.view === "today" && !S.tplOpen && $("#sheet").hidden && document.activeElement !== $("#inputText")) renderToday(); }, 60000);
+setInterval(() => { if (gateStep() && $("#gate").hidden && $("#sheet").hidden) return render(); if (S.view === "today" && !S.tplOpen && !Drag.st && $("#sheet").hidden && document.activeElement !== $("#inputText")) renderToday(); }, 60000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
 
 if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js").catch(() => {});

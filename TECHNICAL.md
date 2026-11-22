@@ -233,10 +233,19 @@ sequenceDiagram
 | Sửa tên, giờ | `renderPlanEdit` → `savePlanEdit` | `updatePlan` (PATCH lần lặp hôm nay) |
 | Thêm | chạm chỗ trống cột Kế hoạch → `renderPlanAdd` → `savePlanAdd` | `addPlan` (sự kiện đơn, `added=1`) |
 | Xoá khối đã thêm | `deletePlanAdded` | `deletePlan` (chỉ cho `added`) |
+| Kéo dời / kéo mép dưới (cả 2 cột) | `Drag` → `applyPlanTime` / `applyActTime` | `updatePlan` / `updateActual` |
+| Kéo chỗ trống cột Kế hoạch | `Drag` → `renderPlanAdd(start, end)` | như Thêm |
 
 Chạm chỗ trống: `y` trong cột → phút = `TL.H0*60 + y / TL.PX * 60`, làm tròn xuống 15 phút.
 Kết thúc mặc định +30 phút, hoặc tới khối kế tiếp nếu khối đó cách ≥15 phút.
 Vạch giờ, vạch hiện tại có `pointer-events: none` để không chặn cú chạm.
+
+Kéo-thả (`Drag`, chỉ `.tl:not(.tl--tpl)`): nghe `pointerdown/move/up/cancel` trên `document`. Cảm ứng nhấc sau `HOLD` ms nếu ngón tay lệch ≤ `SLOP` px (lệch hơn = để trình duyệt cuộn); chuột nhấc khi lệch > `MSLOP`.
+Chế độ chọn lúc `pointerdown`: trên khối, trong 12 px (chuột 6 px) cuối → `resize`, còn lại `move`; chỗ trống cột Kế hoạch → `create`.
+Đã nhấc thì `touchmove` bị `preventDefault` (đặt `touch-action` sau `pointerdown` không chặn được cú chạm đang chạy), tự cuộn khi cách mép `.tl__scroll` < `EDGE` px.
+Phút = `yToMin(col, y)` (dùng chung với chạm chỗ trống) theo vị trí cột lúc đó nên đã tính phần cuộn. Lệch < 7,5 phút giữ nguyên giờ cũ (kể cả giờ lẻ), quá thì làm tròn 15 phút.
+Lúc kéo chỉ đổi `style` của một phần tử, không render. Thả: giờ không đổi thì chỉ `renderToday`; `Drag.dropped` chặn cú click ngay sau đó; vòng `setInterval` 60 s không render khi `Drag.st` còn.
+Khối không thuộc hôm nay hoặc tràn ngoài `TL.H0..TL.H1` thì không kéo.
 
 ### 3.5b Tuần mẫu (`openTpl` / `renderTpl` / `renderTplForm`)
 Trang con của tab Hôm nay (`S.tplOpen`; `setView` luôn tắt nó). Mở là tải lại `listSeries()` (người dùng có thể đã sửa trong Google Calendar).

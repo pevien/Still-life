@@ -78,23 +78,23 @@ Thẻ Rest day liệt kê các thói quen còn hiện mà chưa làm, kèm bản
 Tiêu đề Thói quen hôm nay ghi "rest day" thay vì "xong".
 
 ## Dậy trễ
-Nút "Mình dậy trễ" cạnh "Hôm nay mình không ổn" ở tab Hôm nay. Chỉ hiện khi có Gemini key (chế độ xem thử thì luôn có) và hôm nay còn khối chưa làm, chưa bỏ qua.
-- Bấm nút mở popup kể từ dưới lên, có micro, điền sẵn "Mình dậy lúc HH:MM" (bây giờ, làm tròn xuống 15 phút). Kể thêm được, vd "chiều có hẹn 15:00, bỏ gym".
+Nút "Mình dậy trễ" và "Mình không khoẻ" nằm chung 1 hàng ở tab Hôm nay. "Mình dậy trễ" chỉ hiện khi có Gemini key (chế độ xem thử thì luôn có) và hôm nay còn khối chưa làm, chưa bỏ qua.
+- Bấm nút mở thẳng bộ chọn giờ "Mình dậy lúc" (mặc định bây giờ làm tròn xuống 15 phút). Nút chính "Sắp lại lịch hôm nay". Giờ dậy sau bây giờ thì báo, chưa gửi.
 - Gemini đề xuất giờ mới cho các khối còn lại hôm nay:
   - không xếp vào quá khứ (riêng khối dậy được đặt đúng giờ dậy), không chồng giờ, không quá 23:00;
   - cố giữ giờ lớp học, hẹn và bữa chính;
   - không vừa thì rút ngắn hoặc bỏ khối ít quan trọng.
-- App kiểm tra đề xuất. Sai thì báo, popup giữ chữ để gửi lại. **AI không tự áp dụng.**
+- App kiểm tra đề xuất (giờ lệch dạng như `9:00` thì tự chuẩn hoá). AI vẫn sai luật hoặc lỗi (trừ key sai) thì dùng bản dời đơn giản và ghi rõ trong sheet. **AI không tự áp dụng.**
 - Sheet "Lịch mới hôm nay" gồm:
   - câu tóm tắt của AI và giờ dậy;
   - danh sách `giờ cũ → giờ mới`;
   - mục **Bỏ hôm nay** (có cả khối đã qua giờ mà AI để nguyên);
   - thói quen gắn với khối dậy: chọn sẵn Đạt nếu dậy trong vòng 5 phút sau giờ của khối, còn lại là Chưa, đổi được bằng 3 nút;
-  - nút Kể lại, Hủy / Áp dụng.
+  - nút Đổi giờ dậy, Hủy / Áp dụng.
 - Áp dụng:
   - chỉ đổi **lần lặp của hôm nay** (chuỗi lặp không đổi), khối bị bỏ thì đánh dấu Bỏ qua, nhắc của Google Calendar theo giờ mới;
   - toast có Hoàn tác;
-  - chỗ nút đổi thành "Đã sắp lại từ HH:MM · Trả lại lịch cũ". Chạm phần chữ thì kể lại. Sắp lại lần nữa luôn tính từ lịch gốc.
+  - chỗ nút đổi thành "Đã sắp lại từ HH:MM · Trả lại lịch cũ". Chạm phần chữ thì chọn lại giờ dậy. Sắp lại lần nữa luôn tính từ lịch gốc.
 - Trả lại lịch cũ: các khối về giờ gốc, bỏ những Bỏ qua do lần sắp lại đặt, thói quen về mức trước (trừ khi bạn đã tự đổi mức).
 - Rest day và dậy trễ độc lập: đang rest day thì sheet ghi "các khối 💤 vẫn dời nhưng không nhắc".
 - Lưu: `late` và `lm` trong sự kiện "Thói quen" của ngày (giờ dậy, giờ gốc các khối đã dời, khối đã bỏ, mức thói quen trước đó).
@@ -106,7 +106,7 @@ Thanh dưới có 4 ô: Hôm nay · Thói quen · Nhật ký · Cài đặt (Cà
 1. **Hôm nay**
    - Bây giờ / Tiếp theo: nút Đã làm, Bỏ qua, Làm việc khác. Đã làm ở khối có thói quen (vd Nhật ký) thì đánh dấu thói quen đó đạt.
      Nút ↺ trên thẻ (hoặc Hoàn tác trên toast) bỏ việc đã ghi và trả thói quen về mức trước khi bấm, trừ khi bạn đã tự đổi mức sau đó.
-   - Habit hôm nay, nút "Hôm nay mình không ổn".
+   - Habit hôm nay, nút "Mình không khoẻ".
    - Thời gian theo nhóm + timeline kế hoạch vs thực tế 5:00–23:00 trong khung cao cố định, cuộn bên trong,
      mở ra tự cuộn tới giờ hiện tại, render lại giữ nguyên chỗ đang xem. Khối ngắn hiện 1 dòng, cắt bằng "…".
    - Bấm khối Kế hoạch → "Chỉnh sửa kế hoạch": đổi tên, giờ cho riêng hôm nay, có hoàn tác.
@@ -124,6 +124,11 @@ Thanh dưới có 4 ô: Hôm nay · Thói quen · Nhật ký · Cài đặt (Cà
    - Bấm chỗ trống cột Kế hoạch → "Thêm kế hoạch": giờ bắt đầu theo chỗ bấm (làm tròn xuống 15 phút),
      dài 30 phút hoặc tới khối kế tiếp. Thứ tự ô: Tên, Nhóm, Giờ. Chỉ cho hôm nay.
    - Bấm khối Thực tế → "Sửa việc đã làm" (Tên, Nhóm, Giờ): sửa, xoá việc đã ghi.
+   - **Kéo-thả** (giống Google Calendar, chỉ timeline Hôm nay): điện thoại phải giữ yên khoảng 0,35 giây để nhấc khối (máy rung nhẹ), vuốt ngay thì vẫn là cuộn; chuột thì kéo luôn.
+     Kéo thân khối Kế hoạch hoặc Thực tế = dời giờ. Bắt đầu kéo ở mép dưới = đổi giờ kết thúc (ít nhất 15 phút).
+     Kéo trên chỗ trống cột Kế hoạch = chọn khoảng giờ rồi mở "Thêm kế hoạch" điền sẵn giờ.
+     Bước 15 phút, trong khung 5:00–23:00, kéo gần mép thì timeline tự cuộn, có nhãn giờ nổi. Thả tay là lưu (Kế hoạch chỉ đổi hôm nay), có hoàn tác. Esc huỷ.
+     Khối tràn ra ngoài khung 5:00–23:00 chỉ bấm được, không kéo.
 2. **Nhập** (nút bút nổi ở tab Hôm nay): gõ hoặc nói → Gemini hiểu → thẻ xác nhận (sửa được) → lưu.
    - Thẻ việc theo thứ tự Tên, Nhóm, Giờ, Ngày; nút "+ Thêm việc" thêm thẻ nối tiếp thẻ cuối (cùng ngày, nhóm, 30 phút). Ngày sửa được (không chọn ngày tương lai), khác hôm nay thì được tô màu.
      Chip thói quen của ngày khác có nhãn ngày.

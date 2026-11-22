@@ -5,6 +5,38 @@ Mới nhất ở trên. Số `vNN` là phiên bản cache trong `sw.js`.
 
 ---
 
+## 2026-11-22 · Dậy trễ: bộ chọn giờ thay khung chat, AI hết báo "sai dạng" · v75
+**Đổi gì**
+- "Mình dậy trễ" và "Mình không khoẻ" (trước là "Hôm nay mình không ổn") nằm chung 1 hàng, chia đôi bề ngang, kể cả trên điện thoại. Dòng "Đã sắp lại từ… · Trả lại lịch cũ" vẫn chiếm riêng 1 hàng.
+- Bấm "Mình dậy trễ" mở thẳng bộ chọn giờ "Mình dậy lúc", nút chính "Sắp lại lịch hôm nay" (thay "Xong"). Không còn khung chat. Trong sheet xem trước, "Kể lại" đổi thành "Đổi giờ dậy".
+- Bộ chọn giờ (mọi ô giờ trong app) thấp lại còn 3 hàng (220 → 132px).
+- Gemini trả giờ lệch dạng (`9:00`, `09:00:00`, `9h30`) thì app tự chuẩn hoá. Thiếu 1 đầu giờ thì giữ độ dài cũ. Nhắc khối mà không có giờ thì giữ nguyên.
+- Đề xuất của AI vẫn sai luật (chồng giờ, quá khứ…), hoặc Gemini bận / trả JSON hỏng, thì app dùng bản dời đơn giản (`demoLate`) và ghi rõ trong sheet xem trước, không báo lỗi nữa. Riêng key sai vẫn báo kèm nút Mở Cài đặt.
+
+**Vì sao**
+Thử trên web có key vẫn không tạo được lịch: `lateCheck` chỉ nhận đúng `HH:MM`, Gemini hay trả `9:00` hoặc bỏ trống giờ của khối không đổi, nên bị từ chối với lỗi "giờ của … sai dạng". Gõ chữ để kể chậm hơn chọn giờ, và chỉ cần giờ dậy là đủ để sắp lại.
+
+**Logic**
+- `normT` chuẩn hoá giờ, chỉ trả "" khi hỏng hẳn (vd "chín giờ", "24:00"). Prompt dặn thêm AI viết đủ HH:MM.
+- Giờ dậy lấy theo giờ người dùng chọn, ghi đè `wake` của AI. Giờ dậy sau bây giờ thì báo bằng toast, giữ bộ chọn.
+- `TP.open(null, { title, value, ok, onOk })`: bộ chọn giờ dùng được không cần ô giờ, đổi chữ nút chính. Lúc đang sắp lịch, nút chính quay vòng, Hủy / chạm nền / Esc không đóng được, bấm nhiều lần chỉ gọi AI 1 lần.
+- Vẫn có bước xem trước, AI không bao giờ tự áp dụng.
+- Đánh đổi: không còn kể thêm (vd "chiều có hẹn") cho AI. Muốn chỉnh riêng một khối thì sửa sau trên timeline.
+
+ trên timeline Hôm nay · v74
+**Đổi gì**
+- Giữ rồi kéo khối (Kế hoạch hoặc Thực tế) để dời giờ, kéo mép dưới để đổi giờ kết thúc, kéo trên chỗ trống cột Kế hoạch để chọn khoảng rồi mở "Thêm kế hoạch". Bước 15 phút, có nhãn giờ nổi, tự cuộn ở mép, thả là lưu kèm Hoàn tác.
+
+**Vì sao**
+Đổi giờ phải mở sheet rồi gõ giờ, chậm hơn nhiều so với kéo như trên Google Calendar.
+
+**Logic**
+- Điện thoại phải giữ 350 ms mới nhấc khối, để vuốt dọc vẫn cuộn timeline. Đã nhấc thì chặn `touchmove` để trình duyệt không cuộn.
+- Sheet sửa và kéo-thả dùng chung `applyPlanTime` / `applyActTime` (lưu + hoàn tác). Kế hoạch vẫn chỉ đổi lần lặp hôm nay.
+- Tuần mẫu chưa kéo được.
+
+---
+
 ## 2026-11-22 · Dậy trễ: AI sắp lại lịch hôm nay · v73
 **Đổi gì**
 - Tab Hôm nay có thêm nút "Mình dậy trễ" cạnh "Hôm nay mình không ổn". Nút chỉ hiện khi có Gemini key (hoặc ở chế độ xem thử) và hôm nay còn khối chưa làm, chưa bỏ qua.

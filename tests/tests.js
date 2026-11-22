@@ -434,6 +434,90 @@
     });
   });
 
+  describe("Kéo-thả timeline Hôm nay", () => {
+    // gửi down → (giữ) → move → move → up lên một phần tử; cảm ứng thì chờ đủ HOLD mới kéo
+    const drag = async (el, y0, y1, type = "touch", hold = true) => {
+      const o = { bubbles: true, cancelable: true, pointerId: 7, pointerType: type, isPrimary: true, button: 0, clientX: el.getBoundingClientRect().left + 10 };
+      el.dispatchEvent(new PointerEvent("pointerdown", Object.assign({}, o, { clientY: y0 })));
+      if (type === "touch" && hold) await wait(Drag.HOLD + 40);
+      el.dispatchEvent(new PointerEvent("pointermove", Object.assign({}, o, { clientY: (y0 + y1) / 2 })));
+      el.dispatchEvent(new PointerEvent("pointermove", Object.assign({}, o, { clientY: y1 })));
+      el.dispatchEvent(new PointerEvent("pointerup", Object.assign({}, o, { clientY: y1 })));
+      await wait(60);
+    };
+    // khối kéo được: giờ tròn 15 phút, cách mép khung ≥ 1 giờ; cuộn cho nó nằm giữa khung
+    const pickPlan = () => S.today.plan.find(p => !(p.start.getMinutes() % 15) && !(p.end.getMinutes() % 15) && p.start.getHours() >= TL.H0 + 1 && p.end.getHours() < TL.H1 - 1 && p.end - p.start >= 30 * 60000);
+    const center = el => { const sc = $(".tl__scroll"); sc.scrollTop += el.getBoundingClientRect().top - sc.getBoundingClientRect().top - sc.clientHeight / 2; return el.getBoundingClientRect(); };
+    const saved = async id => (await Demo.listPlan(today, day(1))).find(x => x.id === id);
+
+    test("cảm ứng: giữ rồi kéo khối kế hoạch xuống 30 phút, lưu cho hôm nay, hoàn tác về như cũ", async () => {
+      await reset(); renderToday();
+      const p = pickPlan(), el = $(`.tl__col--plan [data-pid="${p.id}"]`), r = center(el), y = r.top + Math.min(14, r.height / 3);
+      await drag(el, y, y + TL.PX / 2 + 3);
+      const n = await saved(p.id);
+      eq([hm(n.start), hm(n.end)], [hm(new Date(+p.start + 30 * 60000)), hm(new Date(+p.end + 30 * 60000))]);
+      ok(!Drag.st && !$(".tl__scroll.is-dragging") && !$(".tl__dragtime"), "dọn sạch trạng thái kéo");
+      ok(toast._undo, "có hoàn tác");
+      await toast._undo();
+      eq(hm((await saved(p.id)).start), hm(p.start), "hoàn tác");
+    });
+    test("chuột: kéo mép dưới chỉ đổi giờ kết thúc", async () => {
+      await reset(); renderToday();
+      const p = pickPlan(), el = $(`.tl__col--plan [data-pid="${p.id}"]`), r = center(el);
+      await drag(el, r.bottom - 2, r.bottom - 2 + TL.PX, "mouse");
+      const n = await saved(p.id);
+      eq([hm(n.start), hm(n.end)], [hm(p.start), hm(new Date(+p.end + 60 * 60000))]);
+      await toast._undo();
+    });
+    test("kéo khối Thực tế lên 15 phút", async () => {
+      await reset();
+      const a = await Demo.addActual({ title: "Kéo thử", cat: "build", start: at("10:00"), end: at("10:45") });
+      await loadToday(); renderToday();
+      const el = $(`.tl__col--act [data-aid="${a.id}"]`), r = center(el), y = r.top + 10;
+      await drag(el, y, y - TL.PX / 4, "mouse");
+      const n = (await Demo.listActual(today, day(1))).find(x => x.id === a.id);
+      eq([hm(n.start), hm(n.end)], ["09:45", "10:30"]);
+      await Demo.deleteActual(a.id); await reset();
+    });
+    test("kéo chỗ trống cột Kế hoạch mở sheet Thêm với khoảng đã chọn", async () => {
+      await reset(); S.today.plan = []; renderToday();
+      const col = $(".tl__col--plan"), sc = $(".tl__scroll");
+      sc.scrollTop = (14 - TL.H0) * TL.PX - 60;
+      const y = m => col.getBoundingClientRect().top + (m / 60 - TL.H0) * TL.PX;
+      await drag(col, y(14 * 60 + 5), y(15 * 60 + 20), "mouse");
+      eq([sheetTitle(), $("#pStart").value, $("#pEnd").value], ["Thêm kế hoạch", "14:00", "15:30"]);
+      ok(!$(".tl__ghost"), "bỏ khối nháp");
+      closeSheet(); await reset();
+    });
+    test("chạm nhanh vẫn mở sheet; vuốt trước khi giữ đủ lâu thì không kéo; kéo chưa quá nửa bước thì không lưu", async () => {
+      await reset(); renderToday();
+      const orig = Demo.updatePlan; let called = 0;
+      Demo.updatePlan = async x => { called++; return orig(x); };
+      try {
+        const p = pickPlan(), el = $(`.tl__col--plan [data-pid="${p.id}"]`), r = center(el), y = r.top + 10;
+        await drag(el, y, y + 40, "touch", false);
+        ok(!Drag.st && !el.classList.contains("is-lifted"), "vuốt = cuộn, không nhấc khối");
+        await drag(el, y, y + TL.PX / 10, "mouse");
+        eq(called, 0, "không gọi lưu");
+        el.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 7, pointerType: "touch", isPrimary: true, button: 0, clientY: y }));
+        el.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 7, pointerType: "touch", isPrimary: true, button: 0, clientY: y }));
+        Drag.dropped = 0; $(`.tl__col--plan [data-pid="${p.id}"]`).click(); await wait(30);
+        eq(sheetTitle(), "Chỉnh sửa kế hoạch");
+      } finally { Demo.updatePlan = orig; closeSheet(); }
+    });
+    test("Esc khi đang kéo thì trả khối về chỗ cũ", async () => {
+      await reset(); renderToday();
+      const p = pickPlan(), el = $(`.tl__col--plan [data-pid="${p.id}"]`), r = center(el), y = r.top + 10;
+      const o = { bubbles: true, pointerId: 7, pointerType: "mouse", isPrimary: true, button: 0 };
+      el.dispatchEvent(new PointerEvent("pointerdown", Object.assign({}, o, { clientY: y })));
+      el.dispatchEvent(new PointerEvent("pointermove", Object.assign({}, o, { clientY: y + TL.PX })));
+      ok(Drag.st && Drag.st.lifted, "đang kéo");
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      ok(!Drag.st, "huỷ");
+      eq(hm((await saved(p.id)).start), hm(p.start));
+    });
+  });
+
   describe("Chỉnh sửa kế hoạch", () => {
     test("bấm khối kế hoạch mở sheet; khối tuần mẫu không có nút xoá", async () => {
       await reset(); renderToday();
@@ -510,7 +594,7 @@
         release(); await wait(80);
         ok($(".unwell-card"), "có thẻ Unwell day");
         $("#btnUnwellOff").click(); await wait(80);
-        ok($("#btnUnwell"), "quay lại nút không ổn");
+        ok($("#btnUnwell"), "quay lại nút không khoẻ");
       } finally { Demo.mutePlan = orig; release(); }
     });
   });
@@ -1494,10 +1578,19 @@
       bad(out([{ id: "b4", s: "10:00", e: "09:30" }]), "s ≥ e");
       bad(out([{ id: "b3", s: "08:15", e: "09:00" }]), "đổi khối đã làm");
       bad(out([{ id: "b3", skip: true }]), "bỏ khối đã làm");
-      bad(out([{ id: "b4", s: "9:00", e: "10:00" }]), "giờ sai dạng");
+      bad(out([{ id: "b4", s: "chín giờ", e: "10:00" }]), "giờ sai dạng");
       bad(out([], "08:30"), "giờ dậy sau bây giờ");
       bad({ items: [] }, "thiếu giờ dậy");
       ok(!lateCheck(base(), out([{ id: "b3", s: "07:00", e: "07:45" }]), now).err, "khối đã làm nhắc lại đúng giờ cũ thì không sao");
+    });
+    test("lateCheck: chấp nhận giờ AI viết lệch dạng (9:00, 09:00:00, 9h30), thiếu 1 đầu thì giữ độ dài, không có giờ thì giữ nguyên", () => {
+      eq([normT("9:00"), normT("09:00:00"), normT("9h30"), normT("9g"), normT("24:00"), normT("abc"), normT(null)], ["09:00", "09:00", "09:30", "09:00", "", "", ""]);
+      const c = lateCheck(base(), out([{ id: "b4", s: "9:15", e: "11:15:00" }, { id: "b6", s: "20:30" }, { id: "b5", skip: false }], "8:00"), now);
+      ok(!c.err, c.err);
+      eq(hm(c.wake), "08:00");
+      eq([hm(c.res.get("b4").start), hm(c.res.get("b4").end)], ["09:15", "11:15"]);
+      eq(hm(c.res.get("b6").end), "21:30", "thiếu e: giữ 60 phút");
+      ok(!c.res.has("b5"), "nhắc mà không có giờ: giữ nguyên");
     });
     test("demoLate: khối quan trọng chưa tới giờ đứng yên, khối khác nối tiếp, qua lateCheck", () => {
       const b = base(), o = demoLate("nay mình dậy 8h", b, now), c = lateCheck(b, o, now);
@@ -1572,21 +1665,39 @@
       eq(S.today.rec.h[hid], "min", "đã tự đổi thì giữ");
       await setHabit(todayStr(), hid, before || null); await reset();
     });
-    test("Màn hình: nút Mình dậy trễ → popup → sheet xem trước → Áp dụng → dòng Đã sắp lại → Trả lại lịch cũ", async () => {
+    test("Màn hình: Mình dậy trễ → bộ chọn giờ → Sắp lại lịch → xem trước → Áp dụng → Trả lại lịch cũ", async () => {
       await reset();
       const keep = [S.settings.demo, S.settings.geminiKey];
       S.settings.demo = false; S.settings.geminiKey = "";
       ok(!canLate(), "không key, không xem thử thì ẩn nút");
       [S.settings.demo, S.settings.geminiKey] = keep;
       renderToday();
+      ok($("#btnUnwell") && $("#btnUnwell").textContent.trim() === "Mình không khoẻ", "chữ nút mới");
       if (!lateNeeded()) return ok(!$("#btnLate"), "hết khối thì không có nút");
-      ok($("#btnLate"), "có nút"); ok($("#btnLate").closest(".day-toggles").querySelector("#btnUnwell"), "cạnh nút không ổn");
-      $("#inputText").value = "dở";
+      ok($("#btnLate"), "có nút"); ok($("#btnLate").closest(".day-toggles").querySelector("#btnUnwell"), "cạnh nút không khoẻ");
+      ok(Math.abs($("#btnLate").getBoundingClientRect().top - $("#btnUnwell").getBoundingClientRect().top) < 2, "2 nút cùng 1 hàng");
+      const tp = () => document.querySelector(".tp"), tpOk = () => tp().querySelector("[data-tp-ok]");
+      const pick = v => { const [h, m] = v.split(":").map(Number); tp().querySelector('[data-k="h"]').scrollTop = h * 44; tp().querySelector('[data-k="m"]').scrollTop = m * 44; };
       $("#btnLate").click(); await wait(20);
-      ok($("#dock").classList.contains("is-late") && $("#inputText").value.startsWith("Mình dậy lúc"), "popup điền sẵn giờ");
-      await lateAi($("#inputText").value); await wait(20);
-      eq(sheetTitle(), "Lịch mới hôm nay");
-      ok(!$("#dock").classList.contains("is-late") && $("#inputText").value === "dở", "đóng popup, trả lại chữ đang gõ");
+      ok(!tp().hidden && !sheetOpen(), "mở thẳng bộ chọn giờ, không qua sheet");
+      eq(tp().querySelector("#tpTitle").textContent, "Mình dậy lúc");
+      ok(tpOk().textContent.includes("Sắp lại lịch hôm nay"), "nút chính");
+      ok(!$("#dock").classList.contains("is-open"), "không mở khung chat");
+      const later = new Date(Date.now() + 2 * 3600000);
+      if (later.getDate() === new Date().getDate()) {
+        pick(hm(later)); await wait(20); tpOk().click(); await wait(20);
+        ok(!tp().hidden && !sheetOpen(), "giờ dậy sau bây giờ thì báo, giữ bộ chọn");
+      }
+      const w = hm(floor15(new Date()));
+      pick(w); await wait(20); tpOk().click(); await wait(80);
+      ok(tp().hidden, "đóng bộ chọn"); eq(sheetTitle(), "Lịch mới hôm nay");
+      $("#lRetell").click(); await wait(20);
+      ok(!tp().hidden && tpOk().textContent.includes("Sắp lại"), "Đổi giờ dậy mở lại bộ chọn");
+      tpOk().click(); await wait(80);
+      ok(tp().hidden, "đóng bộ chọn");
+      const inp = document.createElement("input"); inp.value = "10:00"; TP.open(inp);
+      ok(tpOk().textContent.includes("Xong") && tp().querySelector("#tpTitle").textContent === "Chọn giờ", "ô giờ thường vẫn là Xong"); TP.close();
+      eq([sheetTitle(), hm(S.late.wake)], ["Lịch mới hôm nay", w], "giữ giờ cũ");
       $("#lApply").click(); await wait(80);
       ok(!sheetOpen(), "đóng sheet");
       ok($("#btnLateUndo") && $(".late-state").textContent.includes("Đã sắp lại từ"), "dòng trạng thái");
@@ -1594,7 +1705,20 @@
       $("#btnLateUndo").click(); await wait(80);
       eq(S.today.rec.late, null);
       ok($("#btnLate"), "quay lại nút");
-      $("#inputText").value = ""; await reset();
+      await reset();
+    });
+    test("lateAi: AI đề xuất sai luật thì dùng bản dời đơn giản, vẫn ra sheet xem trước", async () => {
+      await reset();
+      if (!lateNeeded()) return;
+      const keep = [S.settings.geminiKey, window.fetch];
+      S.settings.geminiKey = "AIzaTEST";
+      window.fetch = async () => ({ ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({ wake: "07:00", items: [{ id: "b99", s: "x", e: "y" }], reply: "r" }) }] } }] }) });
+      try {
+        await lateAi(hm(floor15(new Date())));
+        eq(sheetTitle(), "Lịch mới hôm nay");
+        ok(S.late.reply.includes("dời đơn giản"), "báo đã dùng bản đơn giản");
+        eq(hm(S.late.wake), hm(floor15(new Date())), "giờ dậy theo giờ đã chọn, không theo AI");
+      } finally { [S.settings.geminiKey, window.fetch] = keep; S.late = null; closeSheet(); await reset(); }
     });
   });
 

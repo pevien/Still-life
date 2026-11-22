@@ -259,6 +259,19 @@ button.tl__ev:active { filter: brightness(.95); }
 .plan-meta { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
 .plan-meta .dot { background: var(--cat); }
 .tl__ev.is-short { padding-top: 3px; padding-bottom: 3px; }
+/* kéo-thả timeline Hôm nay */
+.tl:not(.tl--tpl) .tl__ev { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+.tl__scroll.is-dragging { touch-action: none; }
+.tl__scroll.is-dragging .tl__col { cursor: grabbing; }
+.tl__ev.is-lifted { z-index: 5; left: 0 !important; right: 0 !important; width: auto !important; box-shadow: var(--e2); outline: 2px solid var(--cat); outline-offset: -1px; transform: scale(1.02); transition: transform .12s, box-shadow .12s; }
+.tl__ev.is-lifted::after { content: ""; position: absolute; left: 50%; bottom: 3px; width: 22px; height: 3px; margin-left: -11px; border-radius: 2px; background: currentColor; opacity: .55; }
+.tl__ev.is-resizing::after { opacity: 1; }
+.tl__ev.is-saving { opacity: .6; }
+.tl__ghost { position: absolute; left: 0; right: 0; z-index: 4; border-radius: 8px; pointer-events: none; background: color-mix(in srgb, var(--ink) 10%, transparent); border: 1.5px dashed color-mix(in srgb, var(--ink) 45%, transparent); }
+.tl__dragtime { position: absolute; right: 4px; z-index: 6; pointer-events: none; padding: 2px 7px; border-radius: 999px; font-size: var(--fs-s); font-weight: 600; background: var(--ink); color: var(--surface); box-shadow: var(--e1); }
+@media (pointer: fine) {
+  .tl:not(.tl--tpl) .tl__ev:not(.is-short)::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 6px; cursor: ns-resize; }
+}
 .tl__ev.is-short .tl__t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tl__ev small { display: block; font-size: var(--fs-s); font-weight: 500; opacity: .85; }
 .tl__col--plan .tl__ev { background: color-mix(in srgb, var(--cat) 14%, transparent); border: 1px dashed color-mix(in srgb, var(--cat) 55%, transparent); color: var(--ink); }
@@ -525,9 +538,10 @@ input[type=time]::-webkit-date-and-time-value { text-align: left; }
 .tp__wheels { position: relative; display: flex; justify-content: center; align-items: center; gap: 4px; margin: 10px 0 2px; }
 .tp__band { position: absolute; left: 0; right: 0; top: 50%; height: 44px; transform: translateY(-50%); border-radius: var(--r-sm); background: var(--surface-2); pointer-events: none; }
 .tp__col {
-  position: relative; width: 84px; height: 220px; overflow-y: auto; scroll-snap-type: y mandatory; overscroll-behavior: contain;
-  scrollbar-width: none; padding: 88px 0; box-sizing: border-box; outline: none;
-  -webkit-mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent); mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent);
+  /* 3 hàng (132px): hàng giữa là giờ đang chọn, padding = (132 − 44) / 2 để giờ đầu/cuối vẫn vào giữa */
+  position: relative; width: 84px; height: 132px; overflow-y: auto; scroll-snap-type: y mandatory; overscroll-behavior: contain;
+  scrollbar-width: none; padding: 44px 0; box-sizing: border-box; outline: none;
+  -webkit-mask-image: linear-gradient(rgb(0 0 0 / .2), #000 40%, #000 60%, rgb(0 0 0 / .2)); mask-image: linear-gradient(rgb(0 0 0 / .2), #000 40%, #000 60%, rgb(0 0 0 / .2));
 }
 .tp__col::-webkit-scrollbar { display: none; }
 .tp__col:focus-visible { box-shadow: inset 0 0 0 2px var(--silver); border-radius: var(--r-sm); }
@@ -721,8 +735,12 @@ body.is-gated .top, body.is-gated main, body.is-gated .tabs, body.is-gated .fab,
 .hblocks[hidden] { display: none; }
 
 /* Dậy trễ: nút cạnh "Hôm nay mình không ổn", dòng "Đã sắp lại", sheet xem trước lịch mới */
+/* 2 nút nằm chung 1 hàng, chia đôi bề ngang (kể cả trên điện thoại). Dòng "Đã sắp lại" dài nên chiếm riêng 1 hàng. */
 .day-toggles { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.day-toggles .unwell-toggle { margin-top: 0; }
+.day-toggles .unwell-toggle { margin-top: 0; flex: 1 1 0; min-width: 0; justify-content: center; padding: 8px 12px; white-space: nowrap; }
+.day-toggles .unwell-toggle i { font-size: 20px; flex: none; }
+.day-toggles .late-state { flex: 1 1 100%; }
+@media (max-width: 360px) { .day-toggles .unwell-toggle { gap: 4px; padding: 8px 6px; } .day-toggles .unwell-toggle i { font-size: 18px; } }
 .unwell-toggle--late i { color: var(--accent); }
 .late-state { display: inline-flex; align-items: center; min-height: 44px; border-radius: 999px; border: 1px solid var(--line); background: var(--canvas); font-size: var(--fs-m); color: var(--ink-soft); }
 .late-state button { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 8px 12px; background: none; border: 0; color: inherit; font: inherit; }
@@ -742,6 +760,3 @@ body.is-gated .top, body.is-gated main, body.is-gated .tabs, body.is-gated .fab,
 .late__time i { font-size: 12px; color: var(--ink-faint); }
 .late__list--drop .late__name, .late__list--drop .late__time { color: var(--ink-faint); font-weight: 400; text-decoration: line-through; }
 .late__retell { margin-top: 12px; }
-.dock.is-late .dock__title { display: flex; align-items: center; gap: 6px; flex: 1 1 100%; margin: 0 0 2px; font-weight: 700; font-size: var(--fs-b); }
-.dock.is-late .dock__title::before { content: "\23F0"; }
-.dock.is-late .dock__manual { display: none; }
