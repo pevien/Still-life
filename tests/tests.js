@@ -1592,6 +1592,15 @@
       eq(hm(c.res.get("b6").end), "21:30", "thiếu e: giữ 60 phút");
       ok(!c.res.has("b5"), "nhắc mà không có giờ: giữ nguyên");
     });
+    test("lateIssues: khối sửa tay vào quá khứ, quá 23:00, chồng giờ thì báo; khối không đổi thì không", () => {
+      const b = base(), L = { base: b, wake: at("08:00"), res: new Map([["b2", { skip: true }]]) };
+      eq(lateIssues(L, now).size, 0, "chưa sửa gì");
+      L.res.set("b4", { start: at("07:30"), end: at("08:30") }); eq(lateIssues(L, now).get("b4"), "Giờ này đã qua");
+      L.res.set("b4", { start: at("22:30"), end: at("23:30") }); eq(lateIssues(L, now).get("b4"), "Quá 23:00");
+      L.res.set("b4", { start: at("11:00"), end: at("12:00") }); eq(lateIssues(L, now).get("b4"), "Chồng giờ với Ăn trưa");
+      L.res.set("b1", { start: at("08:00"), end: at("08:15") }); L.res.set("b4", { start: at("09:00"), end: at("11:00") });
+      eq(lateIssues(L, now).size, 0, "khối dậy đặt đúng giờ dậy là hợp lệ");
+    });
     test("demoLate: khối quan trọng chưa tới giờ đứng yên, khối khác nối tiếp, qua lateCheck", () => {
       const b = base(), o = demoLate("nay mình dậy 8h", b, now), c = lateCheck(b, o, now);
       ok(!c.err, c.err);
@@ -1698,6 +1707,22 @@
       const inp = document.createElement("input"); inp.value = "10:00"; TP.open(inp);
       ok(tpOk().textContent.includes("Xong") && tp().querySelector("#tpTitle").textContent === "Chọn giờ", "ô giờ thường vẫn là Xong"); TP.close();
       eq([sheetTitle(), hm(S.late.wake)], ["Lịch mới hôm nay", w], "giữ giờ cũ");
+      // sửa trên dòng: bỏ, giữ lại, đổi giờ, chồng giờ thì khoá Áp dụng
+      const k0 = $("#sheetBody [data-lskip]").dataset.lskip;
+      $(`#sheetBody [data-lskip="${k0}"]`).click(); await wait(20);
+      ok($(`#sheetBody [data-lkeep="${k0}"]`), "Bỏ hôm nay → sang mục Bỏ");
+      $(`#sheetBody [data-lkeep="${k0}"]`).click(); await wait(20);
+      if (!tp().hidden) { tpOk().click(); await wait(20); }
+      ok($(`#sheetBody [data-lt="${k0}"]`), "Giữ lại → về danh sách");
+      const ks = [...$$("#sheetBody [data-lt]")].map(x => x.dataset.lt);
+      if (ks.length >= 2) {
+        const r2 = S.late.res.get(ks[1]), b2 = S.late.base.find(x => x.k === ks[1]);
+        $(`#sheetBody [data-lt="${ks[0]}"]`).click(); await wait(20);
+        pick(hm(r2 && !r2.skip ? r2.start : b2.start)); await wait(20); tpOk().click(); await wait(20);
+        ok($("#sheetBody .late__warn") && $("#lApply").disabled, "chồng giờ: báo dưới dòng, khoá Áp dụng");
+        S.late.res.set(ks[0], { skip: true }); renderLateSheet();
+      }
+      ok(!$("#lApply").disabled, "hết lỗi thì Áp dụng được");
       $("#lApply").click(); await wait(80);
       ok(!sheetOpen(), "đóng sheet");
       ok($("#btnLateUndo") && $(".late-state").textContent.includes("Đã sắp lại từ"), "dòng trạng thái");
@@ -1716,7 +1741,7 @@
       try {
         await lateAi(hm(floor15(new Date())));
         eq(sheetTitle(), "Lịch mới hôm nay");
-        ok(S.late.reply.includes("dời đơn giản"), "báo đã dùng bản đơn giản");
+        ok(S.late.fb && !S.late.reply && !$("#sheetBody .hai__note"), "dùng bản đơn giản, không hiện câu báo");
         eq(hm(S.late.wake), hm(floor15(new Date())), "giờ dậy theo giờ đã chọn, không theo AI");
       } finally { [S.settings.geminiKey, window.fetch] = keep; S.late = null; closeSheet(); await reset(); }
     });

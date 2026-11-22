@@ -1958,33 +1958,66 @@ async function lateAi(wake) {
     out = demoLate(text, base, now); c = lateCheck(base, out, now); fb = true;
     if (c.err) throw new Error(`Chưa sắp lại được (${c.err}), thử giờ khác nhé`);
   }
-  const reply = fb ? "AI chưa sắp được nên app dời đơn giản: khối quan trọng giữ giờ, khối khác nối tiếp." : out.reply || "";
-  S.late = { wake: c.wake, base, res: c.res, reply, hab: lateHabit(base, c.wake) };
+  S.late = { wake: c.wake, base, res: c.res, reply: fb ? "" : out.reply || "", fb, hab: lateHabit(base, c.wake) };
   renderLateSheet();
+}
+// Lỗi của các khối người dùng sửa trong sheet xem trước: k → câu báo. Cùng luật với lateCheck (quá khứ, quá 23:00, chồng giờ).
+function lateIssues(L, now = new Date()) {
+  const fl = floor15(now), end = atTime(now, "23:00"), out = new Map();
+  const rows = L.base.filter(b => !b.skip && !(L.res.get(b.k) || {}).skip).map(b => {
+    const r = L.res.get(b.k); return { b, s: r ? r.start : b.start, e: r ? r.end : b.end, ch: !!r && (+r.start !== +b.start || +r.end !== +b.end) };
+  });
+  for (const x of rows) {
+    if (!x.ch) continue;
+    if (x.s < (x.b === L.base[0] ? L.wake : fl)) { out.set(x.b.k, "Giờ này đã qua"); continue; }
+    if (x.e > end) { out.set(x.b.k, "Quá 23:00"); continue; }
+    const y = rows.find(y => y !== x && x.s < y.e && y.s < x.e);
+    if (y) out.set(x.b.k, `Chồng giờ với ${y.b.p.title}`);
+  }
+  return out;
+}
+// Chạm giờ một khối: bộ chọn giờ bắt đầu, giữ độ dài. Dùng cả khi giữ lại khối đã qua giờ (mặc định bây giờ).
+function lateEditTime(k) {
+  const L = S.late, b = L && L.base.find(x => x.k === k); if (!b) return;
+  const r = L.res.get(k), cur = r && !r.skip ? r : null, len = cur ? cur.end - cur.start : b.end - b.start;
+  const fl = floor15(new Date()), def = cur ? cur.start : b.end <= fl ? fl : b.start;
+  TP.open(null, { title: b.p.title, value: hm(def), onOk: v => {
+    const st = atTime(new Date(), v);
+    if (+st === +b.start) L.res.delete(k); else L.res.set(k, { start: st, end: new Date(+st + len) });
+    TP.close(); renderLateSheet();
+  } });
 }
 function renderLateSheet() {
   const L = S.late; if (!L) return;
-  const row = (b, s, e, moved) => `<li class="late__row" style="${catVars(b.p.cat)}"><span class="dot"></span><span class="late__name">${esc(b.p.title)}</span>
-    <span class="late__time num">${moved ? `<s>${hm(b.start)}</s> <i class="ph ph-arrow-right" aria-label="thành"></i> ` : ""}${hm(s)}–${hm(e)}</span></li>`;
+  const bad = lateIssues(L);
+  const row = (b, s, e, moved) => `<li class="late__row${bad.has(b.k) ? " is-bad" : ""}" style="${catVars(b.p.cat)}"><span class="dot"></span><span class="late__name">${esc(b.p.title)}</span>
+    <button type="button" class="late__time num" data-lt="${b.k}" aria-label="Đổi giờ ${esc(b.p.title)}">${moved ? `<s>${hm(b.start)}</s> <i class="ph ph-arrow-right" aria-label="thành"></i> ` : ""}<b>${hm(s)}–${hm(e)}</b></button>
+    <button type="button" class="late__x" data-lskip="${b.k}" aria-label="Bỏ ${esc(b.p.title)} hôm nay" title="Bỏ hôm nay"><i class="ph ph-minus-circle"></i></button></li>
+    ${bad.has(b.k) ? `<li class="act__warn late__warn"><i class="ph ph-warning"></i> ${esc(bad.get(b.k))}</li>` : ""}`;
+  const dropRow = b => `<li class="late__row" style="${catVars(b.p.cat)}"><span class="dot"></span><span class="late__name">${esc(b.p.title)}</span>
+    <span class="late__time num">${hm(b.start)}–${hm(b.end)}</span>
+    <button type="button" class="late__x" data-lkeep="${b.k}" aria-label="Giữ lại ${esc(b.p.title)}" title="Giữ lại"><i class="ph ph-plus-circle"></i></button></li>`;
   const keep = [], drop = [];
   for (const b of L.base) {
     if (b.done || b.skip) continue;
     const r = L.res.get(b.k);
-    if (r && r.skip) drop.push(b); else keep.push({ b, s: r ? r.start : b.start, e: r ? r.end : b.end, moved: !!r });
+    if (r && r.skip) drop.push(b);
+    else { const s0 = r ? r.start : b.start, e0 = r ? r.end : b.end; keep.push({ b, s: s0, e: e0, moved: +s0 !== +b.start || +e0 !== +b.end }); }
   }
   keep.sort((a, b) => a.s - b.s);
   const h = L.hab && HABITS.find(x => x.id === L.hab.hid);
   const opts = [["", "ph-x", "Chưa"], ["min", "ph-circle-half", "Tối thiểu"], ["full", "ph-check", "Đạt"]];
-  openSheet("Lịch mới hôm nay", `<p class="hai__note"><i class="ph-fill ph-sparkle"></i> <span>${esc(L.reply || "Đã sắp lại phần còn lại của hôm nay.")}</span></p>
-    <p class="late__wake muted">Dậy lúc <b class="num">${hm(L.wake)}</b></p>
+  const panel = $(".sheet__panel"), y = !$("#sheet").hidden && $("#sheetTitle").textContent === "Lịch mới hôm nay" ? panel.scrollTop : 0;
+  openSheet("Lịch mới hôm nay", `${L.reply ? `<p class="hai__note"><i class="ph-fill ph-sparkle"></i> <span>${esc(L.reply)}</span></p>` : ""}
+    <div class="late__wake"><span class="muted">Dậy lúc <b class="num">${hm(L.wake)}</b></span><button type="button" class="late__retell" id="lRetell" aria-label="Đổi giờ dậy"><i class="ph ph-alarm"></i> Đổi</button></div>
     ${(S.today.rec || {}).unwell ? `<p class="late__rest muted"><i class="ph ph-moon"></i> Đang rest day: các khối 💤 vẫn dời nhưng không nhắc.</p>` : ""}
     ${keep.length ? `<ul class="late__list">${keep.map(x => row(x.b, x.s, x.e, x.moved)).join("")}</ul>` : `<p class="muted">Không còn khối nào cho hôm nay.</p>`}
-    ${drop.length ? `<p class="mgroup">Bỏ hôm nay</p><ul class="late__list late__list--drop">${drop.map(b => row(b, b.start, b.end, false)).join("")}</ul>` : ""}
-    ${h ? `<p class="mgroup">Thói quen</p><div class="daylist"><div class="dayrow"><i class="ph ${h.icon}" style="${icVars(h.cat)}"></i><span>${esc(h.name)}${h.min ? `<small class="dayrow__min">Tối thiểu: ${esc(h.min)}</small>` : ""}</span><div class="seg" role="group" aria-label="${esc(h.name)}">
+    ${drop.length ? `<p class="mgroup">Bỏ hôm nay</p><ul class="late__list late__list--drop">${drop.map(dropRow).join("")}</ul>` : ""}
+    ${h ? `<p class="mgroup">Thói quen</p><div class="daylist late__hab"><div class="dayrow"><i class="ph ${h.icon}" style="${icVars(h.cat)}"></i><span>${esc(h.name)}${h.min ? `<small class="dayrow__min">Tối thiểu: ${esc(h.min)}</small>` : ""}</span><div class="seg" role="group" aria-label="${esc(h.name)}">
       ${opts.map(([lv, ic, lab]) => lv === "min" && !h.min ? `<span class="seg__gap"></span>` : `<button type="button" data-llv="${lv}" data-lv="${lv}" aria-pressed="${L.hab.lv === lv}" aria-label="${lab}" title="${lab}"><i class="ph ${ic}"></i></button>`).join("")}
     </div></div></div>` : ""}
-    <button type="button" class="btn btn--ghost late__retell" id="lRetell"><i class="ph ph-alarm"></i> Đổi giờ dậy</button>
-    <div class="sheet-actions"><button type="button" class="btn" data-close>Hủy</button><button type="button" class="btn btn--primary" id="lApply"><i class="ph ph-check"></i> Áp dụng</button></div>`);
+    <div class="sheet-actions"><button type="button" class="btn" data-close>Hủy</button><button type="button" class="btn btn--primary" id="lApply"${bad.size ? " disabled" : ""}><i class="ph ph-check"></i> Áp dụng</button></div>`);
+  panel.scrollTop = y;   // sửa một dòng không nhảy về đầu sheet
 }
 // Đổi giờ (chỉ hôm nay) cho các khối trong map id → {start, end}; khối đã đúng giờ thì bỏ qua. Gọi song song.
 async function setPlanTimes(map) {
@@ -2543,6 +2576,13 @@ document.addEventListener("click", async e => {
   }
   if (id === "btnLate" || id === "btnLateRedo") return openLateAi();
   if (id === "lRetell") return openLateAi(S.late ? hm(S.late.wake) : null);
+  if (el.dataset.lt && S.late) return lateEditTime(el.dataset.lt);
+  if (el.dataset.lskip && S.late) { S.late.res.set(el.dataset.lskip, { skip: true }); return renderLateSheet(); }
+  if (el.dataset.lkeep && S.late) {   // giữ lại: khối chưa tới giờ về giờ gốc, khối đã qua giờ thì chọn giờ mới
+    const k = el.dataset.lkeep, b = S.late.base.find(x => x.k === k); if (!b) return;
+    if (b.end > floor15(new Date())) { S.late.res.delete(k); return renderLateSheet(); }
+    return lateEditTime(k);
+  }
   if (el.dataset.llv != null && S.late && S.late.hab) {
     S.late.hab.lv = el.dataset.llv;
     $$("#sheetBody [data-llv]").forEach(b => b.setAttribute("aria-pressed", b.dataset.llv === S.late.hab.lv));

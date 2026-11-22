@@ -749,14 +749,29 @@ body.is-gated .top, body.is-gated main, body.is-gated .tabs, body.is-gated .fab,
 .late-state__main b { color: var(--ink); font-weight: 600; }
 .late-state .late-state__undo { border-left: 1px solid var(--line); color: var(--ink); font-weight: 600; }
 .late-state .is-busy { justify-content: center; }
-.late__wake { margin: 10px 0 4px; font-size: var(--fs-m); }
+.late__wake { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0 0; font-size: var(--fs-m); }
+.late__wake b { color: var(--ink); }
+.late__retell { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0 4px; margin-right: -4px; border: 0; background: none; font: inherit; font-size: var(--fs-m); font-weight: 600; color: var(--ink); }
+.late__retell i { font-size: 16px; color: var(--accent); }
 .late__rest { display: flex; gap: 6px; align-items: center; margin: 4px 0; font-size: var(--fs-m); }
-.late__list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; }
-.late__row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.late__list { list-style: none; margin: 2px 0 0; padding: 0; display: grid; }
+.late__row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.late__row.is-bad { border-bottom: 0; }
 .late__row .dot { background: var(--cat); }
-.late__name { flex: 1; min-width: 0; font-weight: 600; font-size: var(--fs-b); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.late__name { flex: 1; min-width: 0; font-weight: 600; font-size: var(--fs-m); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .late__time { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-m); color: var(--ink); }
+/* ô giờ chạm được nhưng không nền, không viền; lỗi thì chỉ tô đỏ giờ mới */
+button.late__time { min-height: 36px; padding: 0 4px; margin-right: -4px; border: 0; background: none; font: inherit; font-size: var(--fs-m); color: var(--ink); }
+.late__time b { font-weight: inherit; }
+.late__row.is-bad .late__time b { color: var(--miss-ink, #B4554B); }
+.late__x { flex: none; width: 36px; height: 36px; display: grid; place-items: center; margin-right: -8px; border: 0; background: none; color: var(--ink-faint); font-size: 20px; }
+.late__list--drop .late__x { color: var(--ink-soft); }
+/* báo lỗi thụt vào thẳng tên khối (chấm 9px + gap 8px), sát dòng trên */
+.late__warn { list-style: none; margin-top: -4px; padding: 0 0 10px 17px; font-size: var(--fs-s); border-bottom: 1px solid var(--line); }
+.late__warn i { font-size: 14px; }
+/* tiêu đề nhóm trong sheet: thẳng mép trái danh sách, xa nhóm trên hơn nhóm dưới */
+.late__list ~ .mgroup { margin: 20px 0 0; }
+.late__hab .dayrow > span { font-size: var(--fs-m); }
 .late__time s { color: var(--ink-faint); }
 .late__time i { font-size: 12px; color: var(--ink-faint); }
 .late__list--drop .late__name, .late__list--drop .late__time { color: var(--ink-faint); font-weight: 400; text-decoration: line-through; }
-.late__retell { margin-top: 12px; }

@@ -84,13 +84,14 @@ Nút "Mình dậy trễ" và "Mình không khoẻ" nằm chung 1 hàng ở tab H
   - không xếp vào quá khứ (riêng khối dậy được đặt đúng giờ dậy), không chồng giờ, không quá 23:00;
   - cố giữ giờ lớp học, hẹn và bữa chính;
   - không vừa thì rút ngắn hoặc bỏ khối ít quan trọng.
-- App kiểm tra đề xuất (giờ lệch dạng như `9:00` thì tự chuẩn hoá). AI vẫn sai luật hoặc lỗi (trừ key sai) thì dùng bản dời đơn giản và ghi rõ trong sheet. **AI không tự áp dụng.**
+- App kiểm tra đề xuất (giờ lệch dạng như `9:00` thì tự chuẩn hoá). AI vẫn sai luật hoặc lỗi (trừ key sai) thì dùng bản dời đơn giản (không báo gì thêm). **AI không tự áp dụng.**
 - Sheet "Lịch mới hôm nay" gồm:
   - câu tóm tắt của AI và giờ dậy;
   - danh sách `giờ cũ → giờ mới`;
   - mục **Bỏ hôm nay** (có cả khối đã qua giờ mà AI để nguyên);
   - thói quen gắn với khối dậy: chọn sẵn Đạt nếu dậy trong vòng 5 phút sau giờ của khối, còn lại là Chưa, đổi được bằng 3 nút;
-  - nút Đổi giờ dậy, Hủy / Áp dụng.
+  - sửa từng dòng: chạm giờ để đổi giờ bắt đầu (giữ độ dài), ⊖ bỏ hôm nay, ⊕ giữ lại. Chồng giờ / quá khứ / quá 23:00 thì báo dưới dòng và khoá Áp dụng;
+  - nút Đổi (giờ dậy) cạnh dòng giờ dậy ở đầu sheet; Hủy / Áp dụng.
 - Áp dụng:
   - chỉ đổi **lần lặp của hôm nay** (chuỗi lặp không đổi), khối bị bỏ thì đánh dấu Bỏ qua, nhắc của Google Calendar theo giờ mới;
   - toast có Hoàn tác;

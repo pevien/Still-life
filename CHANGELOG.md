@@ -5,7 +5,35 @@ Mới nhất ở trên. Số `vNN` là phiên bản cache trong `sw.js`.
 
 ---
 
-## 2026-11-22 · Dậy trễ: bộ chọn giờ thay khung chat, AI hết báo "sai dạng" · v75
+## 2026-11-22 · Lịch mới hôm nay: ô giờ không nền, không viền · v77
+**Đổi gì**
+- Ô giờ trong sheet "Lịch mới hôm nay" bỏ nền xám và viền, vẫn chạm được. Có lỗi thì chỉ tô đỏ giờ mới (kèm dòng báo bên dưới).
+- Tên khối 15px → 13px, bằng chữ trên timeline và bằng cỡ giờ bên cạnh.
+- Spacing: dòng 48 → 44px; dòng báo lỗi thụt thẳng tên khối, chữ 12px, sát dòng trên; tiêu đề "Bỏ hôm nay" / "Thói quen" thẳng mép trái, sát danh sách bên dưới; tên thói quen 13px như tên khối.
+- Nút "Đổi giờ dậy" lên cùng hàng với "Dậy lúc HH:MM" ở đầu sheet (chữ "Đổi"), bỏ hàng nút riêng ở cuối.
+- Bỏ chữ "· chạm giờ để đổi" và câu "AI chưa sắp được nên app dời đơn giản…". Câu tóm tắt chỉ hiện khi AI tự viết.
+
+**Vì sao**
+Nền và viền lặp lại ở mọi dòng làm danh sách nặng, khó quét giờ.
+
+**Logic**
+- Giờ mới bọc trong `<b>` (giữ độ đậm thường) để tô đỏ riêng phần đó, giờ cũ gạch ngang giữ nguyên.
+
+ từng dòng trước khi áp dụng · v76
+**Đổi gì**
+- Trong sheet "Lịch mới hôm nay", chạm giờ của một khối để đổi giờ bắt đầu (bộ chọn giờ, giữ độ dài).
+- Nút ⊖ cạnh mỗi khối để bỏ hôm nay. Ở mục Bỏ hôm nay có nút ⊕ để giữ lại: khối chưa tới giờ về giờ gốc, khối đã qua giờ thì mở bộ chọn giờ.
+- Sửa ra chồng giờ, vào quá khứ hoặc quá 23:00 thì viền đỏ ô giờ, báo dưới dòng và khoá Áp dụng.
+
+**Vì sao**
+AI hoặc bản dời đơn giản có thể xếp chưa đúng ý. Trước đây chỉ có Áp dụng rồi kéo lại trên timeline, hoặc Hủy.
+
+**Logic**
+- Giữ dạng danh sách `giờ cũ → giờ mới` thay vì dạng lịch: sheet trên điện thoại thấp, khối 15 phút quá mỏng, kéo-thả trong sheet đụng cuộn / vuốt đóng sheet, và timeline Hôm nay đã kéo-thả được.
+- Sửa ghi thẳng vào `S.late.res`, `applyLate` không đổi. `lateIssues` dùng cùng luật với `lateCheck`, chỉ xét khối có đổi giờ.
+- Vẽ lại sheet giữ nguyên vị trí cuộn.
+
+ thay khung chat, AI hết báo "sai dạng" · v75
 **Đổi gì**
 - "Mình dậy trễ" và "Mình không khoẻ" (trước là "Hôm nay mình không ổn") nằm chung 1 hàng, chia đôi bề ngang, kể cả trên điện thoại. Dòng "Đã sắp lại từ… · Trả lại lịch cũ" vẫn chiếm riêng 1 hàng.
 - Bấm "Mình dậy trễ" mở thẳng bộ chọn giờ "Mình dậy lúc", nút chính "Sắp lại lịch hôm nay" (thay "Xong"). Không còn khung chat. Trong sheet xem trước, "Kể lại" đổi thành "Đổi giờ dậy".
