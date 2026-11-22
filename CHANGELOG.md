@@ -5,6 +5,26 @@ Mới nhất ở trên. Số `vNN` là phiên bản cache trong `sw.js`.
 
 ---
 
+## 2026-11-22 · Dậy trễ: AI sắp lại lịch hôm nay · v73
+**Đổi gì**
+- Tab Hôm nay có thêm nút "Mình dậy trễ" cạnh "Hôm nay mình không ổn". Nút chỉ hiện khi có Gemini key (hoặc ở chế độ xem thử) và hôm nay còn khối chưa làm, chưa bỏ qua.
+- Bấm nút mở popup kể (có micro), điền sẵn "Mình dậy lúc HH:MM". Gemini đề xuất lịch mới, app kiểm tra rồi mở sheet "Lịch mới hôm nay": `giờ cũ → giờ mới`, mục Bỏ hôm nay, thói quen của khối dậy (chọn sẵn Đạt / Chưa), nút Kể lại, Hủy / Áp dụng.
+- Áp dụng xong: toast có Hoàn tác, chỗ nút đổi thành "Đã sắp lại từ HH:MM · Trả lại lịch cũ".
+
+**Vì sao**
+Dậy trễ thì các khối buổi sáng đã trôi qua, các khối sau vẫn giữ giờ cũ, nên lịch hôm đó không dùng được và Google Calendar nhắc sai giờ. Để AI sắp thì không phải thêm cờ "giờ cố định" vào Tuần mẫu, và bạn kể thêm được (có hẹn, muốn bỏ gì).
+
+**Logic**
+- Gửi cho Gemini các khối hôm nay theo giờ gốc, kèm mã ngắn b1, b2…, nhóm, `ess` và trạng thái. AI trả `{ wake, items:[{id, s, e, skip}], reply }`.
+- `lateCheck` (hàm thuần) từ chối đề xuất có id lạ, giờ trong quá khứ, `s ≥ e`, quá 23:00, chồng giờ, hoặc đổi khối đã làm. Gặp lỗi thì báo, popup giữ chữ để gửi lại. Khối đã qua giờ, chưa làm mà AI để nguyên thì tự vào mục Bỏ hôm nay.
+- Áp dụng: lưu `rec.late` (giờ gốc các khối đã dời, các khối đã bỏ, mức thói quen trước đó) **trước**, rồi đổi giờ lần lặp hôm nay bằng `updatePlan`, gọi song song. Lỡ hỏng giữa chừng thì vẫn Trả lại lịch cũ được.
+- `rec.late` lưu thành 2 thuộc tính `late` và `lm` của sự kiện Thói quen, vì mỗi thuộc tính của Calendar tối đa 1024 ký tự.
+- Sắp lại lần nữa luôn tính từ giờ gốc (`lateBase`). Trả lại lịch cũ trả thói quen về mức trước, trừ khi bạn đã tự đổi mức.
+- Xem thử không có key thì dùng `demoLate`, một bản dời đơn giản: khối `ess` chưa tới giờ đứng yên, khối khác nối tiếp vào chỗ trống.
+- Đánh đổi: cần key và chờ vài giây, kết quả AI có thể khác nhau giữa các lần. Bù lại luôn có bước xem trước và không bao giờ tự áp dụng.
+
+---
+
 ## 2026-11-16 · Bảng Tuần thoáng hơn · v72
 **Đổi gì**
 - Khoảng cách giữa các hàng thói quen 4px → 10px.

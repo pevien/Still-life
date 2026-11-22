@@ -77,6 +77,28 @@ Thói quen nào còn hiện trong rest day:
 Thẻ Rest day liệt kê các thói quen còn hiện mà chưa làm, kèm bản tối thiểu ("Nếu còn sức, chỉ cần bản tối thiểu:"). Không còn thói quen nào thì ghi "Hôm nay nghỉ ngơi là đủ."
 Tiêu đề Thói quen hôm nay ghi "rest day" thay vì "xong".
 
+## Dậy trễ
+Nút "Mình dậy trễ" cạnh "Hôm nay mình không ổn" ở tab Hôm nay. Chỉ hiện khi có Gemini key (chế độ xem thử thì luôn có) và hôm nay còn khối chưa làm, chưa bỏ qua.
+- Bấm nút mở popup kể từ dưới lên, có micro, điền sẵn "Mình dậy lúc HH:MM" (bây giờ, làm tròn xuống 15 phút). Kể thêm được, vd "chiều có hẹn 15:00, bỏ gym".
+- Gemini đề xuất giờ mới cho các khối còn lại hôm nay:
+  - không xếp vào quá khứ (riêng khối dậy được đặt đúng giờ dậy), không chồng giờ, không quá 23:00;
+  - cố giữ giờ lớp học, hẹn và bữa chính;
+  - không vừa thì rút ngắn hoặc bỏ khối ít quan trọng.
+- App kiểm tra đề xuất. Sai thì báo, popup giữ chữ để gửi lại. **AI không tự áp dụng.**
+- Sheet "Lịch mới hôm nay" gồm:
+  - câu tóm tắt của AI và giờ dậy;
+  - danh sách `giờ cũ → giờ mới`;
+  - mục **Bỏ hôm nay** (có cả khối đã qua giờ mà AI để nguyên);
+  - thói quen gắn với khối dậy: chọn sẵn Đạt nếu dậy trong vòng 5 phút sau giờ của khối, còn lại là Chưa, đổi được bằng 3 nút;
+  - nút Kể lại, Hủy / Áp dụng.
+- Áp dụng:
+  - chỉ đổi **lần lặp của hôm nay** (chuỗi lặp không đổi), khối bị bỏ thì đánh dấu Bỏ qua, nhắc của Google Calendar theo giờ mới;
+  - toast có Hoàn tác;
+  - chỗ nút đổi thành "Đã sắp lại từ HH:MM · Trả lại lịch cũ". Chạm phần chữ thì kể lại. Sắp lại lần nữa luôn tính từ lịch gốc.
+- Trả lại lịch cũ: các khối về giờ gốc, bỏ những Bỏ qua do lần sắp lại đặt, thói quen về mức trước (trừ khi bạn đã tự đổi mức).
+- Rest day và dậy trễ độc lập: đang rest day thì sheet ghi "các khối 💤 vẫn dời nhưng không nhắc".
+- Lưu: `late` và `lm` trong sự kiện "Thói quen" của ngày (giờ dậy, giờ gốc các khối đã dời, khối đã bỏ, mức thói quen trước đó).
+
 ## Màn hình
 Thanh dưới có 4 ô: Hôm nay · Thói quen · Nhật ký · Cài đặt (Cài đặt mở sheet, không đổi tab).
 Đầu trang là 1 dòng chữ nhỏ: lời chào theo buổi · thứ, ngày tháng.

@@ -134,7 +134,7 @@
       eq([it.cat, it.plan, it.added], ["life", "", false]);
     });
     test("recToProps → recFromEv đi vòng giữ nguyên dữ liệu", () => {
-      const r = { id: "d1", date: "2026-11-14", h: { eat: "full", walk: "min" }, v: { walk: 2400 }, unwell: true, reason: "mệt", skip: ["a"], muted: ["b", "c"] };
+      const r = { id: "d1", date: "2026-11-14", h: { eat: "full", walk: "min" }, v: { walk: 2400 }, unwell: true, reason: "mệt", skip: ["a"], muted: ["b", "c"], late: null };
       const back = recFromEv({ id: "d1", extendedProperties: { private: recToProps(r) } });
       eq(back, r);
     });
@@ -1459,6 +1459,142 @@
       renderHabForm(null);
       ok(!$("#hBlocks"), "thêm mới thì không có");
       closeSheet();
+    });
+  });
+
+  // ------------------------------------------------------------ dậy trễ
+  describe("Dậy trễ: AI sắp lại lịch", () => {
+    // base giống lateBase(): khối theo giờ gốc, k = mã ngắn
+    const now = at("08:07");
+    const mk = (k, title, s, e, extra = {}) => ({ k, p: block(title, at(s), at(e), extra.p || {}), start: at(s), end: at(e), done: !!extra.done, skip: !!extra.skip });
+    const base = () => [
+      mk("b1", "Dậy", "05:30", "05:45", { p: { habit: "wake" } }),
+      mk("b2", "Yoga", "06:00", "07:00"),
+      mk("b3", "Ăn sáng", "07:00", "07:45", { done: true }),
+      mk("b4", "Build", "09:00", "11:30"),
+      mk("b5", "Ăn trưa", "11:30", "13:30", { p: { ess: true } }),
+      mk("b6", "Giải trí", "20:00", "21:00"),
+    ];
+    const out = (items, wake = "08:00") => ({ wake, items, reply: "ok" });
+    test("lateCheck: đề xuất hợp lệ → dời, bỏ, khối đã qua mà AI để nguyên thì tự bỏ", () => {
+      const b = base(), c = lateCheck(b, out([{ id: "b1", s: "08:00", e: "08:15" }, { id: "b4", s: "09:00", e: "11:00" }, { id: "b6", skip: true }]), now);
+      ok(!c.err, c.err);
+      eq(hm(c.wake), "08:00");
+      eq([hm(c.res.get("b1").start), hm(c.res.get("b4").end)], ["08:00", "11:00"]);
+      eq([c.res.get("b6").skip, c.res.get("b2").skip, c.res.get("b2").auto], [true, true, true], "Yoga đã qua giờ, AI không nhắc → bỏ hôm nay");
+      ok(!c.res.has("b3") && !c.res.has("b5"), "khối đã làm / không đổi thì không có trong res");
+    });
+    test("lateCheck: bắt lỗi id lạ, quá khứ, chồng giờ, quá 23:00, s ≥ e, đổi khối đã làm, giờ dậy sau bây giờ", () => {
+      const bad = (o, msg) => ok(lateCheck(base(), o, now).err, msg);
+      bad(out([{ id: "b9", s: "09:00", e: "10:00" }]), "id lạ");
+      bad(out([{ id: "b2", s: "07:30", e: "08:30" }]), "xếp vào quá khứ");
+      bad(out([{ id: "b1", s: "07:00", e: "07:15" }]), "khối dậy trước giờ dậy");
+      bad(out([{ id: "b2", s: "11:00", e: "12:00" }]), "chồng giờ ăn trưa");
+      bad(out([{ id: "b6", s: "22:30", e: "23:30" }]), "quá 23:00");
+      bad(out([{ id: "b4", s: "10:00", e: "09:30" }]), "s ≥ e");
+      bad(out([{ id: "b3", s: "08:15", e: "09:00" }]), "đổi khối đã làm");
+      bad(out([{ id: "b3", skip: true }]), "bỏ khối đã làm");
+      bad(out([{ id: "b4", s: "9:00", e: "10:00" }]), "giờ sai dạng");
+      bad(out([], "08:30"), "giờ dậy sau bây giờ");
+      bad({ items: [] }, "thiếu giờ dậy");
+      ok(!lateCheck(base(), out([{ id: "b3", s: "07:00", e: "07:45" }]), now).err, "khối đã làm nhắc lại đúng giờ cũ thì không sao");
+    });
+    test("demoLate: khối quan trọng chưa tới giờ đứng yên, khối khác nối tiếp, qua lateCheck", () => {
+      const b = base(), o = demoLate("nay mình dậy 8h", b, now), c = lateCheck(b, o, now);
+      ok(!c.err, c.err);
+      eq(o.wake, "08:00");
+      eq(hm(c.res.get("b1").start), "08:00", "khối dậy đặt đúng giờ dậy");
+      ok(!c.res.has("b5"), "ăn trưa giữ giờ");
+      ok(c.res.get("b2").start >= at("08:15"), "Yoga dời ra sau khối dậy");
+      ok(!c.res.has("b6"), "giải trí buổi tối không bị đẩy");
+      eq(demoLate("dậy rồi", b, at("04:50")).items.find(i => i.id === "b1").s, "05:30", "dậy trước giờ thì khối dậy không dời sớm lên");
+    });
+    test("lateHabit: chọn sẵn Đạt khi dậy đúng giờ, Chưa khi dậy trễ", () => {
+      const keep = S.today; S.today = { plan: [], actual: [], rec: blankRec(todayStr()) };
+      try {
+        const b = base();
+        if (!HABITS.some(h => h.id === "wake")) return;   // bộ mẫu không có Dậy 5:30 thì thôi
+        eq(lateHabit(b, at("05:33")), { hid: "wake", lv: "full" });
+        eq(lateHabit(b, at("08:00")), { hid: "wake", lv: "" });
+        eq(lateHabit([mk("b1", "Dậy", "05:30", "05:45")], at("08:00")), null, "khối dậy không gắn thói quen");
+      } finally { S.today = keep; }
+    });
+    test("rec.late lưu / đọc lại qua thuộc tính Calendar", () => {
+      const L = { wake: "08:00", moved: [{ id: "abc_20261122T053000Z", s: "05:30", e: "05:45" }], skipped: ["x1"], hprev: { wake: "none" }, hset: "none" };
+      const props = recToProps(Object.assign(blankRec("2026-11-22"), { late: L }));
+      eq(recFromEv({ id: "d", extendedProperties: { private: props } }).late, L);
+      eq(recFromEv({ id: "d", extendedProperties: { private: recToProps(blankRec("2026-11-22")) } }).late, null, "không sắp lại thì null");
+      ok(props.late.length < 1024 && props.lm.length < 1024);
+    });
+    test("Áp dụng → Trả lại lịch cũ; sắp lại lần 2 tính từ giờ gốc; Hoàn tác về trạng thái trước", async () => {
+      await reset();
+      const b0 = lateBase(), [x, y] = b0.filter(b => !b.done && !b.skip).slice(1, 3);
+      ok(x && y, "cần 2 khối");
+      const orig = new Map(S.today.plan.map(p => [p.id, [hm(p.start), hm(p.end)]])), skip0 = [...(S.today.rec.skip || [])];
+      const shift = (b, m) => ({ start: new Date(+b.start + m * 60000), end: new Date(+b.end + m * 60000) });
+      S.late = { text: "t", base: b0, wake: b0[0].start, res: new Map([[x.k, shift(x, 7)], [y.k, { skip: true }]]), reply: "", hab: null };
+      const undo = await applyLate();
+      const px = () => S.today.plan.find(p => p.id === x.p.id);
+      eq(hm(px().start), hm(shift(x, 7).start), "đã dời");
+      ok(S.today.rec.skip.includes(y.p.id), "đã bỏ qua");
+      eq(S.today.rec.late.moved, [{ id: x.p.id, s: orig.get(x.p.id)[0], e: orig.get(x.p.id)[1] }]);
+      const saved = (await Demo.listPlan(startOfDay(new Date()), addDays(startOfDay(new Date()), 1))).find(p => p.id === x.p.id);
+      eq(hm(saved.start), hm(shift(x, 7).start), "đã ghi vào lịch");
+      // lần 2: chỉ dời y, x phải về giờ gốc, y không còn bị bỏ qua do lần 1
+      const b1 = lateBase();
+      eq(hm(b1.find(b => b.p.id === x.p.id).start), orig.get(x.p.id)[0], "lateBase trả giờ gốc");
+      S.late = { text: "t", base: b1, wake: b1[0].start, res: new Map([[b1.find(b => b.p.id === y.p.id).k, shift(y, 5)]]), reply: "", hab: null };
+      await applyLate();
+      eq(hm(px().start), orig.get(x.p.id)[0], "x về giờ gốc");
+      ok(!S.today.rec.skip.includes(y.p.id), "bỏ Bỏ qua của lần 1");
+      eq(S.today.rec.late.moved.map(m => m.id), [y.p.id]);
+      await undoLate();
+      eq(S.today.rec.late, null);
+      const key = l => l.map(r => r.join(" ")).sort().join("|");
+      eq(key(S.today.plan.map(p => [p.id, hm(p.start), hm(p.end)])), key([...orig].map(([id, [s, e]]) => [id, s, e])), "về đúng giờ gốc");
+      eq(S.today.rec.skip, skip0);
+      await undo();   // hoàn tác của lần 1 = trở về trạng thái trước lần 1 (đã là lịch gốc), không lỗi
+      eq(S.today.rec.late, null);
+      await reset();
+    });
+    test("Thói quen: Áp dụng lưu mức đã chọn, Trả lại lịch cũ trả về mức trước (trừ khi đã tự đổi)", async () => {
+      await reset();
+      const b0 = lateBase(), hid = b0[0] && b0[0].p.habit;
+      if (!hid || !HABITS.some(h => h.id === hid)) return;
+      const before = S.today.rec.h[hid];
+      S.late = { text: "t", base: b0, wake: b0[0].start, res: new Map(), reply: "", hab: { hid, lv: "full" } };
+      await applyLate();
+      eq(S.today.rec.h[hid], "full");
+      await undoLate();
+      eq(S.today.rec.h[hid], before, "về mức trước");
+      S.late = { text: "t", base: lateBase(), wake: b0[0].start, res: new Map(), reply: "", hab: { hid, lv: "full" } };
+      await applyLate(); await setHabit(todayStr(), hid, "min"); await undoLate();
+      eq(S.today.rec.h[hid], "min", "đã tự đổi thì giữ");
+      await setHabit(todayStr(), hid, before || null); await reset();
+    });
+    test("Màn hình: nút Mình dậy trễ → popup → sheet xem trước → Áp dụng → dòng Đã sắp lại → Trả lại lịch cũ", async () => {
+      await reset();
+      const keep = [S.settings.demo, S.settings.geminiKey];
+      S.settings.demo = false; S.settings.geminiKey = "";
+      ok(!canLate(), "không key, không xem thử thì ẩn nút");
+      [S.settings.demo, S.settings.geminiKey] = keep;
+      renderToday();
+      if (!lateNeeded()) return ok(!$("#btnLate"), "hết khối thì không có nút");
+      ok($("#btnLate"), "có nút"); ok($("#btnLate").closest(".day-toggles").querySelector("#btnUnwell"), "cạnh nút không ổn");
+      $("#inputText").value = "dở";
+      $("#btnLate").click(); await wait(20);
+      ok($("#dock").classList.contains("is-late") && $("#inputText").value.startsWith("Mình dậy lúc"), "popup điền sẵn giờ");
+      await lateAi($("#inputText").value); await wait(20);
+      eq(sheetTitle(), "Lịch mới hôm nay");
+      ok(!$("#dock").classList.contains("is-late") && $("#inputText").value === "dở", "đóng popup, trả lại chữ đang gõ");
+      $("#lApply").click(); await wait(80);
+      ok(!sheetOpen(), "đóng sheet");
+      ok($("#btnLateUndo") && $(".late-state").textContent.includes("Đã sắp lại từ"), "dòng trạng thái");
+      ok(toast._undo, "có hoàn tác");
+      $("#btnLateUndo").click(); await wait(80);
+      eq(S.today.rec.late, null);
+      ok($("#btnLate"), "quay lại nút");
+      $("#inputText").value = ""; await reset();
     });
   });
 

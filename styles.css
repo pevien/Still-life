@@ -719,3 +719,29 @@ body.is-gated .top, body.is-gated main, body.is-gated .tabs, body.is-gated .fab,
 .hblocks { display: flex; gap: 6px; align-items: flex-start; margin: -4px 0 14px; font-size: var(--fs-m); line-height: 1.4; color: var(--ink-soft); }
 .hblocks i { flex: none; font-size: 16px; margin-top: 1px; }
 .hblocks[hidden] { display: none; }
+
+/* Dậy trễ: nút cạnh "Hôm nay mình không ổn", dòng "Đã sắp lại", sheet xem trước lịch mới */
+.day-toggles { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.day-toggles .unwell-toggle { margin-top: 0; }
+.unwell-toggle--late i { color: var(--accent); }
+.late-state { display: inline-flex; align-items: center; min-height: 44px; border-radius: 999px; border: 1px solid var(--line); background: var(--canvas); font-size: var(--fs-m); color: var(--ink-soft); }
+.late-state button { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 8px 12px; background: none; border: 0; color: inherit; font: inherit; }
+.late-state .late-state__main:disabled { opacity: 1; cursor: default; }
+.late-state__main i { font-size: 20px; color: var(--accent); }
+.late-state__main b { color: var(--ink); font-weight: 600; }
+.late-state .late-state__undo { border-left: 1px solid var(--line); color: var(--ink); font-weight: 600; }
+.late-state .is-busy { justify-content: center; }
+.late__wake { margin: 10px 0 4px; font-size: var(--fs-m); }
+.late__rest { display: flex; gap: 6px; align-items: center; margin: 4px 0; font-size: var(--fs-m); }
+.late__list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; }
+.late__row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.late__row .dot { background: var(--cat); }
+.late__name { flex: 1; min-width: 0; font-weight: 600; font-size: var(--fs-b); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.late__time { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-m); color: var(--ink); }
+.late__time s { color: var(--ink-faint); }
+.late__time i { font-size: 12px; color: var(--ink-faint); }
+.late__list--drop .late__name, .late__list--drop .late__time { color: var(--ink-faint); font-weight: 400; text-decoration: line-through; }
+.late__retell { margin-top: 12px; }
+.dock.is-late .dock__title { display: flex; align-items: center; gap: 6px; flex: 1 1 100%; margin: 0 0 2px; font-weight: 700; font-size: var(--fs-b); }
+.dock.is-late .dock__title::before { content: "\23F0"; }
+.dock.is-late .dock__manual { display: none; }

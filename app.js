@@ -264,10 +264,19 @@ function evToItem(ev, kind) {
 function recFromEv(ev) {
   const p = ev.extendedProperties.private;
   const j = (s, d) => { try { return JSON.parse(s); } catch { return d; } };
-  return { id: ev.id, date: p.date, h: j(p.h, {}), v: j(p.v, {}), unwell: p.unwell === "1", reason: p.reason || "", skip: j(p.skip, []), muted: j(p.muted, []) };
+  return { id: ev.id, date: p.date, h: j(p.h, {}), v: j(p.v, {}), unwell: p.unwell === "1", reason: p.reason || "", skip: j(p.skip, []), muted: j(p.muted, []), late: lateParse(p.late, p.lm) };
 }
 function recToProps(r) {
-  return { sl: "day", date: r.date, h: JSON.stringify(r.h || {}), v: JSON.stringify(r.v || {}), unwell: r.unwell ? "1" : "0", reason: (r.reason || "").slice(0, 500), skip: JSON.stringify(r.skip || []), muted: JSON.stringify(r.muted || []) };
+  return { sl: "day", date: r.date, h: JSON.stringify(r.h || {}), v: JSON.stringify(r.v || {}), unwell: r.unwell ? "1" : "0", reason: (r.reason || "").slice(0, 500), skip: JSON.stringify(r.skip || []), muted: JSON.stringify(r.muted || []), ...lateProps(r.late) };
+}
+// Dậy trễ: lưu gọn thành 2 thuộc tính (mỗi thuộc tính của Calendar tối đa 1024 ký tự). lm = giờ gốc các khối đã dời [[id, s, e]]
+function lateProps(L) {
+  if (!L) return { late: "", lm: "" };
+  return { late: JSON.stringify({ w: L.wake, k: L.skipped || [], h: L.hprev || {}, x: L.hset || "" }), lm: JSON.stringify((L.moved || []).map(m => [m.id, m.s, m.e])) };
+}
+function lateParse(late, lm) {
+  if (!late) return null;
+  try { const o = JSON.parse(late), m = JSON.parse(lm || "[]"); return { wake: o.w, moved: m.map(([id, s, e]) => ({ id, s, e })), skipped: o.k || [], hprev: o.h || {}, hset: o.x || "" }; } catch { return null; }
 }
 // Nhắc của một khối: mảng số phút trước giờ bắt đầu ([] = không nhắc). Lưu trong sự kiện (rem = "30,0"),
 // để khối tự thêm cũng bật / tắt nhắc đúng khi rest day. Sự kiện cũ chưa có rem thì lấy theo tuần mẫu trong code.
@@ -556,7 +565,7 @@ const api = () => (S.settings.demo ? Demo : Google);
 const ready = () => S.settings.demo || (S.cfg && signedIn());
 
 // ============================================================ habit logic
-function blankRec(date) { return { id: null, date, h: {}, v: {}, unwell: false, reason: "", skip: [], muted: [] }; }
+function blankRec(date) { return { id: null, date, h: {}, v: {}, unwell: false, reason: "", skip: [], muted: [], late: null }; }
 function scheduled(hb, d) { const s = sch(hb, d); return s.freq === "daily" || s.days.includes(d.getDay()); }
 function trackStart() {
   if (S.settings.demo) return addDays(startOfDay(new Date()), -60);
@@ -713,7 +722,12 @@ function renderToday() {
     </article>`;
   }
 
-  if (!rec.unwell) html += `<button class="unwell-toggle" id="btnUnwell"><i class="ph-fill ph-hand-heart"></i> Hôm nay mình không ổn</button>`;
+  // Hàng nút nhẹ: "Mình dậy trễ" (có key, còn khối chưa xong) hoặc dòng "Đã sắp lại", rồi "Hôm nay mình không ổn"
+  const lateBtn = rec.late
+    ? `<div class="late-state"><button class="late-state__main" id="btnLateRedo"${canLate() ? "" : " disabled"}><i class="ph ph-alarm"></i> Đã sắp lại từ <b class="num">${esc(rec.late.wake)}</b></button><button class="late-state__undo" id="btnLateUndo"><i class="ph ph-arrow-counter-clockwise"></i> Trả lại lịch cũ</button></div>`
+    : canLate() && lateNeeded() ? `<button class="unwell-toggle unwell-toggle--late" id="btnLate"><i class="ph ph-alarm"></i> Mình dậy trễ</button>` : "";
+  const toggles = lateBtn + (rec.unwell ? "" : `<button class="unwell-toggle" id="btnUnwell"><i class="ph-fill ph-hand-heart"></i> Hôm nay mình không ổn</button>`);
+  if (toggles) html += `<div class="day-toggles">${toggles}</div>`;
 
   // habits today: giữ thứ tự của HABITS (theo nhóm), không đổi chỗ khi đánh dấu. Chạm thẻ = đạt, nút ½ = tối thiểu.
   const t = startOfDay(new Date());
@@ -1150,12 +1164,15 @@ function openHabAi() {
     : "Kể thói quen bằng lời của bạn. vd uống 2 lít nước mỗi ngày, ngày mệt thì 1 lít cũng được");
 }
 const habAiOpen = () => !!(S.compose && S.compose.mode === "habit");
+const lateAiOpen = () => !!(S.compose && S.compose.mode === "late");
+// Đóng popup của chế độ riêng (Nhờ AI thói quen / Dậy trễ): trả lại chữ đang gõ dở ở ô Hôm nay
 function endHabAi() {
-  if (!habAiOpen()) return;
+  if (!S.compose) return;
   const t = $("#inputText");
   t.value = S.compose.text; t.placeholder = S.compose.ph; S.compose = null;
-  $("#dock").classList.remove("is-habit"); autosize();
+  $("#dock").classList.remove("is-habit", "is-late"); autosize();
 }
+const dockSend = text => (habAiOpen() ? habAi(text) : lateAiOpen() ? lateAi(text) : submitInput(text));
 async function habAi(text) {
   text = text.trim(); if (!text) return $("#inputText").focus();
   const dock = $("#dock"), ic = $("#btnSend i");
@@ -1655,7 +1672,7 @@ function openCompose(placeholder) {
 }
 function closeCompose(keepOther) {
   $("#dock").classList.remove("is-open"); $("#dockBackdrop").hidden = true;
-  if (habAiOpen()) return endHabAi();   // popup Nhờ AI của form thói quen: trả lại chữ của ô Hôm nay, không đụng S.otherFor
+  if (S.compose) return endHabAi();   // popup Nhờ AI / Dậy trễ: trả lại chữ của ô Hôm nay, không đụng S.otherFor
   if (!keepOther && !$("#inputText").value.trim()) resetOther();
 }
 
@@ -1682,6 +1699,212 @@ async function setUnwell(on) {
   rec.unwell = on;
   await saveRec(rec);
   S.today.plan.forEach(p => (p.muted = on && rec.muted.includes(p.id)));
+}
+
+// ============================================================ dậy trễ: AI sắp lại lịch hôm nay
+// Luồng: nút "Mình dậy trễ" → popup kể (có micro) → Gemini đề xuất → app kiểm tra (lateCheck) → sheet xem trước → Áp dụng.
+// Chỉ đổi lần lặp của hôm nay (updatePlan). rec.late giữ giờ gốc để "Trả lại lịch cũ" và để sắp lại lần nữa từ lịch gốc.
+const canLate = () => !!(cleanKey(S.settings.geminiKey) || S.settings.demo);   // xem thử không có key thì dùng demoLate
+const floor15 = d => { const x = new Date(d); x.setSeconds(0, 0); x.setMinutes(x.getMinutes() - (x.getMinutes() % 15)); return x; };
+// Các khối hôm nay theo giờ gốc (trước lần sắp lại), k = mã ngắn gửi cho AI (b1, b2…)
+function lateBase() {
+  const rec = S.today.rec || {}, L = rec.late, mv = new Map(((L && L.moved) || []).map(m => [m.id, m]));
+  const doneIds = new Set(S.today.actual.map(a => a.plan).filter(Boolean)), lateSkip = (L && L.skipped) || [];
+  const userSkip = new Set((rec.skip || []).filter(id => !lateSkip.includes(id)));
+  return S.today.plan.map(p => { const m = mv.get(p.id); return { p, start: m ? atTime(p.start, m.s) : p.start, end: m ? atTime(p.start, m.e) : p.end, done: doneIds.has(p.id), skip: userSkip.has(p.id) }; })
+    .sort((a, b) => a.start - b.start).map((b, i) => Object.assign(b, { k: "b" + (i + 1) }));
+}
+// Còn khối nào chưa làm, chưa bỏ qua, chưa kết thúc thì mới cần nút
+function lateNeeded() {
+  const now = new Date(), rec = S.today.rec || {}, done = new Set(S.today.actual.map(a => a.plan).filter(Boolean));
+  return S.today.plan.some(p => p.end > now && !done.has(p.id) && !(rec.skip || []).includes(p.id));
+}
+function lateAiSchema() {
+  return {
+    type: "OBJECT",
+    properties: {
+      wake: { type: "STRING", description: "giờ người dùng dậy, HH:MM" },
+      items: { type: "ARRAY", items: { type: "OBJECT", properties: {
+        id: { type: "STRING" }, s: { type: "STRING", description: "giờ bắt đầu mới HH:MM" }, e: { type: "STRING", description: "giờ kết thúc mới HH:MM" },
+        skip: { type: "BOOLEAN", description: "true = bỏ khối này hôm nay" } }, required: ["id"] } },
+      reply: { type: "STRING", description: "1 câu tiếng Việt ngắn, nhẹ nhàng: đã dời / giữ / bỏ gì" },
+    },
+    required: ["wake", "items", "reply"],
+  };
+}
+function lateAiPrompt(text, base, now) {
+  const rows = base.map(b => JSON.stringify({ id: b.k, ten: b.p.title, nhom: (CATS[b.p.cat] || CATS.life).name, s: hm(b.start), e: hm(b.end),
+    quan_trong: !!b.p.ess, trang_thai: b.done ? "đã làm" : b.skip ? "đã bỏ qua" : b.end <= now ? "đã qua giờ" : "chưa làm" })).join("\n");
+  return `Bạn giúp người dùng app "Still life" sắp lại lịch HÔM NAY vì họ dậy trễ. Bây giờ là ${hm(now)}, ${DOW[now.getDay()]}.
+Các khối kế hoạch hôm nay (giờ gốc):
+${rows}
+Luật:
+- wake = giờ họ nói đã dậy; không nói thì lấy ${hm(floor15(now))}. wake không được sau ${hm(now)}.
+- Khối đầu tiên trong ngày (thường là khối dậy) có thể đặt bắt đầu đúng lúc wake. Các khối khác dời thì bắt đầu từ ${hm(floor15(now))} trở đi, không xếp vào quá khứ.
+- Khối "đã làm" hoặc "đã bỏ qua": không đổi, không nhắc tới.
+- Khối "đã qua giờ" mà chưa làm: dời ra sau, hoặc skip nếu không còn chỗ / không còn hợp lý.
+- Khối có giờ hẹn với người khác (lớp học, hẹn) và bữa ăn chính (trưa, tối) cố giữ đúng giờ. quan_trong = true là khối quan trọng, ưu tiên giữ.
+- Không chồng giờ nhau, kể cả với khối đã làm. Không kết thúc sau 23:00.
+- Không vừa thì rút ngắn khối linh hoạt hoặc skip khối ít quan trọng (giải trí trước, rồi tới việc có thể làm ngày khác).
+- Nghe theo lời người dùng (vd có hẹn lúc nào, muốn bỏ gì).
+- items chỉ gồm các khối bị đổi giờ hoặc skip. Khối không nhắc tới giữ nguyên.
+- reply: 1 câu tiếng Việt, không trách, không phán xét.
+Lời người dùng:
+"""${text}"""`;
+}
+// Kiểm tra đề xuất của AI. Trả { wake, res: Map(k → {start,end} | {skip:true}) } hoặc { err }.
+// Khối đã qua giờ mà AI để nguyên (chưa làm) thì coi như bỏ hôm nay, hiện trong mục "Bỏ hôm nay".
+function lateCheck(base, out, now) {
+  const T = /^([01]\d|2[0-3]):[0-5]\d$/, day = startOfDay(now), fl = floor15(now), end = atTime(day, "23:00");
+  const bad = m => ({ err: m });
+  if (!out || !T.test(out.wake || "")) return bad("thiếu giờ dậy");
+  const wake = atTime(day, out.wake);
+  if (wake > now) return bad("giờ dậy sau bây giờ");
+  const by = new Map(base.map(b => [b.k, b])), res = new Map();
+  for (const it of out.items || []) {
+    const b = by.get(it.id);
+    if (!b) return bad(`không có khối ${it.id}`);
+    if (res.has(it.id)) return bad(`khối ${b.p.title} bị nhắc 2 lần`);
+    if (it.skip) {
+      if (b.skip) continue;
+      if (b.done) return bad(`bỏ khối đã làm (${b.p.title})`);
+      res.set(it.id, { skip: true }); continue;
+    }
+    if (!T.test(it.s || "") || !T.test(it.e || "")) return bad(`giờ của ${b.p.title} sai dạng`);
+    const s = atTime(day, it.s), e = atTime(day, it.e);
+    if (+s === +b.start && +e === +b.end) continue;
+    if (b.done || b.skip) return bad(`đổi khối đã xong (${b.p.title})`);
+    if (s >= e) return bad(`${b.p.title} kết thúc trước khi bắt đầu`);
+    if (s < (b === base[0] ? wake : fl)) return bad(`${b.p.title} bị xếp vào quá khứ`);
+    if (e > end) return bad(`${b.p.title} quá 23:00`);
+    res.set(it.id, { start: s, end: e });
+  }
+  for (const b of base) if (!res.has(b.k) && !b.done && !b.skip && b.end <= fl) res.set(b.k, { skip: true, auto: true });
+  const fin = base.filter(b => !b.skip && !(res.get(b.k) || {}).skip).map(b => { const r = res.get(b.k); return { b, s: r ? r.start : b.start, e: r ? r.end : b.end, ch: !!r }; });
+  for (const x of fin) if (x.ch) for (const y of fin) if (y !== x && x.s < y.e && y.s < x.e) return bad(`${x.b.p.title} chồng giờ với ${y.b.p.title}`);
+  return { wake, res };
+}
+// Xem thử không có key: dời đơn giản. Khối quan trọng chưa tới giờ đứng yên, khối còn lại xếp nối tiếp vào chỗ trống, không vừa thì bỏ.
+function demoLate(text, base, now) {
+  const m = text.match(/(\d{1,2})\s*(?:[h:g]|giờ)\s*(\d{1,2})?/i), fl = floor15(now), day = startOfDay(now);
+  let wake = m ? atTime(day, `${pad(+m[1])}:${pad(+(m[2] || 0))}`) : fl;
+  if (wake > now) wake = fl;
+  const cur0 = wake > fl ? wake : fl, busyAt = [], items = [];
+  for (const b of base) if (b.done || b.skip || (b.p.ess && b.start >= cur0)) busyAt.push([b.start, b.end]);
+  const free = (s, e) => busyAt.every(([a, z]) => e <= a || s >= z);
+  let cur = cur0;
+  for (const b of base) {
+    if (b.done || b.skip || (b.p.ess && b.start >= cur0)) continue;
+    const len = b.end - b.start;
+    let s = new Date(Math.max(b === base[0] ? wake : cur, b.start));
+    while (!free(s, new Date(+s + len)) && s < atTime(day, "23:00")) s = new Date(+s + 15 * 60000);
+    const e = new Date(+s + len);
+    if (e > atTime(day, "23:00")) { items.push({ id: b.k, skip: true }); continue; }
+    busyAt.push([s, e]); cur = e > cur ? e : cur;
+    items.push({ id: b.k, s: hm(s), e: hm(e) });
+  }
+  return { wake: hm(wake), items, reply: "Chế độ xem thử dời đơn giản. Thêm Gemini key để AI sắp khéo hơn." };
+}
+// Thói quen gắn với khối dậy (khối đầu tiên trong ngày). Chọn sẵn Đạt khi dậy trong vòng 5 phút sau giờ của khối, còn lại Chưa
+function lateHabit(base, wake) {
+  const b = base[0], hid = b && b.p.habit;
+  if (!hid || hid === "walk" || !HABITS.some(h => h.id === hid)) return null;
+  const L = (S.today.rec || {}).late, prior = L && L.hprev && hid in L.hprev ? L.hprev[hid] : (S.today.rec || {}).h?.[hid];
+  const rule = wake <= new Date(+b.start + 5 * 60000) ? "full" : "";
+  return { hid, lv: prior === "full" || prior === "min" ? better(rule, prior) : rule };
+}
+function openLateAi(text) {
+  const t = $("#inputText");
+  if (!S.compose) S.compose = { mode: "late", text: t.value, ph: t.placeholder };
+  t.value = text != null ? text : `Mình dậy lúc ${hm(floor15(new Date()))}`;
+  $("#dock").classList.add("is-late");
+  $("#dockTitle").textContent = "Dậy trễ cũng không sao. Kể mình nghe";
+  openCompose("Mình dậy lúc mấy giờ? Hôm nay có hẹn gì không?");
+}
+async function lateAi(text) {
+  text = text.trim(); if (!text) return $("#inputText").focus();
+  const dock = $("#dock"), ic = $("#btnSend i");
+  dock.classList.add("is-busy"); ic.className = "ph ph-circle-notch";
+  try {
+    const now = new Date(), base = lateBase();
+    const out = S.settings.demo && !cleanKey(S.settings.geminiKey) ? demoLate(text, base, now) : (await geminiJSON(lateAiPrompt(text, base, now), lateAiSchema(), 0.3)).p;
+    const c = lateCheck(base, out, now);
+    if (c.err) { console.warn("lateCheck", c.err, out); return toast(`AI sắp chưa ổn (${c.err}), thử lại nhé`, 4200); }
+    S.late = { text, base, wake: c.wake, res: c.res, reply: out.reply || "", hab: lateHabit(base, c.wake) };
+    closeCompose(); renderLateSheet();
+  } catch (e) { handleErr(e); }   // lỗi thì giữ popup và chữ để thử lại
+  finally { dock.classList.remove("is-busy"); ic.className = "ph ph-paper-plane-tilt"; }
+}
+function renderLateSheet() {
+  const L = S.late; if (!L) return;
+  const row = (b, s, e, moved) => `<li class="late__row" style="${catVars(b.p.cat)}"><span class="dot"></span><span class="late__name">${esc(b.p.title)}</span>
+    <span class="late__time num">${moved ? `<s>${hm(b.start)}</s> <i class="ph ph-arrow-right" aria-label="thành"></i> ` : ""}${hm(s)}–${hm(e)}</span></li>`;
+  const keep = [], drop = [];
+  for (const b of L.base) {
+    if (b.done || b.skip) continue;
+    const r = L.res.get(b.k);
+    if (r && r.skip) drop.push(b); else keep.push({ b, s: r ? r.start : b.start, e: r ? r.end : b.end, moved: !!r });
+  }
+  keep.sort((a, b) => a.s - b.s);
+  const h = L.hab && HABITS.find(x => x.id === L.hab.hid);
+  const opts = [["", "ph-x", "Chưa"], ["min", "ph-circle-half", "Tối thiểu"], ["full", "ph-check", "Đạt"]];
+  openSheet("Lịch mới hôm nay", `<p class="hai__note"><i class="ph-fill ph-sparkle"></i> <span>${esc(L.reply || "Đã sắp lại phần còn lại của hôm nay.")}</span></p>
+    <p class="late__wake muted">Dậy lúc <b class="num">${hm(L.wake)}</b></p>
+    ${(S.today.rec || {}).unwell ? `<p class="late__rest muted"><i class="ph ph-moon"></i> Đang rest day: các khối 💤 vẫn dời nhưng không nhắc.</p>` : ""}
+    ${keep.length ? `<ul class="late__list">${keep.map(x => row(x.b, x.s, x.e, x.moved)).join("")}</ul>` : `<p class="muted">Không còn khối nào cho hôm nay.</p>`}
+    ${drop.length ? `<p class="mgroup">Bỏ hôm nay</p><ul class="late__list late__list--drop">${drop.map(b => row(b, b.start, b.end, false)).join("")}</ul>` : ""}
+    ${h ? `<p class="mgroup">Thói quen</p><div class="daylist"><div class="dayrow"><i class="ph ${h.icon}" style="${icVars(h.cat)}"></i><span>${esc(h.name)}${h.min ? `<small class="dayrow__min">Tối thiểu: ${esc(h.min)}</small>` : ""}</span><div class="seg" role="group" aria-label="${esc(h.name)}">
+      ${opts.map(([lv, ic, lab]) => lv === "min" && !h.min ? `<span class="seg__gap"></span>` : `<button type="button" data-llv="${lv}" data-lv="${lv}" aria-pressed="${L.hab.lv === lv}" aria-label="${lab}" title="${lab}"><i class="ph ${ic}"></i></button>`).join("")}
+    </div></div></div>` : ""}
+    <button type="button" class="btn btn--ghost late__retell" id="lRetell"><i class="ph ph-pencil-simple"></i> Kể lại</button>
+    <div class="sheet-actions"><button type="button" class="btn" data-close>Hủy</button><button type="button" class="btn btn--primary" id="lApply"><i class="ph ph-check"></i> Áp dụng</button></div>`);
+}
+// Đổi giờ (chỉ hôm nay) cho các khối trong map id → {start, end}; khối đã đúng giờ thì bỏ qua. Gọi song song.
+async function setPlanTimes(map) {
+  const jobs = S.today.plan.filter(p => { const t = map.get(p.id); return t && (+t.start !== +p.start || +t.end !== +p.end); })
+    .map(async p => { const t = map.get(p.id); await api().updatePlan(Object.assign({}, p, { start: t.start, end: t.end })); p.start = t.start; p.end = t.end; });
+  const r = await Promise.allSettled(jobs);
+  S.today.plan.sort((a, b) => a.start - b.start);
+  const f = r.find(x => x.status === "rejected"); if (f) throw f.reason;
+}
+async function applyLate() {
+  const L = S.late; if (!L) return;
+  const cur = S.today.rec || blankRec(todayStr()), prevRec = JSON.parse(JSON.stringify(cur));
+  const prevTimes = new Map(S.today.plan.map(p => [p.id, { start: p.start, end: p.end }]));
+  const rec = Object.assign(blankRec(todayStr()), JSON.parse(JSON.stringify(cur))), old = rec.late;
+  const target = new Map(), moved = [], skipped = [];
+  for (const b of L.base) {
+    const r = L.res.get(b.k);
+    if (r && r.skip) skipped.push(b.p.id);
+    const t = r && !r.skip ? r : { start: b.start, end: b.end };   // khối không đổi: về giờ gốc (sắp lại lần 2 không chồng lên lần trước)
+    target.set(b.p.id, t);
+    if (+t.start !== +b.start || +t.end !== +b.end) moved.push({ id: b.p.id, s: hm(b.start), e: hm(b.end) });
+  }
+  const oldSkip = (old && old.skipped) || [];
+  rec.skip = [...new Set([...(rec.skip || []).filter(id => !oldSkip.includes(id)), ...skipped])];
+  let hprev = (old && old.hprev) || {}, hset = "";
+  if (L.hab) {
+    const { hid, lv } = L.hab;
+    if (!(hid in hprev)) hprev = Object.assign({}, hprev, { [hid]: rec.h[hid] || "none" });
+    rec.h = Object.assign({}, rec.h); if (lv) rec.h[hid] = lv; else delete rec.h[hid];
+    hset = lv || "none";
+  }
+  rec.late = { wake: hm(L.wake), moved, skipped, hprev, hset };
+  await saveRec(rec);   // lưu giờ gốc trước, lỡ đổi giờ hỏng giữa chừng vẫn "Trả lại lịch cũ" được
+  await setPlanTimes(target);
+  S.late = null;
+  return async () => { await restoreRec(todayStr(), prevRec); await setPlanTimes(prevTimes); };
+}
+// Trả lại lịch cũ: giờ gốc, bỏ các Bỏ qua do lần sắp lại đặt, thói quen về mức trước (trừ khi người dùng đã tự đổi)
+async function undoLate() {
+  const rec = Object.assign(blankRec(todayStr()), JSON.parse(JSON.stringify(S.today.rec || {}))), L = rec.late; if (!L) return;
+  const base = new Map(L.moved.map(m => [m.id, { start: atTime(new Date(), m.s), end: atTime(new Date(), m.e) }]));
+  rec.skip = (rec.skip || []).filter(id => !L.skipped.includes(id));
+  rec.h = Object.assign({}, rec.h);
+  for (const [hid, pv] of Object.entries(L.hprev || {})) if ((rec.h[hid] || "none") === (L.hset || "none")) { if (pv === "none") delete rec.h[hid]; else rec.h[hid] = pv; }
+  rec.late = null;
+  await saveRec(rec);
+  await setPlanTimes(base);
 }
 
 async function markBlock(id, how) {
@@ -2180,6 +2403,24 @@ document.addEventListener("click", async e => {
     if (failed && S.dayDate === date && row && row.isConnected) renderDaySheet(date);
     return S.view === "habits" ? renderHabits() : renderToday();
   }
+  if (id === "btnLate" || id === "btnLateRedo") return openLateAi();
+  if (id === "lRetell") return openLateAi(S.late ? S.late.text : null);
+  if (el.dataset.llv != null && S.late && S.late.hab) {
+    S.late.hab.lv = el.dataset.llv;
+    $$("#sheetBody [data-llv]").forEach(b => b.setAttribute("aria-pressed", b.dataset.llv === S.late.hab.lv));
+    return;
+  }
+  if (id === "lApply") {
+    const done = busy(el, "Đang sắp lại lịch");
+    try { const undo = await applyLate(); closeSheet(); render(); toast("Đã sắp lại lịch hôm nay", 2600, undo); }
+    catch (er) { done(); handleErr(er); try { await loadToday(); } catch {} render(); }
+    return;
+  }
+  if (id === "btnLateUndo") {
+    busy(el, "Đang trả lại lịch cũ");
+    try { await undoLate(); toast("Đã trả lại lịch cũ"); } catch (er) { handleErr(er); try { await loadToday(); } catch {} }
+    return render();
+  }
   if (id === "btnUnwellOff") { busy(el, "Đang bật lại lịch"); try { await setUnwell(false); toast("Đã bật lại lịch bình thường"); } catch (er) { handleErr(er); } return render(); }
   if (id === "cSave") return savePending();
   if (el.dataset.act) {
@@ -2229,7 +2470,7 @@ document.addEventListener("click", async e => {
 
 document.addEventListener("submit", async e => {
   e.preventDefault();
-  if (e.target.id === "dock") return habAiOpen() ? habAi($("#inputText").value) : submitInput($("#inputText").value);
+  if (e.target.id === "dock") return dockSend($("#inputText").value);
   if (e.target.id === "jform" || e.target.id === "jpast") {
     // jform (form trống ở trang): nối vào trang hôm nay nếu đã có. jpast (Sửa trong sheet): ghi đè đúng trang đó.
     const fd = new FormData(e.target), add = Object.fromEntries(fd.entries()), day = e.target.dataset.date || todayStr(), past = e.target.id === "jpast";
@@ -2322,7 +2563,7 @@ document.addEventListener("pointerdown", e => { if (e.target.matches?.('input[ty
 document.addEventListener("click", e => { if (e.target.matches?.('input[type="time"]')) { e.preventDefault(); TP.open(e.target); } });
 document.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches?.('input[type="time"]')) { e.preventDefault(); TP.open(e.target); } });
 
-$("#inputText").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && matchMedia("(pointer: fine)").matches) { e.preventDefault(); habAiOpen() ? habAi(e.target.value) : submitInput(e.target.value); } });
+$("#inputText").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && matchMedia("(pointer: fine)").matches) { e.preventDefault(); dockSend(e.target.value); } });
 document.addEventListener("keydown", e => { if (e.key !== "Escape") return; if (TP.isOpen()) TP.close(); else if ($("#dock").classList.contains("is-open")) closeCompose(); else if (!$("#sheet").hidden) closeSheet(); });
 
 // Giọng nói (Web Speech, tiếng Việt)
